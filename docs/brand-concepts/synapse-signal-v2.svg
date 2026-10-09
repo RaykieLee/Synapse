@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Synapse 信号交接标志</title>
+  <desc id="desc">两条等宽的几何曲线在中心留出交接间隙，组成抽象字母 S。</desc>
+  <path d="M183 55H97C64 55 45 76 45 104c0 25 17 40 48 40h33" stroke="#111111" stroke-width="20" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M130 112h33c32 0 48 16 48 40 0 28-20 49-52 49H73" stroke="#111111" stroke-width="20" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M117 128h22" stroke="#39C996" stroke-width="6" stroke-linecap="square"/>
+</svg>

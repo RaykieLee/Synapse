@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synapse-api"
+version = "0.1.0"
+description = "Synapse FastAPI service"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.13,<2",
+    "bcrypt>=4.2,<5",
+    "fastapi>=0.115,<1",
+    "email-validator>=2.2,<3",
+    "python-multipart>=0.0.9,<1",
+    "croniter>=3.0,<7",
+    "pydantic-settings>=2.6,<3",
+    "sqlalchemy>=2.0,<3",
+    "uvicorn[standard]>=0.32,<1",
+    "agentscope[service,storage-redis] @ git+https://github.com/agentscope-ai/agentscope.git@72f3f6fa0b2fc38b8517f408ab616f0f2bd229e6",
+    "ag-ui-protocol>=0.1.10,<1",
+    "apscheduler>=3.10,<4",
+    "redis>=5,<7",
+    "cryptography>=43,<48",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2,<4"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

@@ -1,0 +1,33 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Python environments and generated files
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local runtime data and credentials
+*.db
+*.sqlite
+*.sqlite3
+*.pem
+*.key
+*.log
+uploads/
+storage/
+data/

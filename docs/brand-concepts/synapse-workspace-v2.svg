@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Synapse 协作空间标志</title>
+  <desc id="desc">三个等宽的方向折线围成六边形协作空间，中央是清晰的留白。</desc>
+  <path d="M128 30 204 74v54" stroke="#111111" stroke-width="18" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="m205 131-76 44-47-27" stroke="#111111" stroke-width="18" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="m79 148-28-16V76l76-44" stroke="#111111" stroke-width="18" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="m87 96 41-24 41 24v48l-41 24-41-24V96Z" stroke="#111111" stroke-width="12" stroke-linejoin="miter"/>
+  <path d="M111 120h34" stroke="#39C996" stroke-width="6" stroke-linecap="square"/>
+</svg>
