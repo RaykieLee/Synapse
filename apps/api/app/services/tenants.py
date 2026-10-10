@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
-from typing import Generic, TypeVar
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +12,7 @@ from app.models.tenant import Tenant, TenantMember, Workspace, WorkspaceMember
 from app.models.user import User
 from app.schemas.tenants import MemberCreate, MemberPatch, TenantCreate, TenantPatch
 from app.services.errors import ConflictError, DomainValidationError, ForbiddenError, NotFoundError
+from app.services.results import ActorContext, PageResult
 
 
 class TenantSlugConflict(ConflictError):
@@ -33,23 +33,6 @@ class TenantValidityError(DomainValidationError):
 
 class TargetUserUnavailable(DomainValidationError):
     code = "VALIDATION_ERROR"
-
-
-T = TypeVar("T")
-
-
-@dataclass(frozen=True)
-class PageResult(Generic[T]):
-    items: tuple[T, ...]
-    total: int
-    page: int
-    page_size: int
-
-
-@dataclass(frozen=True)
-class ActorContext:
-    user_id: int
-    platform_role: str | None = None
 
 
 @dataclass(frozen=True)

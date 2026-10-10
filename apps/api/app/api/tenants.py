@@ -17,7 +17,8 @@ from app.schemas.tenants import (
     TenantPatch,
     TenantResponse,
 )
-from app.services.tenants import ActorContext, TenantService
+from app.services.results import ActorContext
+from app.services.tenants import TenantService
 
 
 router = APIRouter(tags=["tenants"])

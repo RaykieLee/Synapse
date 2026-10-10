@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.services.errors import (
+    BadRequestError,
     ConflictError,
     DomainValidationError,
     ForbiddenError,
@@ -42,6 +43,7 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ServiceError)
     async def service_problem(request: Request, exc: ServiceError):
         status_by_type = {
+            BadRequestError: 400,
             NotFoundError: 404,
             ForbiddenError: 403,
             DomainValidationError: 422,

@@ -19,5 +19,9 @@ class DomainValidationError(ServiceError):
     code = "VALIDATION_ERROR"
 
 
+class BadRequestError(ServiceError):
+    """A client-selected context or identifier is malformed."""
+
+
 class ConflictError(ServiceError):
     code = "CONFLICT"

@@ -11,6 +11,8 @@ cd Synapse/apps/api
 
 实际结果：`1 passed, 2 warnings`（0.41 s）。测试在 pytest 的 `tmp_path` 下创建临时 SQLite 数据库，将 Alembic migrations 应用到 `0002_tenants`，为临时用户签发带签名的 bearer token，通过 `TestClient` 调用 FastAPI，最后丢弃数据库。测试不会连接配置的应用数据库。
 
+2026-10-11 回归：Workspace 业务规则迁移到 `WorkspaceService`、请求/响应契约集中到 `app/schemas/workspaces.py` 后，`test_f06_workspace_backend.py` 与 `test_f06b_archived_workspace.py` 均复验通过；默认本地 SQLite/API 测试套件为 `23 passed`。
+
 两条警告分别是 Starlette 的 `httpx` 弃用提示和 Alembic 缺少 `path_separator` 配置的弃用提示；均未影响测试结果。
 
 ## 已验证行为

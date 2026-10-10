@@ -11,13 +11,15 @@ cd Synapse/apps/api
 .venv/bin/python tests/verification/run_f10_workspace_frontend.py
 ```
 
-运行器先执行 `pnpm build`，创建临时 SQLite 数据库并迁移至 Alembic `0003_tenant_invitations`，填充三个租户及多个账户/workspaces，在空闲本地端口启动 uvicorn 和 Vite，然后通过 Chromium 驱动真实 UI。运行结束会停止 API 和 Vite 进程并丢弃数据库。
+运行器先执行 `pnpm build`，创建临时 SQLite 数据库并迁移至当前 Alembic head，填充三个租户及多个账户/workspaces，在空闲本地端口启动 uvicorn 和 Vite，然后通过 Chromium 驱动真实 UI。运行结束会停止 API 和 Vite 进程树并丢弃数据库。
 
 ## 构建记录
 
 首次构建在 `apps/web/src/features/workspaces/directory.tsx:85` 出现两个 TS18047 错误（`recent` 可能为 null）。实现开发者添加了显式 null 检查。之后的 `pnpm build` 均通过，最终完整运行器也成功。
 
 最终结果：`F10 workspace frontend verification passed`（运行器退出码 0）。完整命令也成功完成 production `tsc -b && vite build`、临时数据库迁移以及 Vite/Playwright 浏览器流程。本验收者未修改产品代码。
+
+2026-10-11 回归：Workspace API 集中到 `apps/web/src/api/workspaces.ts`、后端迁移到 `WorkspaceService` 后复验通过。本地 SQLite 后端套件 `23 passed`、`pnpm build` 通过、定向 ESLint 无错误，真实浏览器运行器再次输出 `F10 workspace frontend verification passed`。本次运行按测试环境设置关闭 AgentScope 与 scheduler，只验证 Workspace 管理链路。
 
 ## 浏览器中已验证
 
