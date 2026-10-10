@@ -10,4 +10,21 @@
 
 功能进度和独立验证证据见 [开发台账](docs/development-status.md)。开发与验收均按单一任务委派，验收报告位于 docs/verification。
 
+## API 测试分层
+
+在 `apps/api` 中默认只运行本地 SQLite/API 套件，不要求 Redis、浏览器或系统符号链接权限：
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q
+```
+
+外部环境套件按需选择：
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q -m redis           # AgentScope/Redis
+.venv\Scripts\python.exe -m pytest -q -m browser         # Vite + API + Playwright
+.venv\Scripts\python.exe -m pytest -q -m windows_symlink # Windows 符号链接权限
+.venv\Scripts\python.exe -m pytest -q -m integration     # 多进程/真实外部服务
+```
+
 详细范围、目录、技术方案及阶段验收见 [集成计划](docs/integration-plan.md)。

@@ -25,16 +25,30 @@ from app.integrations.agentscope import create_agentscope_app
 from app.tasks.scheduler_runtime import make_worker_id, run_scheduler_loop
 
 
+@asynccontextmanager
+async def _empty_lifespan() -> AsyncIterator[None]:
+    yield
+
+
 def create_app() -> FastAPI:
     """Build a fresh API application using the current service settings."""
     settings = get_settings()
-    agentscope_app = create_agentscope_app(settings)
+    # Non-AI tests can exercise the platform without constructing AgentScope's
+    # Redis clients or entering its async lifespan.
+    agentscope_app = create_agentscope_app(settings) if settings.agentscope_enabled else FastAPI(
+        title="Synapse AI (disabled)"
+    )
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
         # Starlette does not start mounted ASGI apps' lifespan automatically.
         # Enter it once under the unified Synapse process and unwind it on shutdown.
-        async with agentscope_app.router.lifespan_context(agentscope_app):
+        child_lifespan = (
+            agentscope_app.router.lifespan_context(agentscope_app)
+            if settings.agentscope_enabled
+            else _empty_lifespan()
+        )
+        async with child_lifespan:
             scheduler_task = None
             stop_scheduler = None
             if settings.scheduled_tasks_enabled:

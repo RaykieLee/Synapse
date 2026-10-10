@@ -26,6 +26,16 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.2,<4"]
+dev = ["pytest>=8,<10"]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not redis and not browser and not windows_symlink and not integration'"
+markers = [
+    "redis: requires a live Redis/AgentScope endpoint; run with -m redis",
+    "browser: starts Vite/API and a real browser; run with -m browser",
+    "windows_symlink: depends on OS symlink privileges; run with -m windows_symlink",
+    "integration: exercises multiple processes or live external services",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

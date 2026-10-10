@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     agentscope_workspace_path: Path = Path("./var/agentscope/workspaces")
     agentscope_download_secret: SecretStr | None = None
     agentscope_credential_encryption_key: SecretStr | None = None
+    agentscope_enabled: bool = True
     scheduled_tasks_enabled: bool = True
     scheduled_task_poll_interval_seconds: float = Field(default=5, gt=0, le=3600)
     scheduled_task_lease_seconds: int = Field(default=300, ge=1, le=86400)
