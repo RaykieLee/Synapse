@@ -22,7 +22,7 @@ def test_f18a_tenant_scheduled_task_definitions_and_migration(tmp_path, monkeypa
     get_session_factory.cache_clear()
 
     alembic = Config("alembic.ini")
-    command.upgrade(alembic, "0011_attachments")
+    command.upgrade(alembic, "0016_tenant_validity")
     from app.models.tenant import Tenant, TenantMember, Workspace, WorkspaceMember
     from app.models.attachment import Attachment
     from app.models.user import User

@@ -21,7 +21,7 @@ def test_f13c_tenant_role_menu_grants_and_migration(tmp_path, monkeypatch):
     get_session_factory.cache_clear()
 
     alembic = Config("alembic.ini")
-    command.upgrade(alembic, "0006_tenant_menus")
+    command.upgrade(alembic, "0016_tenant_validity")
     from app.models.tenant import Tenant, TenantMember
     from app.models.tenant_member_role import TenantMemberRole
     from app.models.tenant_menu import TenantMenu
@@ -89,7 +89,7 @@ def test_f13c_tenant_role_menu_grants_and_migration(tmp_path, monkeypatch):
     engine = get_engine()
     with engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        assert revision == "0009_tenant_dictionaries"  # current head; includes 0007_tenant_role_menus
+        assert revision == "0016_tenant_validity"  # current head; includes 0007_tenant_role_menus
         inspector = inspect(connection)
         assert "tenant_role_menus" in inspector.get_table_names()
         fks = inspector.get_foreign_keys("tenant_role_menus")

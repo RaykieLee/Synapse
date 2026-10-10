@@ -19,7 +19,7 @@ def test_f05_tenant_api_contract(tmp_path, monkeypatch):
     get_session_factory.cache_clear()
 
     config = Config("alembic.ini")
-    command.upgrade(config, "0002_tenants")
+    command.upgrade(config, "0016_tenant_validity")
 
     from app.auth.security import issue_token
     from app.database.session import get_session_factory

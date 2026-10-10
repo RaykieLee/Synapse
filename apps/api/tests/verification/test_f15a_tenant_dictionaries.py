@@ -20,7 +20,7 @@ def test_f15a_tenant_dictionary_api_and_migration(tmp_path, monkeypatch):
     get_session_factory.cache_clear()
 
     alembic = Config("alembic.ini")
-    command.upgrade(alembic, "0008_tenant_departments")
+    command.upgrade(alembic, "0016_tenant_validity")
 
     from app.models.tenant import Tenant, TenantMember
     from app.models.tenant_department import TenantDepartment
@@ -77,7 +77,7 @@ def test_f15a_tenant_dictionary_api_and_migration(tmp_path, monkeypatch):
     engine = get_engine()
     with engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        assert revision == "0009_tenant_dictionaries"
+        assert revision == "0016_tenant_validity"
         inspector = inspect(connection)
         assert {"tenant_dict_types", "tenant_dict_data"}.issubset(set(inspector.get_table_names()))
         type_unique = inspector.get_unique_constraints("tenant_dict_types")

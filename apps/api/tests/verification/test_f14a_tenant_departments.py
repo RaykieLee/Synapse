@@ -19,7 +19,7 @@ def test_f14a_tenant_department_api_and_migration(tmp_path, monkeypatch):
     get_session_factory.cache_clear()
 
     alembic = Config("alembic.ini")
-    command.upgrade(alembic, "0007_tenant_role_menus")
+    command.upgrade(alembic, "0016_tenant_validity")
     from app.models.tenant import Tenant, TenantMember
     from app.models.tenant_menu import TenantMenu
     from app.models.tenant_role import TenantRole
@@ -62,7 +62,7 @@ def test_f14a_tenant_department_api_and_migration(tmp_path, monkeypatch):
     engine = get_engine()
     with engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        assert revision == "0009_tenant_dictionaries"  # current head; includes 0008_tenant_departments
+        assert revision == "0016_tenant_validity"  # current head; includes 0008_tenant_departments
         inspector = inspect(connection)
         assert "tenant_departments" in inspector.get_table_names()
         parent_fk = next(fk for fk in inspector.get_foreign_keys("tenant_departments") if fk["constrained_columns"] == ["parent_id", "tenant_id"])

@@ -26,7 +26,7 @@ def test_f17a_attachment_storage_api_and_migration(tmp_path, monkeypatch):
     get_session_factory.cache_clear()
 
     alembic = Config("alembic.ini")
-    command.upgrade(alembic, "0010_tenant_configs")
+    command.upgrade(alembic, "0016_tenant_validity")
     from app.models.tenant import Tenant, TenantMember, Workspace, WorkspaceMember
     from app.models.user import User
     from app.models.attachment import Attachment

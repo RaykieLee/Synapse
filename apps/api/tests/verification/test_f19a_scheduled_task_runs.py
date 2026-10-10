@@ -50,7 +50,7 @@ def test_f19a_task_run_migration_api_scope_filters_and_redaction(tmp_path, monke
     os.chdir(api_dir)
     alembic = Config("alembic.ini")
     try:
-        command.upgrade(alembic, "0014_tenant_task_schedule_state")
+        command.upgrade(alembic, "0016_tenant_validity")
     finally:
         os.chdir(old_cwd)
 

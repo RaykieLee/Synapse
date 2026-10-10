@@ -20,7 +20,7 @@ def test_f13a_tenant_menu_api_and_migration(tmp_path, monkeypatch):
     get_session_factory.cache_clear()
 
     alembic = Config("alembic.ini")
-    command.upgrade(alembic, "0005_tenant_member_roles")
+    command.upgrade(alembic, "0016_tenant_validity")
     from app.models.tenant import Tenant, TenantMember
     from app.models.tenant_member_role import TenantMemberRole
     from app.models.tenant_role import TenantRole
@@ -70,7 +70,7 @@ def test_f13a_tenant_menu_api_and_migration(tmp_path, monkeypatch):
     engine = get_engine()
     with engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        assert revision == "0006_tenant_menus"
+        assert revision == "0016_tenant_validity"
         inspector = inspect(connection)
         assert "tenant_menus" in inspector.get_table_names()
         menu_fks = inspector.get_foreign_keys("tenant_menus")

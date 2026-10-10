@@ -215,7 +215,7 @@ def test_f18b2b_persisted_scheduler_claims_lifecycle_and_migration(tmp_path, mon
     restarted_engine = get_engine()
     with restarted_engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        assert revision == "0014_tenant_task_schedule_state"
+        assert revision == "0016_tenant_validity"
         assert revision == ScriptDirectory.from_config(alembic).get_current_head()
     with get_session_factory()() as db:
         saved = db.get(TenantTaskScheduleState, task_ids["success slot"])

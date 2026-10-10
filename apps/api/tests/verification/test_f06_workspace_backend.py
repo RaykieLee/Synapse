@@ -13,7 +13,7 @@ def test_f06_workspace_api_contract(tmp_path, monkeypatch):
     from app.core.config import get_settings
     from app.database.session import get_engine, get_session_factory
     get_settings.cache_clear(); get_engine.cache_clear(); get_session_factory.cache_clear()
-    command.upgrade(Config("alembic.ini"), "0002_tenants")
+    command.upgrade(Config("alembic.ini"), "0016_tenant_validity")
     from app.auth.security import issue_token
     from app.main import create_app
     from app.models.user import User

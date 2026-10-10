@@ -63,7 +63,7 @@ def main():
         old_cwd = os.getcwd()
         os.chdir(API)
         try:
-            command.upgrade(Config("alembic.ini"), "0003_tenant_invitations")
+            command.upgrade(Config("alembic.ini"), "0016_tenant_validity")
         finally:
             os.chdir(old_cwd)
 

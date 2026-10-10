@@ -22,6 +22,8 @@ class TenantCreate(BaseModel):
     slug: str = Field(min_length=1, max_length=64, pattern=SLUG)
     name: str = Field(min_length=1, max_length=120)
     first_owner_user_id: str = Field(pattern=r"^[0-9]+$")
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
 
 
 class TenantPatch(BaseModel):
@@ -29,6 +31,8 @@ class TenantPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     status: str | None = Field(default=None, pattern="^(active|suspended|archived)$")
     settings: dict | None = None
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
 
 
 class MemberCreate(BaseModel):
@@ -59,8 +63,17 @@ def _require_role(db: Session, tenant_id: int, user: User, roles: set[str]) -> s
     if role not in roles: _problem(403, "FORBIDDEN")
     return role
 def _iso(dt): return dt.isoformat() if dt else None
+def _aware(dt: datetime | None) -> datetime | None:
+    # SQLite may return naive datetimes; treat stored values as UTC so they
+    # can be compared with tz-aware request payloads.
+    if dt is None or dt.tzinfo is not None: return dt
+    return dt.replace(tzinfo=timezone.utc)
+def _validate_validity(valid_from: datetime | None, valid_until: datetime | None):
+    a, b = _aware(valid_from), _aware(valid_until)
+    if a and b and b <= a: _problem(422, "VALIDITY_RANGE")
 def _tenant_data(t: Tenant, role: str | None = None):
     return {"tenant_id": str(t.tenant_id), "slug": t.slug, "name": t.name, "status": t.status,
+            "valid_from": _iso(t.valid_from), "valid_until": _iso(t.valid_until),
             "settings": json.loads(t.settings_json or "{}"), "tenant_role": role,
             "membership_version": t.membership_version, "created_at": _iso(t.created_at), "updated_at": _iso(t.updated_at)}
 def _workspace_data(w: Workspace, role: str):
@@ -77,8 +90,10 @@ def create_tenant(body: TenantCreate, admin: User = Depends(require_platform_adm
     owner_id = int(body.first_owner_user_id)
     owner = db.get(User, owner_id)
     if not owner or owner.del_flag or owner.status != "active": _problem(422, "VALIDATION_ERROR")
+    _validate_validity(body.valid_from, body.valid_until)
     try:
-        tenant = Tenant(slug=body.slug, name=body.name, status="active", settings_json="{}", membership_version=1)
+        tenant = Tenant(slug=body.slug, name=body.name, status="active", valid_from=body.valid_from,
+                        valid_until=body.valid_until, settings_json="{}", membership_version=1)
         db.add(tenant); db.flush()
         now = _now()
         db.add(TenantMember(tenant_id=tenant.tenant_id, user_id=owner_id, status="active", tenant_role="owner", joined_at=now))
@@ -169,6 +184,7 @@ def patch_tenant(tenant_id: int, body: TenantPatch, user: User = Depends(get_cur
     platform = user.platform_role == "platform_admin"
     if not platform and role not in {"owner", "admin"}: _problem(403, "FORBIDDEN")
     if "status" in fields and not platform: _problem(403, "FORBIDDEN")
+    _validate_validity(fields.get("valid_from", tenant.valid_from), fields.get("valid_until", tenant.valid_until))
     for key, value in fields.items():
         setattr(tenant, "settings_json" if key == "settings" else key, json.dumps(value, ensure_ascii=False) if key == "settings" else value)
     tenant.updated_at = _now(); tenant.membership_version += int("status" in fields)

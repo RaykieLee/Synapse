@@ -57,7 +57,7 @@ def main():
         get_settings.cache_clear(); get_engine.cache_clear(); get_session_factory.cache_clear()
         previous = os.getcwd(); os.chdir(API)
         try:
-            command.upgrade(Config("alembic.ini"), "0003_tenant_invitations")
+            command.upgrade(Config("alembic.ini"), "0016_tenant_validity")
         finally:
             os.chdir(previous)
         factory = get_session_factory()

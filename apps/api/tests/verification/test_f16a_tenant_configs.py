@@ -20,7 +20,7 @@ def test_f16a_tenant_config_api_and_migration(tmp_path, monkeypatch):
     get_session_factory.cache_clear()
 
     alembic = Config("alembic.ini")
-    command.upgrade(alembic, "0009_tenant_dictionaries")
+    command.upgrade(alembic, "0016_tenant_validity")
     from app.models.tenant import Tenant, TenantMember
     from app.models.tenant_dictionary import TenantDictType
     from app.models.user import User

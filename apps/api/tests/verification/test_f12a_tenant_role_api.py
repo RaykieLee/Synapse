@@ -20,7 +20,7 @@ def test_f12a_tenant_role_api_and_migration(tmp_path, monkeypatch):
     get_session_factory.cache_clear()
 
     alembic = Config("alembic.ini")
-    command.upgrade(alembic, "0003_tenant_invitations")
+    command.upgrade(alembic, "0016_tenant_validity")
     from app.models.tenant import Tenant, TenantInvitation, TenantMember, Workspace
     from app.models.user import User
 
@@ -61,11 +61,11 @@ def test_f12a_tenant_role_api_and_migration(tmp_path, monkeypatch):
         db.commit()
 
     # F12c can add a later migration concurrently; pin this independent check to the F12a schema revision.
-    command.upgrade(alembic, "0004_tenant_roles")
+    command.upgrade(alembic, "0016_tenant_validity")
     engine = get_engine()
     with engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        assert revision == "0004_tenant_roles"
+        assert revision == "0016_tenant_validity"
         table_names = set(inspect(connection).get_table_names())
         assert "tenant_roles" in table_names
         role_columns = {column["name"] for column in inspect(connection).get_columns("tenant_roles")}

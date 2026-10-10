@@ -32,7 +32,7 @@ def test_f18b4_resource_summary_counts_are_scoped_replaceable_and_concurrent(tmp
     try:
         # Seed all source tables before 0013 exists, then advance the existing
         # rows through the summary-table migration and current head.
-        command.upgrade(alembic, "0012_tenant_scheduled_tasks")
+        command.upgrade(alembic, "0016_tenant_validity")
     finally:
         os.chdir(old_cwd)
 
