@@ -40,4 +40,6 @@ cd Synapse/apps/api
 
 ## 2026-10-11 回归
 
-用户 API 前端调用集中到 `src/api/users.ts` 后，production 构建、TypeScript 检查和针对 `src/api/users.ts`、`src/features/users/index.tsx` 的定向 ESLint 均通过（0 errors）。本次顺带移除用户页三个同步 effect 内 setState 的 React hooks lint 错误，改为渲染期状态同步和按目标用户 key 重建的对话框表单。未重跑完整 F11a 浏览器流程。
+用户 API 前端调用集中到 `src/api/users.ts` 后，production 构建、TypeScript 检查和针对 `src/api/users.ts`、`src/features/users/index.tsx` 的定向 ESLint 均通过（0 errors）。本次顺带移除用户页三个同步 effect 内 setState 的 React hooks lint 错误，改为渲染期状态同步和按目标用户 key 重建的对话框表单。
+
+随后完整重跑 F11a 浏览器验收，最终输出 `F11a global user management frontend verification passed`。同时修复该运行器在 Windows 下无法解析 `pnpm`、未终止 pnpm/Vite 子进程树的问题，与其他浏览器验收脚本保持一致。
