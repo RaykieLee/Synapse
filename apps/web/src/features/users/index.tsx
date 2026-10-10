@@ -7,23 +7,25 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ConfigDrawer } from '@/components/config-drawer'
+import {
+  createUser,
+  deleteUser,
+  listUsers,
+  patchUser,
+  resetUserPassword,
+  type GlobalUser,
+  type UserCreatePayload,
+  type UserProfilePayload,
+} from '@/api/users'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ApiProblem, api } from '@/lib/api'
+import { ApiProblem } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
 const route = getRouteApi('/_authenticated/users/')
 const pageSizes = [10, 20, 50, 100]
-
-type GlobalUser = {
-  user_id: string; user_name: string; nick_name: string | null; email: string | null
-  phonenumber: string | null; sex: string | null; avatar: string | null
-  status: 'active' | 'disabled'; platform_role: string; created_at: string | null; updated_at: string | null
-}
-type UserPage = { items: GlobalUser[]; total: number; page: number; page_size: number }
-type UserProfile = Pick<GlobalUser, 'nick_name' | 'email' | 'phonenumber' | 'sex' | 'avatar'>
 
 const userKey = (actorId: string, page: number, size: number, search: string) =>
   ['synapse', actorId, 'global', 'personal', 'users', page, size, search] as const
@@ -50,6 +52,7 @@ export function Users() {
   const page = params.page ?? 1
   const pageSize = params.pageSize ?? 20
   const search = params.search ?? ''
+  const [lastSearch, setLastSearch] = React.useState(search)
   const [searchInput, setSearchInput] = React.useState(search)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<GlobalUser | null>(null)
@@ -57,7 +60,10 @@ export function Users() {
   const [notice, setNotice] = React.useState('')
   const [actionError, setActionError] = React.useState('')
 
-  React.useEffect(() => setSearchInput(search), [search])
+  if (search !== lastSearch) {
+    setLastSearch(search)
+    setSearchInput(search)
+  }
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
       const value = searchInput.trim()
@@ -68,36 +74,36 @@ export function Users() {
 
   const users = useQuery({
     queryKey: userKey(actorId, page, pageSize, search),
-    queryFn: () => {
-      const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-      if (search) query.set('search', search)
-      return api<UserPage>(`/users?${query}`)
-    },
+    queryFn: () =>
+      listUsers({ page, pageSize, search: search || undefined }),
     enabled: actor?.platform_role === 'platform_admin',
   })
   const refresh = () => client.invalidateQueries({ queryKey: ['synapse', actorId, 'global', 'personal', 'users'] })
   const create = useMutation({
-    mutationFn: (body: object) => api<GlobalUser>('/users', { method: 'POST', body: JSON.stringify(body) }),
+    mutationFn: (body: UserCreatePayload) => createUser(body),
     onSuccess: async () => { setCreateOpen(false); setActionError(''); setNotice('用户账号已创建。'); await navigate({ search: (old) => ({ ...old, search: '', page: 1 }) }); await refresh() },
     onError: (error) => setActionError(errorMessage(error)),
   })
   const update = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: UserProfile }) => api<GlobalUser>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    mutationFn: ({ id, body }: { id: string; body: UserProfilePayload }) =>
+      patchUser(id, body),
     onSuccess: async () => { setEditing(null); setActionError(''); setNotice('用户资料已更新。'); await refresh() },
     onError: (error) => setActionError(errorMessage(error)),
   })
   const status = useMutation({
-    mutationFn: ({ id, value }: { id: string; value: GlobalUser['status'] }) => api<GlobalUser>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify({ status: value }) }),
+    mutationFn: ({ id, value }: { id: string; value: GlobalUser['status'] }) =>
+      patchUser(id, { status: value }),
     onSuccess: async (user) => { setActionError(''); setNotice(user.status === 'active' ? '账号已启用。' : '账号已停用，旧登录令牌已撤销。'); await refresh() },
     onError: (error) => setActionError(errorMessage(error)),
   })
   const reset = useMutation({
-    mutationFn: ({ id, new_password }: { id: string; new_password: string }) => api<void>(`/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ new_password }) }),
+    mutationFn: ({ id, new_password }: { id: string; new_password: string }) =>
+      resetUserPassword(id, { new_password }),
     onSuccess: async () => { setResetting(null); setActionError(''); setNotice('密码已重置，旧登录令牌已撤销。'); await refresh() },
     onError: (error) => setActionError(errorMessage(error)),
   })
   const remove = useMutation({
-    mutationFn: (id: string) => api<void>(`/users/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: string) => deleteUser(id),
     onSuccess: async () => { setActionError(''); setNotice('账号已软删除；租户和 Workspace 成员关系未修改。'); await refresh() },
     onError: (error) => setActionError(errorMessage(error)),
   })
@@ -134,7 +140,7 @@ export function Users() {
   </>
 }
 
-function UserCreateDialog({ open, onOpenChange, pending, error, onSubmit }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; error: string; onSubmit: (body: object) => void }) {
+function UserCreateDialog({ open, onOpenChange, pending, error, onSubmit }: { open: boolean; onOpenChange: (open: boolean) => void; pending: boolean; error: string; onSubmit: (body: UserCreatePayload) => void }) {
   const [password, setPassword] = React.useState('')
   const [sex, setSex] = React.useState('')
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -148,10 +154,13 @@ function UserCreateDialog({ open, onOpenChange, pending, error, onSubmit }: { op
   </DialogContent></Dialog>
 }
 
-function UserEditDialog({ user, onOpenChange, pending, error, onSubmit }: { user: GlobalUser | null; onOpenChange: (open: boolean) => void; pending: boolean; error: string; onSubmit: (body: UserProfile) => void }) {
-  const [sex, setSex] = React.useState(user?.sex ?? '')
-  React.useEffect(() => setSex(user?.sex ?? ''), [user])
+function UserEditDialog({ user, onOpenChange, pending, error, onSubmit }: { user: GlobalUser | null; onOpenChange: (open: boolean) => void; pending: boolean; error: string; onSubmit: (body: UserProfilePayload) => void }) {
   if (!user) return null
+  return <UserEditDialogForm key={user.user_id} user={user} onOpenChange={onOpenChange} pending={pending} error={error} onSubmit={onSubmit} />
+}
+
+function UserEditDialogForm({ user, onOpenChange, pending, error, onSubmit }: { user: GlobalUser; onOpenChange: (open: boolean) => void; pending: boolean; error: string; onSubmit: (body: UserProfilePayload) => void }) {
+  const [sex, setSex] = React.useState(user.sex ?? '')
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const values = new FormData(event.currentTarget)
@@ -161,9 +170,12 @@ function UserEditDialog({ user, onOpenChange, pending, error, onSubmit }: { user
 }
 
 function PasswordResetDialog({ user, onOpenChange, pending, error, onSubmit }: { user: GlobalUser | null; onOpenChange: (open: boolean) => void; pending: boolean; error: string; onSubmit: (password: string) => void }) {
-  const [password, setPassword] = React.useState('')
-  React.useEffect(() => setPassword(''), [user])
   if (!user) return null
+  return <PasswordResetDialogForm key={user.user_id} user={user} onOpenChange={onOpenChange} pending={pending} error={error} onSubmit={onSubmit} />
+}
+
+function PasswordResetDialogForm({ user, onOpenChange, pending, error, onSubmit }: { user: GlobalUser; onOpenChange: (open: boolean) => void; pending: boolean; error: string; onSubmit: (password: string) => void }) {
+  const [password, setPassword] = React.useState('')
   return <Dialog open onOpenChange={(value) => { if (!value) setPassword(''); onOpenChange(value) }}><DialogContent><DialogHeader><DialogTitle>重置密码</DialogTitle><DialogDescription>为 {user.user_name} 设置至少 12 个字符的新密码；旧登录令牌会被撤销。</DialogDescription></DialogHeader><form className='space-y-3' onSubmit={(event) => { event.preventDefault(); onSubmit(password) }}><div className='space-y-1.5'><Label htmlFor='reset-password'>新密码</Label><Input id='reset-password' type='password' autoComplete='new-password' minLength={12} maxLength={256} required value={password} onChange={(event) => setPassword(event.target.value)} /></div>{error && <p role='alert' className='text-sm text-destructive'>{error}</p>}<DialogFooter><Button type='button' variant='outline' onClick={() => onOpenChange(false)}>取消</Button><Button type='submit' disabled={pending || password.length < 12}>{pending ? '重置中…' : '重置密码'}</Button></DialogFooter></form></DialogContent></Dialog>
 }
 

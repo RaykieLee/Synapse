@@ -26,3 +26,7 @@ cd Synapse/apps/api
 ## 限制
 
 本次只验证 SQLite/TestClient 路径，不能据此确认生产 PostgreSQL 行为或管理员并发写入行为。bcrypt 场景验证了配置使用的旧版 `$2b$` 哈希格式；API 文档另行列明支持 `$2a$` 和 `$2y$` 前缀。
+
+## 2026-10-11 service 化回归
+
+全局用户管理迁移为 `UserService` 后重新执行同文件，1 个用例通过。列表/详情/创建/编辑/启停/软删/重置密码均由 service 承担，router 保留平台管理员依赖和 response model；service 不再显式 commit/rollback，成功请求由 `get_db()` 统一提交。
