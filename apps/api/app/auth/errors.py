@@ -9,6 +9,7 @@ from app.services.errors import (
     ConflictError,
     DomainValidationError,
     ForbiddenError,
+    GoneError,
     NotFoundError,
     ServiceError,
 )
@@ -16,7 +17,7 @@ from app.services.errors import (
 
 def problem(status_code: int, code: str, detail: str | None = None, errors=None, request_id: str | None = None):
     title = {400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
-             409: "Conflict", 422: "Unprocessable Content"}.get(status_code, "Error")
+             409: "Conflict", 410: "Gone", 422: "Unprocessable Content"}.get(status_code, "Error")
     payload = {"type": f"https://synapse.invalid/problems/{code.lower()}", "title": title,
                "status": status_code, "code": code, "detail": detail or title,
                "request_id": request_id or f"req_{uuid.uuid4().hex}"}
@@ -48,6 +49,7 @@ def install_error_handlers(app: FastAPI) -> None:
             ForbiddenError: 403,
             DomainValidationError: 422,
             ConflictError: 409,
+            GoneError: 410,
         }
         status_code = next(
             (status for error_type, status in status_by_type.items() if isinstance(exc, error_type)),

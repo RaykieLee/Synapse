@@ -16,6 +16,13 @@ import {
   type TenantPatchPayload,
   type TenantStatus,
 } from '@/api/tenants'
+import {
+  createTenantInvitation,
+  listTenantInvitations,
+  revokeTenantInvitation,
+  type CreatedTenantInvitation,
+  type TenantInvitationCreatePayload,
+} from '@/api/tenant-invitations'
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiProblem, api } from '@/lib/api'
 import {
@@ -54,8 +61,6 @@ import {
 } from './components/tenant-table'
 import {
   tenantText,
-  type CreatedTenantInvitation,
-  type TenantInvitation,
   type TenantRoleRecord,
 } from './types'
 
@@ -289,8 +294,7 @@ export function TenantDetail() {
   const invitations = useQuery({
     queryKey: invitationKey,
     enabled: canManage,
-    queryFn: () =>
-      api<{ items: TenantInvitation[] }>(`/tenants/${tenantId}/invitations`),
+    queryFn: () => listTenantInvitations(tenantId),
   })
   const [createdInvite, setCreatedInvite] =
     useState<CreatedTenantInvitation | null>(null)
@@ -329,11 +333,8 @@ export function TenantDetail() {
     onError: (cause) => setError(errorText(cause)),
   })
   const createInvite = useMutation({
-    mutationFn: (body: object) =>
-      api<CreatedTenantInvitation>(`/tenants/${tenantId}/invitations`, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+    mutationFn: (body: TenantInvitationCreatePayload) =>
+      createTenantInvitation(tenantId, body),
     onSuccess: async (invite) => {
       setCreatedInvite(invite)
       setError('')
@@ -343,9 +344,7 @@ export function TenantDetail() {
   })
   const revokeInvite = useMutation({
     mutationFn: (invitationId: string) =>
-      api<void>(`/tenants/${tenantId}/invitations/${invitationId}`, {
-        method: 'DELETE',
-      }),
+      revokeTenantInvitation(tenantId, invitationId),
     onSuccess: async () => {
       setError('')
       await client.invalidateQueries({ queryKey: invitationKey })
@@ -558,6 +557,7 @@ export function TenantDetail() {
               created={createdInvite}
               invitations={invitations.data?.items ?? []}
               loading={invitations.isLoading}
+              canInviteAdmin={item.tenant_role === 'owner'}
               onCreate={(payload) => createInvite.mutate(payload)}
               onRevoke={(invitation) =>
                 revokeInvite.mutate(invitation.invitation_id)

@@ -12,22 +12,12 @@ export type MemberCustomRoleResponse = {
   role: TenantRoleRecord | null
 }
 
-export type TenantInvitation = {
-  invitation_id: string
-  tenant_id: string
-  email: string | null
-  target_user_id: string | null
-  tenant_role: 'admin' | 'member'
-  status: string
-  expired: boolean
-  expires_at: string
-  created_at: string
-}
-
-export type CreatedTenantInvitation = TenantInvitation & {
-  token: string
-  invite_link: string
-}
+export type {
+  CreatedTenantInvitation,
+  TenantInvitation,
+  TenantInvitationCreatePayload,
+  TenantInvitationRole,
+} from '@/api/tenant-invitations'
 
 export const tenantText = {
   active: '启用',

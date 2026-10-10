@@ -42,6 +42,7 @@ export function InvitationPanel({
   created,
   invitations,
   loading,
+  canInviteAdmin,
   onCreate,
   onRevoke,
 }: {
@@ -49,6 +50,7 @@ export function InvitationPanel({
   created: CreatedTenantInvitation | null
   invitations: TenantInvitation[]
   loading: boolean
+  canInviteAdmin: boolean
   onCreate: (payload: {
     email?: string
     user_id?: string
@@ -57,6 +59,7 @@ export function InvitationPanel({
   onRevoke: (invitation: TenantInvitation) => void
 }) {
   const [kind, setKind] = useState<'email' | 'user_id'>('email')
+  const [role, setRole] = useState<'admin' | 'member'>('member')
   const [target, setTarget] = useState('')
   const [copyMessage, setCopyMessage] = useState('')
   const [revokeTarget, setRevokeTarget] = useState<TenantInvitation | null>(
@@ -73,7 +76,7 @@ export function InvitationPanel({
           if (!value) return
           onCreate({
             [kind]: value,
-            tenant_role: 'member',
+            tenant_role: canInviteAdmin ? role : 'member',
           })
         }}
       >
@@ -108,12 +111,18 @@ export function InvitationPanel({
         </div>
         <div className='space-y-2'>
           <Label htmlFor='invite-role'>租户角色</Label>
-          <div
-            id='invite-role'
-            className='flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground'
+          <Select
+            value={canInviteAdmin ? role : 'member'}
+            onValueChange={(value) => setRole(value as 'admin' | 'member')}
           >
-            成员
-          </div>
+            <SelectTrigger id='invite-role' className='w-full'>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='member'>成员</SelectItem>
+              {canInviteAdmin && <SelectItem value='admin'>管理员</SelectItem>}
+            </SelectContent>
+          </Select>
         </div>
         <div className='flex items-end'>
           <Button type='submit' className='w-full lg:w-auto' disabled={pending}>

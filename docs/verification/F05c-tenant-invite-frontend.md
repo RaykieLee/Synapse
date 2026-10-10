@@ -45,3 +45,7 @@ Owner/admin/member 关系图和初始 Workspace 直接写入临时数据库。�
 
 - **F05c：** 现有账户邀请前端和接受流程 — 组合运行通过。
 - **F05e：** 通过租户邮件邀请注册新账户 — 覆盖成功创建、所得租户身份、token 清理、拒绝重放以及不自动加入 Workspace；组合运行通过。更广泛的 API 注册校验单独记录于 F05d。
+
+## 2026-10-11 回归
+
+租户邀请前后端重构后再次执行真实浏览器验收：production 构建、一次性 SQLite 迁移、Vite/API 双进程和 Chromium 流程全部通过，最终输出 `F05c/F05e tenant invite frontend verification passed`。本次同时恢复 owner 可选择邀请 admin、admin 仅能邀请 member 的 UI 规则，并将邀请相关前端调用集中到 `src/api/tenant-invitations.ts`。

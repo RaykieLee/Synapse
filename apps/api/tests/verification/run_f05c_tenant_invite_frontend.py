@@ -1,6 +1,7 @@
 """Build and run F05c invitation frontend flows on a disposable API database."""
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -14,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[4]
 API = ROOT / "apps" / "api"
 WEB = ROOT / "apps" / "web"
 FLOW = Path(__file__).with_name("f05c_tenant_invite_frontend.mjs")
+PNPM = shutil.which("pnpm") or ("pnpm.cmd" if os.name == "nt" else "pnpm")
 
 
 def port():
@@ -36,11 +38,28 @@ def wait(url, process):
     raise RuntimeError(f"Timed out waiting for {url}")
 
 
+def terminate_process_tree(process):
+    """Terminate pnpm's child Vite process as well as the command wrapper."""
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+            )
+        else:
+            process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
 def main():
-    build = subprocess.run(["pnpm", "build"], cwd=WEB)
+    build = subprocess.run([PNPM, "build"], cwd=WEB)
     if build.returncode:
         return build.returncode
-    with tempfile.TemporaryDirectory(prefix="synapse-f05c-") as temp:
+    with tempfile.TemporaryDirectory(prefix="synapse-f05c-", ignore_cleanup_errors=True) as temp:
         temp_path = Path(temp)
         db_url = f"sqlite:///{temp_path / 'f05c.sqlite'}"
         secret = "f05c-verification-only-jwt-secret"
@@ -105,14 +124,14 @@ def main():
         env.update({"SYNAPSE_DATABASE_URL":db_url,"SYNAPSE_JWT_SECRET":secret,"VITE_API_PROXY_TARGET":f"http://127.0.0.1:{api_port}"})
         api_log = (temp_path / "api.log").open("w"); web_log = (temp_path / "vite.log").open("w")
         api = subprocess.Popen([sys.executable,"-m","uvicorn","app.main:create_app","--factory","--host","127.0.0.1","--port",str(api_port)],cwd=API,env=env,stdout=api_log,stderr=api_log)
-        web = subprocess.Popen(["pnpm","dev","--host","127.0.0.1","--port",str(web_port),"--strictPort"],cwd=WEB,env=env,stdout=web_log,stderr=web_log)
+        web = subprocess.Popen([PNPM,"dev","--host","127.0.0.1","--port",str(web_port),"--strictPort"],cwd=WEB,env=env,stdout=web_log,stderr=web_log)
         seed.update({"web":f"http://127.0.0.1:{web_port}","api":f"http://127.0.0.1:{api_port}/api/v1"})
         seed_file.write_text(json.dumps(seed))
         try:
             wait(seed["api"]+"/health",api); wait(seed["web"],web)
             return subprocess.run(["node",str(FLOW),str(seed_file)],cwd=WEB,env=env).returncode
         finally:
-            web.terminate(); api.terminate(); web.wait(timeout=10); api.wait(timeout=10)
+            terminate_process_tree(web); terminate_process_tree(api)
             api_log.close(); web_log.close()
 
 

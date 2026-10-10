@@ -23,3 +23,7 @@
 ## 范围与限制
 
 本验证只针对临时 SQLite 数据库和当前 Alembic `head`，并发检查覆盖同一 SQLite 文件中的双请求竞争；没有验证生产数据库方言、跨进程多主机负载或真实邮件投递。没有发现需要转交产品开发者的缺陷。
+
+## 2026-10-11 service 化回归
+
+注册与原子认领逻辑迁入 `TenantInvitationService` 后重新执行，1 个用例通过。保留 SQL conditional update 作为一次性邀请闸门；用户名/邮箱唯一键冲突仍回滚为 pending，并保持 409 `ACCOUNT_CONFLICT` 契约。

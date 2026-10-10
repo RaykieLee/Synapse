@@ -25,3 +25,7 @@ cd Synapse/apps/api
 ## 限制
 
 本次运行通过 TestClient 在 SQLite 上验证邀请生命周期，不能据此确认生产 PostgreSQL 行为、多 worker 并发认领行为或邮件投递。本次验收未修改产品代码。
+
+## 2026-10-11 service 化回归
+
+邀请生命周期迁移为 `TenantInvitationService` 后重新执行同文件，两个用例通过。过期邀请保留原有 410 `INVITATION_EXPIRED` 行为，并新增共享 `GoneError` / 410 全局映射。service 内不再显式 commit/rollback；成功请求由 `get_db()` 统一提交，冲突由异常触发统一回滚。

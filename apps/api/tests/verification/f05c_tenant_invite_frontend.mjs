@@ -23,12 +23,19 @@ const signInThroughReturnLink = async (url, username) => {
   const redirect = new URL(page.url()).searchParams.get('redirect')
   assert.ok(redirect, 'sign-in URL preserves the invitation redirect')
   assert.equal(new URL(redirect, seed.web).searchParams.get('token'), new URL(url).searchParams.get('token'), 'redirect retains original invite token')
+  await page.waitForLoadState('networkidle')
   await page.locator('input[autocomplete="username"]').fill(username)
   const passwordField = page.locator('form input[type="password"]')
   await passwordField.waitFor({ state: 'visible' })
   await passwordField.fill(seed.password)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await page.waitForURL((current) => current.pathname === '/invite/accept')
+  await page.getByRole('button', { name: '登录工作空间' }).click()
+  await Promise.race([
+    page.waitForURL((current) => current.pathname === '/invite/accept'),
+    page.locator('.login-error').waitFor({ state: 'visible' }),
+  ])
+  if (await page.locator('.login-error').isVisible()) {
+    throw new Error(`Sign-in failed: ${await page.locator('.login-error').textContent()}`)
+  }
   assert.equal(new URL(page.url()).searchParams.get('token'), new URL(url).searchParams.get('token'))
 }
 const copyCreatedLink = async () => {
@@ -41,7 +48,8 @@ const copyCreatedLink = async () => {
 }
 const makeInviteAsOwner = async (email, role = 'member') => {
   await page.getByPlaceholder('name@example.com').fill(email)
-  await page.getByLabel('租户角色').selectOption(role)
+  await page.getByRole('combobox', { name: '租户角色' }).click()
+  await page.getByRole('option', { name: role === 'admin' ? '管理员' : '成员' }).click()
   await page.getByRole('button', { name: '创建邀请' }).click()
   await page.getByText('邀请链接已创建').waitFor()
   return copyCreatedLink()
@@ -57,8 +65,8 @@ try {
   const revokedUrl = await makeInviteAsOwner('revoke@example.test', 'admin')
   const revokedRow = page.locator('tr').filter({ hasText: 'revoke@example.test' })
   await revokedRow.getByText('管理员').waitFor()
-  page.once('dialog', (dialog) => dialog.accept())
   await revokedRow.getByRole('button', { name: '撤销' }).click()
+  await page.getByRole('button', { name: '撤销邀请' }).click()
   await revokedRow.waitFor({ state: 'detached' })
   await signInThroughReturnLink(revokedUrl.toString(), 'f05c-target')
   await page.getByRole('button', { name: '接受租户邀请' }).click()
@@ -157,12 +165,12 @@ try {
   await setToken(seed.admin_token)
   await page.goto(`${seed.web}/tenants/${seed.tenant_id}`)
   await page.getByRole('heading', { name: '邀请链接' }).waitFor()
-  const roleSelect = page.getByLabel('租户角色')
-  assert.equal(await roleSelect.locator('option[value="admin"]').count(), 0, 'tenant admin cannot select the admin invite role')
+  const roleSelect = page.getByRole('combobox', { name: '租户角色' })
+  assert.equal(await roleSelect.textContent(), '成员', 'tenant admin cannot select the admin invite role')
   const adminInvite = await makeInviteAsOwner('admin-created@example.test')
   const adminRow = page.locator('tr').filter({ hasText: 'admin-created@example.test' })
-  page.once('dialog', (dialog) => dialog.accept())
   await adminRow.getByRole('button', { name: '撤销' }).click()
+  await page.getByRole('button', { name: '撤销邀请' }).click()
   await adminRow.waitFor({ state: 'detached' })
   assert.ok(adminInvite.searchParams.get('token'))
 

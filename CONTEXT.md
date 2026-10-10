@@ -16,18 +16,18 @@ HTTP router
 - `app/models/*`：SQLAlchemy ORM 模型，不包含 HTTP 语义。
 - 不引入 repository 层。SQLAlchemy Session 已提供工作单元和查询能力，额外包装只增加样板。
 
-已迁移完成的域：租户与租户成员（`app/services/tenants.py`）、Workspace 与空间成员（`app/services/workspaces.py`）。其他既有 router 仍保持旧写法，后续按业务域逐个迁移，不做一次性大爆炸重写。
+已迁移完成的域：租户与租户成员（`app/services/tenants.py`）、Workspace 与空间成员（`app/services/workspaces.py`）、租户邀请（`app/services/tenant_invitations.py`）。其他既有 router 仍保持旧写法，后续按业务域逐个迁移，不做一次性大爆炸重写。
 
 ## 事务与错误
 
 - `app/database/session.py:get_db()` 提供请求级托管事务：请求成功统一 commit，任何异常统一 rollback，最后 close。
 - service 只 `flush()` 获取数据库生成值并暴露约束冲突；事务提交归 `get_db()`。
-- service 抛 `ServiceError` 子类表达领域失败。全局 handler 在 `app/auth/errors.py` 统一映射为 `application/problem+json`：400 / 404 / 403 / 422 / 409，未知 `ServiceError` 为 500。
+- service 抛 `ServiceError` 子类表达领域失败。全局 handler 在 `app/auth/errors.py` 统一映射为 `application/problem+json`：400 / 404 / 403 / 409 / 410 / 422，未知 `ServiceError` 为 500。
 - 领域专属错误如 `TenantSlugConflict`、`TenantValidityError`、`WorkspaceSlugConflict`、`LastWorkspaceOwnerRequired` 放在对应 service 文件，继承共享错误类型。
 
 ## 前端 API 方向
 
-前端按域集中到 `apps/web/src/api/*.ts`，导出带入参/出参类型的 API 函数；`useQuery` / `useMutation` 仍留在组件中。当前已完成 `tenants.ts` 与 `workspaces.ts`，其余领域继续按此方向迁移。契约稳定后再评估从 OpenAPI 生成 typed client，不在本次重构中同时引入。
+前端按域集中到 `apps/web/src/api/*.ts`，导出带入参/出参类型的 API 函数；`useQuery` / `useMutation` 仍留在组件中。当前已完成 `tenants.ts`、`workspaces.ts` 与 `tenant-invitations.ts`，其余领域继续按此方向迁移。契约稳定后再评估从 OpenAPI 生成 typed client，不在本次重构中同时引入。
 
 ## 迁移规则
 

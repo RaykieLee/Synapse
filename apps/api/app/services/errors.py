@@ -25,3 +25,7 @@ class BadRequestError(ServiceError):
 
 class ConflictError(ServiceError):
     code = "CONFLICT"
+
+
+class GoneError(ServiceError):
+    """A resource was available but has permanently expired."""

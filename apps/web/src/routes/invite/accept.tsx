@@ -1,21 +1,13 @@
 import { useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import {
+  acceptTenantInvitation,
+  registerAndAcceptTenantInvitation,
+  type TenantInvitationMembership,
+} from '@/api/tenant-invitations'
 import { ApiProblem, api, type AuthUser } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
-type AcceptResult = {
-  tenant_id: string
-  user_id: string
-  status: string
-  tenant_role: string
-  joined_at: string
-  workspace_memberships_created: number
-}
-type RegisterResult = {
-  access_token: string
-  user: AuthUser
-  tenant: AcceptResult
-}
 
 export const Route = createFileRoute('/invite/accept')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -36,7 +28,9 @@ function InvitationAcceptPage() {
   const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [accepted, setAccepted] = useState<AcceptResult | null>(null)
+  const [accepted, setAccepted] = useState<TenantInvitationMembership | null>(
+    null
+  )
 
   async function signIn(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -62,9 +56,7 @@ function InvitationAcceptPage() {
     setBusy(true)
     setError('')
     try {
-      const result = await api<AcceptResult>('/tenant-invitations/accept', {
-        method: 'POST', body: JSON.stringify({ token }),
-      })
+      const result = await acceptTenantInvitation({ token })
       setAccepted(result)
       await clearInvitationFromUrl()
     } catch (cause) {
@@ -87,9 +79,10 @@ function InvitationAcceptPage() {
     setBusy(true)
     setError('')
     try {
-      const result = await api<RegisterResult>('/tenant-invitations/register-and-accept', {
-        method: 'POST',
-        body: JSON.stringify({ token, user_name: username.trim(), password }),
+      const result = await registerAndAcceptTenantInvitation({
+        token,
+        user_name: username.trim(),
+        password,
       })
       // The API creates the account and tenant membership atomically, and
       // returns a normal Synapse access token. Store no invitation token or
