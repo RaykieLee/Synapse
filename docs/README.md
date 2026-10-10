@@ -6,6 +6,7 @@
 | --- | --- |
 | 项目目标、技术选型与功能范围 | [集成计划](integration-plan.md) |
 | 各功能目前完成到哪一步 | [开发与独立验收台账](development-status.md) |
+| 当前架构约定与已接受决策 | [工程上下文](../CONTEXT.md)、[ADR](adr/) |
 | 登录、租户、Workspace 与权限规则 | [认证契约](auth-contract.md)、[租户契约](tenancy-contract.md)、[权限使用说明](tenancy-authorization-usage.md) |
 | AgentScope 如何接入及隔离 | [嵌入契约](agentscope-embedding-contract.md)、[运行说明](agentscope-runtime.md)及同目录的 `agentscope-*.md` |
 | 管理接口的字段和行为 | 同目录的 `*-api.md` 与 `*-notes.md` |

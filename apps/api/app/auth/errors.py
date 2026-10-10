@@ -4,6 +4,14 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError, HTTPException
 from fastapi.responses import JSONResponse
 
+from app.services.errors import (
+    ConflictError,
+    DomainValidationError,
+    ForbiddenError,
+    NotFoundError,
+    ServiceError,
+)
+
 
 def problem(status_code: int, code: str, detail: str | None = None, errors=None, request_id: str | None = None):
     title = {400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
@@ -30,6 +38,25 @@ def install_error_handlers(app: FastAPI) -> None:
                    "code": "INVALID_VALUE", "message": e["msg"]} for e in exc.errors()]
         return problem(422, "VALIDATION_ERROR", "Request validation failed", errors,
                        getattr(request.state, "request_id", None))
+
+    @app.exception_handler(ServiceError)
+    async def service_problem(request: Request, exc: ServiceError):
+        status_by_type = {
+            NotFoundError: 404,
+            ForbiddenError: 403,
+            DomainValidationError: 422,
+            ConflictError: 409,
+        }
+        status_code = next(
+            (status for error_type, status in status_by_type.items() if isinstance(exc, error_type)),
+            500,
+        )
+        return problem(
+            status_code,
+            exc.code,
+            str(exc) or None,
+            request_id=getattr(request.state, "request_id", None),
+        )
 
     @app.exception_handler(Exception)
     async def internal_problem(request: Request, exc: Exception):
