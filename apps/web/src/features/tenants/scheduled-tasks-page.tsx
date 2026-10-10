@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
-type Tenant = { tenant_id: string; name: string; status: 'active' | 'suspended' | 'archived'; tenant_role: 'owner' | 'admin' | 'member' | null }
 type Task = {
   task_id: string; tenant_id: string; task_name: string; description: string | null; execution_target: string
   parameters: Record<string, string | number | boolean | null>; schedule_type: 'cron' | 'interval'
@@ -46,7 +46,7 @@ export function TenantScheduledTasksPage() {
   const [enabledFilter, setEnabledFilter] = useState('')
   const [page, setPage] = useState(1)
   const tenantKey = ['synapse', actorId, tenantId, 'personal', 'tenant'] as const
-  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => api<Tenant>(`/tenants/${tenantId}`) })
+  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
   const active = tenant.data?.status === 'active'
   const params = new URLSearchParams({ page: String(page), page_size: '20' })

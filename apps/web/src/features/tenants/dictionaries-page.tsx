@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getTenant, type Page } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
-type Tenant = { tenant_id: string; name: string; status: 'active' | 'suspended' | 'archived'; tenant_role: 'owner' | 'admin' | 'member' | null; membership_version: number }
 type DictType = { dict_type_id: string; tenant_id: string; dict_name: string; dict_type: string; order_num: number; status: '0' | '1'; remark: string | null }
 type DictEntry = { dict_data_id: string; tenant_id: string; dict_type_id: string; dict_type: string; dict_sort: number; dict_label: string; dict_value: string; css_class: string | null; list_class: string | null; is_default: 'Y' | 'N'; status: '0' | '1'; remark: string | null }
-type Page<T> = { items: T[]; total: number; page: number; page_size: number }
 type TypeDraft = { dict_type_id?: string; dict_name: string; dict_type: string; order_num: number; status: '0' | '1'; remark: string }
 type EntryDraft = { dict_data_id?: string; dict_sort: number; dict_label: string; dict_value: string; css_class: string; list_class: string; is_default: 'Y' | 'N'; status: '0' | '1'; remark: string }
 
@@ -33,7 +32,7 @@ export function TenantDictionariesPage() {
   const [error, setError] = useState('')
 
   const tenantKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant'] as const
-  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => api<Tenant>(`/tenants/${tenantId}`) })
+  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
   const tenantActive = tenant.data?.status === 'active'
   const normalizedTypeSearch = typeSearch.trim()

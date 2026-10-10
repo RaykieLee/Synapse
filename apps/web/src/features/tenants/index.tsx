@@ -1,14 +1,27 @@
 import { useState } from 'react'
 import { Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  createTenant,
+  createTenantMember,
+  getTenant,
+  listPlatformTenants,
+  listTenantMembers,
+  listTenants,
+  updateTenant,
+  updateTenantMember,
+  type Member,
+  type MemberRole,
+  type Page,
+  type Tenant,
+  type TenantPatchPayload,
+  type TenantStatus,
+} from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
-type Tenant = { tenant_id: string; slug: string; name: string; status: 'active' | 'suspended' | 'archived'; valid_from: string | null; valid_until: string | null; tenant_role: 'owner' | 'admin' | 'member' | null; membership_version: number; created_at: string; updated_at: string }
-type Member = { user_id: string; user_name: string; nick_name: string | null; email: string | null; status: 'invited' | 'active' | 'suspended' | 'removed'; tenant_role: 'owner' | 'admin' | 'member'; joined_at: string | null }
 type TenantRole = { role_id: string; tenant_id: string; role_name: string; role_key: string; status: 'active' | 'disabled'; permissions: string[] }
 type MemberCustomRoleResponse = { user_id: string; role: TenantRole | null }
-type Page<T> = { items: T[]; total: number; page: number; page_size: number }
 type Invitation = { invitation_id: string; tenant_id: string; email: string | null; target_user_id: string | null; tenant_role: 'admin' | 'member'; status: string; expired: boolean; expires_at: string; created_at: string }
 type CreatedInvitation = Invitation & { token: string; invite_link: string }
 const label: Record<string, string> = { active: '启用', suspended: '已停用', archived: '已归档', invited: '待加入', removed: '已移除', owner: '所有者', admin: '管理员', member: '成员' }
@@ -32,24 +45,22 @@ export function Tenants() {
   const actor = useAuthStore((s) => s.auth.user)
   const admin = actor?.platform_role === 'platform_admin'
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState<TenantStatus | ''>('')
   const [page, setPage] = useState(1)
   const [error, setError] = useState('')
   const client = useQueryClient()
-  const params = new URLSearchParams({ page: String(page), page_size: '20' })
-  if (query.trim()) params.set('name', query.trim())
-  if (status) params.set('status', status)
-  const key = ['synapse', actor?.user_id ?? 'anonymous', 'global', 'personal', 'tenants', admin ? 'platform' : 'member', page, query.trim(), status]
-  const tenants = useQuery({ queryKey: key, queryFn: () => api<Page<Tenant>>(`${admin ? '/platform/tenants' : '/tenants'}?${params}`) })
+  const request = { page, pageSize: 20, name: query.trim() || undefined, status: status || undefined }
+  const key = ['synapse', actor?.user_id ?? 'anonymous', 'global', 'personal', 'tenants', admin ? 'platform' : 'member', page, query.trim(), status, request]
+  const tenants = useQuery({ queryKey: key, queryFn: () => (admin ? listPlatformTenants(request) : listTenants(request)) })
   const refresh = async () => { await client.invalidateQueries({ queryKey: ['synapse', actor?.user_id ?? 'anonymous', 'global', 'personal', 'tenants'] }) }
-  const mutation = useMutation({ mutationFn: ({ id, body }: { id: string; body: object }) => api(`/tenants/${id}`, { method: 'PATCH', body: JSON.stringify(body) }), onSuccess: refresh, onError: (e) => setError(errorText(e)) })
-  const create = useMutation({ mutationFn: (body: object) => api('/tenants', { method: 'POST', body: JSON.stringify(body) }), onSuccess: async () => { setError(''); setCreateOpen(false); await refresh(); setPage(1) }, onError: (e) => setError(errorText(e)) })
+  const mutation = useMutation({ mutationFn: ({ id, body }: { id: string; body: TenantPatchPayload }) => updateTenant(id, body), onSuccess: refresh, onError: (e) => setError(errorText(e)) })
+  const create = useMutation({ mutationFn: createTenant, onSuccess: async () => { setError(''); setCreateOpen(false); await refresh(); setPage(1) }, onError: (e) => setError(errorText(e)) })
   const [createOpen, setCreateOpen] = useState(false)
   return <main className="space-y-5 p-6">
     <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-semibold">租户管理</h1><p className="mt-1 text-sm text-muted-foreground">{admin ? '平台租户目录用于管理租户状态，不代表您拥有租户内业务或成员访问权限。' : '查看您所属的启用租户。'}</p></div>{admin && <button className={primary} onClick={() => { setCreateOpen(!createOpen); setError('') }}>创建租户</button>}</header>
-    {admin && createOpen && <form className={`${panel} grid gap-3 md:grid-cols-4`} onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); create.mutate({ slug: f.get('slug'), name: f.get('name'), first_owner_user_id: f.get('owner'), valid_from: toIsoInput(f.get('valid_from')), valid_until: toIsoInput(f.get('valid_until')) }); }}><label className="text-sm">租户标识<input required name="slug" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxLength={64} className={`${input} mt-1`} placeholder="例如 acme" /></label><label className="text-sm">租户名称<input required name="name" maxLength={120} className={`${input} mt-1`} /></label><label className="text-sm">首位所有者的全局账号 ID<input required name="owner" inputMode="numeric" pattern="[0-9]+" className={`${input} mt-1`} /></label><label className="text-sm">有效期开始<input type="datetime-local" name="valid_from" className={`${input} mt-1`} /></label><label className="text-sm">有效期结束<input type="datetime-local" name="valid_until" className={`${input} mt-1`} /></label><div className="flex items-end gap-2"><button className={primary} disabled={create.isPending}>创建</button><button type="button" className={button} onClick={() => setCreateOpen(false)}>取消</button></div></form>}
+    {admin && createOpen && <form className={`${panel} grid gap-3 md:grid-cols-4`} onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); create.mutate({ slug: String(f.get('slug')), name: String(f.get('name')), first_owner_user_id: String(f.get('owner')), valid_from: toIsoInput(f.get('valid_from')), valid_until: toIsoInput(f.get('valid_until')) }); }}><label className="text-sm">租户标识<input required name="slug" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxLength={64} className={`${input} mt-1`} placeholder="例如 acme" /></label><label className="text-sm">租户名称<input required name="name" maxLength={120} className={`${input} mt-1`} /></label><label className="text-sm">首位所有者的全局账号 ID<input required name="owner" inputMode="numeric" pattern="[0-9]+" className={`${input} mt-1`} /></label><label className="text-sm">有效期开始<input type="datetime-local" name="valid_from" className={`${input} mt-1`} /></label><label className="text-sm">有效期结束<input type="datetime-local" name="valid_until" className={`${input} mt-1`} /></label><div className="flex items-end gap-2"><button className={primary} disabled={create.isPending}>创建</button><button type="button" className={button} onClick={() => setCreateOpen(false)}>取消</button></div></form>}
     {error && <ErrorBox message={error} />}
-    <section className={`${panel} space-y-4`}><div className="flex flex-wrap gap-3"><input className={`${input} max-w-sm`} value={query} placeholder="按租户名称搜索" onChange={(e) => { setQuery(e.target.value); setPage(1) }} /><select className={`${input} max-w-48`} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}><option value="">全部状态</option>{['active','suspended','archived'].map((s) => <option key={s} value={s}>{label[s]}</option>)}</select></div>
+      <section className={`${panel} space-y-4`}><div className="flex flex-wrap gap-3"><input className={`${input} max-w-sm`} value={query} placeholder="按租户名称搜索" onChange={(e) => { setQuery(e.target.value); setPage(1) }} /><select className={`${input} max-w-48`} value={status} onChange={(e) => { setStatus(e.target.value as TenantStatus | ''); setPage(1) }}><option value="">全部状态</option>{['active','suspended','archived'].map((s) => <option key={s} value={s}>{label[s]}</option>)}</select></div>
       {tenants.isLoading ? <p className="text-sm text-muted-foreground">正在加载…</p> : tenants.isError ? <ErrorBox message={errorText(tenants.error)} /> : tenants.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3">名称</th><th className="p-3">标识</th><th className="p-3">状态</th>{!admin && <th className="p-3">我的角色</th>}<th className="p-3">操作</th></tr></thead><tbody>{tenants.data.items.map((t) => <tr key={t.tenant_id} className="border-b last:border-0"><td className="p-3 font-medium">{t.name}</td><td className="p-3">{t.slug}</td><td className="p-3">{label[t.status]}</td>{!admin && <td className="p-3">{label[t.tenant_role ?? ''] ?? '—'}</td>}<td className="p-3"><Link className="underline underline-offset-4" to="/tenants/$tenantId" params={{ tenantId: t.tenant_id }}>查看详情</Link>{admin && t.status !== 'archived' && <><button className="ml-4 underline underline-offset-4" onClick={() => mutation.mutate({ id: t.tenant_id, body: { status: t.status === 'active' ? 'suspended' : 'active' } })}>{t.status === 'active' ? '停用' : '重新启用'}</button><button className="ml-3 underline underline-offset-4" onClick={() => { if (window.confirm(`确定归档租户“${t.name}”吗？`)) mutation.mutate({ id: t.tenant_id, body: { status: 'archived' } }) }}>归档</button></>}</td></tr>)}</tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground">暂无租户</p>}
       <Pager page={page} size={20} total={tenants.data?.total ?? 0} setPage={setPage} /></section>
   </main>
@@ -63,11 +74,11 @@ export function TenantDetail() {
   const [error, setError] = useState('')
   const [memberPage, setMemberPage] = useState(1)
   const tenantKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant']
-  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => api<Tenant>(`/tenants/${tenantId}`) })
+  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
   const canManageStatus = platformAdmin
   const membersKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant-members', tenant.data?.membership_version ?? 0, memberPage, 20]
-  const members = useQuery({ queryKey: membersKey, enabled: canManage || tenant.data?.tenant_role === 'member', queryFn: () => api<Page<Member>>(`/tenants/${tenantId}/members?page=${memberPage}&page_size=20`) })
+  const members = useQuery({ queryKey: membersKey, enabled: canManage || tenant.data?.tenant_role === 'member', queryFn: () => listTenantMembers(tenantId, { page: memberPage, pageSize: 20 }) })
   const rolesKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'roles', 'active-assignment-options']
   const activeRoles = useQuery({
     queryKey: rolesKey,
@@ -82,9 +93,9 @@ export function TenantDetail() {
   const [createdInvite, setCreatedInvite] = useState<CreatedInvitation | null>(null)
   const [copyMessage, setCopyMessage] = useState('')
   const refresh = async () => { await client.invalidateQueries({ queryKey: tenantKey }); await client.invalidateQueries({ queryKey: ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant-members'] }) }
-  const patchTenant = useMutation({ mutationFn: (body: object) => api(`/tenants/${tenantId}`, { method: 'PATCH', body: JSON.stringify(body) }), onSuccess: refresh, onError: (e) => setError(errorText(e)) })
-  const patchMember = useMutation({ mutationFn: ({ userId, body }: { userId: string; body: object }) => api(`/tenants/${tenantId}/members/${userId}`, { method: 'PATCH', body: JSON.stringify(body) }), onSuccess: refresh, onError: (e) => setError(errorText(e)) })
-  const add = useMutation({ mutationFn: (body: object) => api(`/tenants/${tenantId}/members`, { method: 'POST', body: JSON.stringify(body) }), onSuccess: refresh, onError: (e) => setError(errorText(e)) })
+  const patchTenant = useMutation({ mutationFn: (body: TenantPatchPayload) => updateTenant(tenantId, body), onSuccess: refresh, onError: (e) => setError(errorText(e)) })
+  const patchMember = useMutation({ mutationFn: ({ userId, body }: { userId: string; body: Parameters<typeof updateTenantMember>[2] }) => updateTenantMember(tenantId, userId, body), onSuccess: refresh, onError: (e) => setError(errorText(e)) })
+  const add = useMutation({ mutationFn: (body: Parameters<typeof createTenantMember>[1]) => createTenantMember(tenantId, body), onSuccess: refresh, onError: (e) => setError(errorText(e)) })
   const createInvite = useMutation({
     mutationFn: (body: object) => api<CreatedInvitation>(`/tenants/${tenantId}/invitations`, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: async (invite) => {
@@ -107,7 +118,7 @@ export function TenantDetail() {
     <section className={panel}><h2 className="font-semibold">租户信息</h2><dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">租户 ID</dt><dd>{item.tenant_id}</dd></div><div><dt className="text-muted-foreground">创建时间</dt><dd>{item.created_at ? new Date(item.created_at).toLocaleString('zh-CN') : '—'}</dd></div><div><dt className="text-muted-foreground">有效期开始</dt><dd>{item.valid_from ? new Date(item.valid_from).toLocaleString('zh-CN') : '—'}</dd></div><div><dt className="text-muted-foreground">有效期结束</dt><dd>{item.valid_until ? new Date(item.valid_until).toLocaleString('zh-CN') : '—'}</dd></div></dl><p className="mt-3 text-sm text-muted-foreground">租户成员关系不会自动授予任何工作区业务数据访问权。</p></section>
     {error && <ErrorBox message={error} />}
     {(canManage || item.tenant_role === 'member') && <section className={`${panel} space-y-4`}><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold">租户成员</h2><p className="text-sm text-muted-foreground">添加已有全局账号。邀请通过链接接受，不会自动加入任何 Workspace。</p></div>{canManage && <AddMember onAdd={(userId, role) => add.mutate({ user_id: userId, tenant_role: role })} pending={add.isPending} />}</div>
-      {members.isLoading ? <p className="text-sm text-muted-foreground">正在加载成员…</p> : members.isError ? <ErrorBox message={errorText(members.error)} /> : members.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3">成员</th><th className="p-3">账号 ID</th><th className="p-3">角色</th><th className="p-3">自定义角色</th><th className="p-3">状态</th>{canManage && <th className="p-3">管理</th>}</tr></thead><tbody>{members.data.items.map((m) => <tr key={m.user_id} className="border-b last:border-0"><td className="p-3">{m.nick_name || m.user_name}{m.email && <span className="block text-muted-foreground">{m.email}</span>}</td><td className="p-3">{m.user_id}</td><td className="p-3">{canManage && m.tenant_role !== 'owner' ? <select aria-label={`${m.user_name}角色`} className="rounded border bg-background p-1" value={m.tenant_role} onChange={(e) => patchMember.mutate({ userId: m.user_id, body: { tenant_role: e.target.value } })}><option value="member">成员</option><option value="admin">管理员</option>{item.tenant_role === 'owner' && <option value="owner">所有者</option>}</select> : label[m.tenant_role]}</td><td className="p-3">{canManage ? <MemberCustomRole tenantId={tenantId} actorId={actor?.user_id ?? 'anonymous'} member={m} roles={activeRoles.data?.items ?? []} rolesLoading={activeRoles.isLoading} rolesError={activeRoles.isError ? errorText(activeRoles.error) : undefined} membershipVersion={item.membership_version} canManage onError={(message) => setError(message)} /> : m.user_id === actor?.user_id && m.status === 'active' && m.tenant_role === 'member' ? <MemberCustomRole tenantId={tenantId} actorId={actor?.user_id ?? 'anonymous'} member={m} roles={[]} rolesLoading={false} membershipVersion={item.membership_version} canManage={false} onError={(message) => setError(message)} /> : '需租户管理员读取'}</td><td className="p-3">{label[m.status]}</td>{canManage && <td className="space-x-3 p-3">{m.tenant_role === 'owner' ? '所有者不可由此操作' : m.status === 'active' ? <><button className="underline" onClick={() => patchMember.mutate({ userId: m.user_id, body: { status: 'suspended' } })}>暂停</button><button className="underline" onClick={() => { if (window.confirm(`确定移除成员“${m.nick_name || m.user_name}”吗？`)) patchMember.mutate({ userId: m.user_id, body: { status: 'removed' } }) }}>移除</button></> : m.status === 'removed' || m.status === 'suspended' ? <button className="underline" onClick={() => patchMember.mutate({ userId: m.user_id, body: { status: 'active' } })}>重新加入</button> : '—'}</td>}</tr>)}</tbody></table></div> : <p className="py-5 text-center text-sm text-muted-foreground">暂无成员</p>}
+      {members.isLoading ? <p className="text-sm text-muted-foreground">正在加载成员…</p> : members.isError ? <ErrorBox message={errorText(members.error)} /> : members.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3">成员</th><th className="p-3">账号 ID</th><th className="p-3">角色</th><th className="p-3">自定义角色</th><th className="p-3">状态</th>{canManage && <th className="p-3">管理</th>}</tr></thead><tbody>{members.data.items.map((m) => <tr key={m.user_id} className="border-b last:border-0"><td className="p-3">{m.nick_name || m.user_name}{m.email && <span className="block text-muted-foreground">{m.email}</span>}</td><td className="p-3">{m.user_id}</td><td className="p-3">{canManage && m.tenant_role !== 'owner' ? <select aria-label={`${m.user_name}角色`} className="rounded border bg-background p-1" value={m.tenant_role} onChange={(e) => patchMember.mutate({ userId: m.user_id, body: { tenant_role: e.target.value as MemberRole } })}><option value="member">成员</option><option value="admin">管理员</option>{item.tenant_role === 'owner' && <option value="owner">所有者</option>}</select> : label[m.tenant_role]}</td><td className="p-3">{canManage ? <MemberCustomRole tenantId={tenantId} actorId={actor?.user_id ?? 'anonymous'} member={m} roles={activeRoles.data?.items ?? []} rolesLoading={activeRoles.isLoading} rolesError={activeRoles.isError ? errorText(activeRoles.error) : undefined} membershipVersion={item.membership_version} canManage onError={(message) => setError(message)} /> : m.user_id === actor?.user_id && m.status === 'active' && m.tenant_role === 'member' ? <MemberCustomRole tenantId={tenantId} actorId={actor?.user_id ?? 'anonymous'} member={m} roles={[]} rolesLoading={false} membershipVersion={item.membership_version} canManage={false} onError={(message) => setError(message)} /> : '需租户管理员读取'}</td><td className="p-3">{label[m.status]}</td>{canManage && <td className="space-x-3 p-3">{m.tenant_role === 'owner' ? '所有者不可由此操作' : m.status === 'active' ? <><button className="underline" onClick={() => patchMember.mutate({ userId: m.user_id, body: { status: 'suspended' } })}>暂停</button><button className="underline" onClick={() => { if (window.confirm(`确定移除成员“${m.nick_name || m.user_name}”吗？`)) patchMember.mutate({ userId: m.user_id, body: { status: 'removed' } }) }}>移除</button></> : m.status === 'removed' || m.status === 'suspended' ? <button className="underline" onClick={() => patchMember.mutate({ userId: m.user_id, body: { status: 'active' } })}>重新加入</button> : '—'}</td>}</tr>)}</tbody></table></div> : <p className="py-5 text-center text-sm text-muted-foreground">暂无成员</p>}
       <Pager page={memberPage} size={20} total={members.data?.total ?? 0} setPage={setMemberPage} /></section>}
     {canManage && item.status === 'active' && <section className={`${panel} space-y-4`}>
       <div><h2 className="font-semibold">邀请链接</h2><p className="text-sm text-muted-foreground">收件人使用已有 Synapse 账号登录后接受邀请。租户管理员只能邀请为成员。</p></div>
@@ -192,9 +203,9 @@ async function copyInviteLink(path: string) {
   await navigator.clipboard.writeText(absoluteInviteLink(path))
 }
 
-function AddMember({ onAdd, pending }: { onAdd: (userId: string, role: string) => void; pending: boolean }) {
+function AddMember({ onAdd, pending }: { onAdd: (userId: string, role: MemberRole) => void; pending: boolean }) {
   const [open, setOpen] = useState(false)
-  return open ? <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); onAdd(String(f.get('user_id')), String(f.get('role'))); e.currentTarget.reset(); setOpen(false) }}><input required name="user_id" inputMode="numeric" pattern="[0-9]+" placeholder="已有账号 ID" className="h-9 rounded-md border bg-background px-3 text-sm" /><select name="role" className="h-9 rounded-md border bg-background px-2 text-sm"><option value="member">成员</option><option value="admin">管理员</option></select><button className={primary} disabled={pending}>添加</button><button type="button" className={button} onClick={() => setOpen(false)}>取消</button></form> : <button className={button} onClick={() => setOpen(true)}>添加已有成员</button>
+  return open ? <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); onAdd(String(f.get('user_id')), String(f.get('role')) as MemberRole); e.currentTarget.reset(); setOpen(false) }}><input required name="user_id" inputMode="numeric" pattern="[0-9]+" placeholder="已有账号 ID" className="h-9 rounded-md border bg-background px-3 text-sm" /><select name="role" className="h-9 rounded-md border bg-background px-2 text-sm"><option value="member">成员</option><option value="admin">管理员</option></select><button className={primary} disabled={pending}>添加</button><button type="button" className={button} onClick={() => setOpen(false)}>取消</button></form> : <button className={button} onClick={() => setOpen(true)}>添加已有成员</button>
 }
 function TenantNameForm({ initial, onSave }: { initial: string; onSave: (name: string) => void }) {
   const [open, setOpen] = useState(false)

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
-type Tenant = { tenant_id: string; name: string; status: 'active' | 'suspended' | 'archived'; tenant_role: 'owner' | 'admin' | 'member' | null }
 type TenantRole = {
   role_id: string
   tenant_id: string
@@ -58,7 +58,7 @@ export function TenantRolesPage() {
   const [error, setError] = useState('')
 
   const tenantKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant']
-  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => api<Tenant>(`/tenants/${tenantId}`) })
+  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
   const normalizedSearch = search.trim()
   const roleKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'roles', page, 20, normalizedSearch, status]
