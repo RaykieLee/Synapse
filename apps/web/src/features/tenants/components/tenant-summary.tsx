@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDateTime, formatDateRange, tenantText } from '../types'
 import { StatusBadge } from './tenant-table'
+import { LocalizedText } from '@/components/localized-text'
 
 export function TenantSummaryCard({
   tenant,
@@ -33,7 +34,7 @@ export function TenantSummaryCard({
               </Badge>
             </div>
             <p className='text-xs text-muted-foreground'>
-              租户 ID：{tenant.tenant_id}
+              <LocalizedText text={"\n              租户 ID："} />{tenant.tenant_id}
             </p>
           </div>
           <div className='flex items-center gap-2 rounded-lg border bg-background/70 px-3 py-2 text-xs text-muted-foreground'>
@@ -67,7 +68,7 @@ export function TenantSummaryCard({
 function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
     <div className='space-y-1 rounded-lg bg-muted/20 px-3 py-2'>
-      <p className='text-xs text-muted-foreground'>{label}</p>
+      <p className='text-xs text-muted-foreground'><LocalizedText text={label} /></p>
       <p className='text-sm font-medium'>{value}</p>
     </div>
   )
@@ -83,8 +84,7 @@ export function TenantManagementLinks({
       <CardHeader className='pb-3'>
         <CardTitle className='flex items-center gap-2 text-base'>
           <Shield className='size-4 text-muted-foreground' />
-          租户配置
-        </CardTitle>
+          <LocalizedText text={"\n          租户配置\n        "} /></CardTitle>
       </CardHeader>
       <CardContent className='space-y-1'>
         {links.map((link) => (

@@ -1,10 +1,13 @@
 import * as React from 'react'
+import { Input } from '@/components/ui/input'
+import { formatMessage, useLocaleText } from '@/lib/i18n'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, File, FileUp, Trash2 } from 'lucide-react'
 import { api, apiBlob } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { useWorkspace } from './context'
+import { LocalizedText } from '@/components/localized-text'
 
 type ScopeKind = 'workspace' | 'personal'
 type Attachment = {
@@ -36,6 +39,7 @@ export function WorkspaceAttachments() {
 }
 
 function WorkspaceAttachmentsContent({ workspace, actorId }: { workspace: { tenant_id: string; workspace_id: string; name: string; status: string; workspace_role: string; membership_version?: number }; actorId: string }) {
+  const t = useLocaleText()
   const client = useQueryClient()
   const [scopeKind, setScopeKind] = React.useState<ScopeKind>('workspace')
   const [page, setPage] = React.useState(1)
@@ -125,57 +129,57 @@ function WorkspaceAttachmentsContent({ workspace, actorId }: { workspace: { tena
   return (
     <main className='space-y-6 p-6'>
       <header>
-        <Link className='text-sm underline underline-offset-4' to='/w/$workspaceId' params={{ workspaceId: workspace.workspace_id }}>← 返回空间</Link>
-        <p className='mt-3 text-sm text-muted-foreground'>Workspace · {workspace.name}</p>
-        <h1 className='mt-1 text-2xl font-semibold'>附件</h1>
-        <p className='mt-2 text-sm text-muted-foreground'>管理此空间中的文件。个人附件只对上传者本人可见。</p>
+        <Link className='text-sm underline underline-offset-4' to='/w/$workspaceId' params={{ workspaceId: workspace.workspace_id }}><LocalizedText text={"← 返回空间"} /></Link>
+        <p className='mt-3 text-sm text-muted-foreground'><LocalizedText text={"Workspace · "} />{workspace.name}</p>
+        <h1 className='mt-1 text-2xl font-semibold'><LocalizedText text={"附件"} /></h1>
+        <p className='mt-2 text-sm text-muted-foreground'><LocalizedText text={"管理此空间中的文件。个人附件只对上传者本人可见。"} /></p>
       </header>
 
-      {workspace.status !== 'active' ? <section className={`${panel} text-sm text-muted-foreground`}>空间已归档，附件当前为只读不可用状态。恢复空间后可以继续访问。</section> : <>
+      {workspace.status !== 'active' ? <section className={`${panel} text-sm text-muted-foreground`}><LocalizedText text={"空间已归档，附件当前为只读不可用状态。恢复空间后可以继续访问。"} /></section> : <>
         <section className={`${panel} space-y-4`}>
           <div>
-            <h2 className='font-semibold'>存储范围</h2>
-            <p className='mt-1 text-sm text-muted-foreground'>Workspace 附件对有访问权限的空间成员开放；个人附件仅当前账号可见。</p>
+            <h2 className='font-semibold'><LocalizedText text={"存储范围"} /></h2>
+            <p className='mt-1 text-sm text-muted-foreground'><LocalizedText text={"Workspace 附件对有访问权限的空间成员开放；个人附件仅当前账号可见。"} /></p>
           </div>
-          <div className='flex flex-wrap gap-2' role='group' aria-label='附件存储范围'>
-            <Button type='button' variant={scopeKind === 'workspace' ? 'default' : 'outline'} aria-pressed={scopeKind === 'workspace'} onClick={() => setScopeKind('workspace')}>Workspace 附件</Button>
-            <Button type='button' variant={scopeKind === 'personal' ? 'default' : 'outline'} aria-pressed={scopeKind === 'personal'} onClick={() => setScopeKind('personal')}>我的个人附件</Button>
+          <div className='flex flex-wrap gap-2' role='group' aria-label={t('附件存储范围')}>
+            <Button type='button' variant={scopeKind === 'workspace' ? "default" : "outline"} aria-pressed={scopeKind === 'workspace'} onClick={() => setScopeKind('workspace')}><LocalizedText text={"Workspace 附件"} /></Button>
+            <Button type='button' variant={scopeKind === 'personal' ? "default" : "outline"} aria-pressed={scopeKind === 'personal'} onClick={() => setScopeKind('personal')}><LocalizedText text={"我的个人附件"} /></Button>
           </div>
           <div className='flex flex-col gap-3 sm:flex-row sm:items-end'>
             <div className='min-w-0 flex-1 space-y-2'>
-              <label className='text-sm font-medium' htmlFor='workspace-attachment-file'>选择文件</label>
-              <input ref={fileInput} id='workspace-attachment-file' type='file' accept={accepted} disabled={!canUpload || upload.isPending} onChange={(event) => chooseFile(event.target.files?.[0])} className='block w-full rounded-md border bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5' />
-              <p className='text-xs text-muted-foreground'>单个文件最大 25 MiB。支持 PNG、JPEG、GIF、WebP、PDF、TXT、CSV、DOCX、XLSX、PPTX。</p>
+              <label className='text-sm font-medium' htmlFor='workspace-attachment-file'><LocalizedText text={"选择文件"} /></label>
+              <Input ref={fileInput} id='workspace-attachment-file' type='file' accept={accepted} disabled={!canUpload || upload.isPending} onChange={(event) => chooseFile(event.target.files?.[0])} className='block w-full rounded-md border bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5' />
+              <p className='text-xs text-muted-foreground'><LocalizedText text={"单个文件最大 25 MiB。支持 PNG、JPEG、GIF、WebP、PDF、TXT、CSV、DOCX、XLSX、PPTX。"} /></p>
             </div>
             <Button type='button' disabled={!canUpload || !selectedFile || upload.isPending} onClick={() => selectedFile && upload.mutate(selectedFile)}>
-              <FileUp className='mr-2 size-4' />{upload.isPending ? '上传中…' : '上传附件'}
+              <FileUp className='mr-2 size-4' />{upload.isPending ? <LocalizedText text={"上传中…"} /> : <LocalizedText text={"上传附件"} />}
             </Button>
           </div>
-          {selectedFile && <p className='text-sm text-muted-foreground'>待上传：{selectedFile.name} · {formatSize(selectedFile.size)}</p>}
-          {!canUpload && <p className='text-sm text-muted-foreground'>当前空间角色无上传权限。</p>}
+          {selectedFile && <p className='text-sm text-muted-foreground'><LocalizedText text={"待上传："} />{selectedFile.name} <LocalizedText text={" · "} />{formatSize(selectedFile.size)}</p>}
+          {!canUpload && <p className='text-sm text-muted-foreground'><LocalizedText text={"当前空间角色无上传权限。"} /></p>}
         </section>
 
         <section className={panel}>
           <div className='flex flex-wrap items-center justify-between gap-3'>
-            <div><h2 className='font-semibold'>{scopeKind === 'workspace' ? 'Workspace 附件' : '我的个人附件'}</h2><p className='mt-1 text-sm text-muted-foreground'>{scopeKind === 'workspace' ? '当前 Workspace 可见的附件。' : '只有你可以列出、下载或删除这些附件。'}</p></div>
-            {attachments.data && <span className='text-sm text-muted-foreground'>共 {attachments.data.total} 个文件</span>}
+            <div><h2 className='font-semibold'>{scopeKind === 'workspace' ? <LocalizedText text={"Workspace 附件"} /> : <LocalizedText text={"我的个人附件"} />}</h2><p className='mt-1 text-sm text-muted-foreground'>{scopeKind === 'workspace' ? <LocalizedText text={"当前 Workspace 可见的附件。"} /> : <LocalizedText text={"只有你可以列出、下载或删除这些附件。"} />}</p></div>
+            {attachments.data && <span className='text-sm text-muted-foreground'><LocalizedText text={"共 "} />{attachments.data.total} <LocalizedText text={" 个文件"} /></span>}
           </div>
-          {attachments.isLoading ? <p className='py-8 text-center text-sm text-muted-foreground'>正在加载附件…</p> : attachments.isError ? <p role='alert' className='py-8 text-center text-sm text-destructive'>{errorMessage(attachments.error)}</p> : attachments.data?.items.length ? <div className='mt-4 divide-y'>
+          {attachments.isLoading ? <p className='py-8 text-center text-sm text-muted-foreground'><LocalizedText text={"正在加载附件…"} /></p> : attachments.isError ? <p role='alert' className='py-8 text-center text-sm text-destructive'>{errorMessage(attachments.error)}</p> : attachments.data?.items.length ? <div className='mt-4 divide-y'>
             {attachments.data.items.map((attachment) => {
               const canDelete = scopeKind === 'personal' || canDeleteWorkspaceFiles
               return <article key={attachment.attachment_id} className='flex flex-col gap-3 py-3 sm:flex-row sm:items-center'>
                 <File className='hidden size-5 shrink-0 text-muted-foreground sm:block' aria-hidden='true' />
-                <div className='min-w-0 flex-1'><p className='truncate font-medium' title={attachment.filename}>{attachment.filename}</p><p className='mt-1 text-xs text-muted-foreground'>{formatSize(attachment.size_bytes)} · {attachment.media_type} · {new Date(attachment.created_at).toLocaleString()}</p></div>
+                <div className='min-w-0 flex-1'><p className='truncate font-medium' title={attachment.filename}>{attachment.filename}</p><p className='mt-1 text-xs text-muted-foreground'>{formatSize(attachment.size_bytes)} <LocalizedText text={" · "} />{attachment.media_type} <LocalizedText text={" · "} />{new Date(attachment.created_at).toLocaleString()}</p></div>
                 <div className='flex shrink-0 gap-2'>
-                  <Button type='button' size='sm' variant='outline' onClick={() => void download(attachment)}><Download className='mr-2 size-4' />下载</Button>
+                  <Button type='button' size='sm' variant='outline' onClick={() => void download(attachment)}><Download className='mr-2 size-4' /><LocalizedText text={"下载"} /></Button>
                   {canDelete && <Button type='button' size='sm' variant='outline' disabled={remove.isPending} onClick={() => {
-                    if (window.confirm(`确定删除“${attachment.filename}”吗？`)) remove.mutate({ id: attachment.attachment_id, scope: scopeKind })
-                  }}><Trash2 className='mr-2 size-4' />删除</Button>}
+                    if (window.confirm(formatMessage('确定删除“{name}”吗？', { name: attachment.filename }))) remove.mutate({ id: attachment.attachment_id, scope: scopeKind })
+                  }}><Trash2 className='mr-2 size-4' /><LocalizedText text={"删除"} /></Button>}
                 </div>
               </article>
             })}
-            <div className='flex items-center justify-between pt-4 text-sm'><span>第 {page} 页</span><div className='flex gap-2'><Button size='sm' variant='outline' disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>上一页</Button><Button size='sm' variant='outline' disabled={page * 20 >= attachments.data.total} onClick={() => setPage((value) => value + 1)}>下一页</Button></div></div>
-          </div> : <div className='py-10 text-center'><File className='mx-auto size-8 text-muted-foreground/60' /><p className='mt-3 text-sm text-muted-foreground'>{scopeKind === 'workspace' ? '此 Workspace 暂无附件。' : '你还没有个人附件。'}</p></div>}
+            <div className='flex items-center justify-between pt-4 text-sm'><span><LocalizedText text={"第 "} />{page} <LocalizedText text={" 页"} /></span><div className='flex gap-2'><Button size='sm' variant='outline' disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}><LocalizedText text={"上一页"} /></Button><Button size='sm' variant='outline' disabled={page * 20 >= attachments.data.total} onClick={() => setPage((value) => value + 1)}><LocalizedText text={"下一页"} /></Button></div></div>
+          </div> : <div className='py-10 text-center'><File className='mx-auto size-8 text-muted-foreground/60' /><p className='mt-3 text-sm text-muted-foreground'>{scopeKind === 'workspace' ? <LocalizedText text={"此 Workspace 暂无附件。"} /> : <LocalizedText text={"你还没有个人附件。"} />}</p></div>}
         </section>
       </>}
       {error && <p role='alert' className='text-sm text-destructive'>{error}</p>}

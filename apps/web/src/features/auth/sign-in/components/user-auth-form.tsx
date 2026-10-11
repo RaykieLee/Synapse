@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Input } from '@/components/ui/input'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -33,6 +34,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { LocalizedText } from '@/components/localized-text'
 
 const REMEMBERED_USERNAME_KEY = 'synapse.login.remembered-username'
 
@@ -144,8 +146,7 @@ export function UserAuthForm({
       >
         <div className='login-tabs' aria-label='登录方式'>
           <button type='button' className='login-tab' aria-current='page'>
-            账号登录
-          </button>
+            <LocalizedText text={"\n            账号登录\n          "} /></button>
           <button
             type='button'
             className='login-tab'
@@ -156,8 +157,7 @@ export function UserAuthForm({
               )
             }
           >
-            验证码登录
-          </button>
+            <LocalizedText text={"\n            验证码登录\n          "} /></button>
         </div>
 
         <FormField
@@ -165,11 +165,11 @@ export function UserAuthForm({
           name='user_name'
           render={({ field }) => (
             <FormItem className='login-field'>
-              <FormLabel className='login-field-label'>账号</FormLabel>
+              <FormLabel className='login-field-label'><LocalizedText text={"账号"} /></FormLabel>
               <span className='login-input-wrap'>
                 <UserRound aria-hidden='true' className='login-input-icon' />
                 <FormControl>
-                  <input
+                  <Input
                     {...field}
                     autoComplete='username'
                     placeholder='请输入用户名'
@@ -179,8 +179,7 @@ export function UserAuthForm({
                 </FormControl>
               </span>
               <FormDescription className='sr-only'>
-                用于登录工作空间的用户名。
-              </FormDescription>
+                <LocalizedText text={"\n                用于登录工作空间的用户名。\n              "} /></FormDescription>
               <FormMessage className='login-field-error' />
             </FormItem>
           )}
@@ -191,13 +190,13 @@ export function UserAuthForm({
           name='password'
           render={({ field }) => (
             <FormItem className='login-field'>
-              <FormLabel className='login-field-label'>密码</FormLabel>
+              <FormLabel className='login-field-label'><LocalizedText text={"密码"} /></FormLabel>
               <span className='login-input-wrap'>
                 <LockKeyhole aria-hidden='true' className='login-input-icon' />
                 <FormControl>
-                  <input
+                  <Input
                     {...field}
-                    type={passwordVisible ? 'text' : 'password'}
+                    type={passwordVisible ? "text" : "password"}
                     autoComplete='current-password'
                     placeholder='请输入密码'
                     className='login-field-input login-password-input'
@@ -207,7 +206,7 @@ export function UserAuthForm({
                 <button
                   type='button'
                   className='login-password-toggle'
-                  aria-label={passwordVisible ? '隐藏密码' : '显示密码'}
+                  aria-label={passwordVisible ? "隐藏密码" : "显示密码"}
                   aria-pressed={passwordVisible}
                   onClick={() => setPasswordVisible((visible) => !visible)}
                 >
@@ -219,8 +218,7 @@ export function UserAuthForm({
                 </button>
               </span>
               <FormDescription className='sr-only'>
-                对应账号的登录密码。
-              </FormDescription>
+                <LocalizedText text={"\n                对应账号的登录密码。\n              "} /></FormDescription>
               <FormMessage className='login-field-error' />
             </FormItem>
           )}
@@ -235,7 +233,7 @@ export function UserAuthForm({
               }
               aria-label='记住账号'
             />
-            <span>记住账号</span>
+            <span><LocalizedText text={"记住账号"} /></span>
           </label>
           <button
             type='button'
@@ -247,8 +245,7 @@ export function UserAuthForm({
               )
             }
           >
-            忘记密码？
-          </button>
+            <LocalizedText text={"\n            忘记密码？\n          "} /></button>
         </div>
 
         {loginError && (
@@ -266,17 +263,16 @@ export function UserAuthForm({
           {isLoading ? (
             <>
               <Loader2 aria-hidden='true' className='animate-spin' />
-              正在登录…
-            </>
+              <LocalizedText text={"\n              正在登录…\n            "} /></>
           ) : (
             <>
-              登录工作空间 <ArrowRight aria-hidden='true' />
+              <LocalizedText text={"\n              登录工作空间 "} /><ArrowRight aria-hidden='true' />
             </>
           )}
         </Button>
 
         <div className='login-divider' aria-hidden='true'>
-          <span>或</span>
+          <span><LocalizedText text={"或"} /></span>
         </div>
 
         <Button
@@ -291,11 +287,10 @@ export function UserAuthForm({
           }
         >
           <Building2 aria-hidden='true' />
-          使用企业 SSO 登录
-        </Button>
+          <LocalizedText text={"\n          使用企业 SSO 登录\n        "} /></Button>
 
         <p className='login-admin-help'>
-          需要帮助？{' '}
+          <LocalizedText text={"\n          需要帮助？"} />{' '}
           <button
             type='button'
             className='login-text-button'
@@ -306,8 +301,7 @@ export function UserAuthForm({
               )
             }
           >
-            联系管理员
-          </button>
+            <LocalizedText text={"\n            联系管理员\n          "} /></button>
         </p>
 
         <Dialog

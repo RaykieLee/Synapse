@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LocalizedText } from '@/components/localized-text'
 
 export function AccountForm() {
   const reset = useAuthStore((s) => s.auth.reset)
@@ -25,8 +26,8 @@ export function AccountForm() {
     finally { setSaving(false) }
   }
   return <form onSubmit={submit} className='space-y-5'>
-    <div className='space-y-2'><Label htmlFor='current-password'>Current password</Label><Input id='current-password' type='password' autoComplete='current-password' required value={current} onChange={(e) => setCurrent(e.target.value)} /></div>
-    <div className='space-y-2'><Label htmlFor='new-password'>New password</Label><Input id='new-password' type='password' autoComplete='new-password' minLength={12} required value={next} onChange={(e) => setNext(e.target.value)} /><p className='text-sm text-muted-foreground'>At least 12 characters. You will need to sign in again after changing it.</p></div>
-    <Button type='submit' disabled={saving}>{saving ? 'Updating…' : 'Change password'}</Button>
+    <div className='space-y-2'><Label htmlFor='current-password'><LocalizedText text={"Current password"} /></Label><Input id='current-password' type='password' autoComplete='current-password' required value={current} onChange={(e) => setCurrent(e.target.value)} /></div>
+    <div className='space-y-2'><Label htmlFor='new-password'><LocalizedText text={"New password"} /></Label><Input id='new-password' type='password' autoComplete='new-password' minLength={12} required value={next} onChange={(e) => setNext(e.target.value)} /><p className='text-sm text-muted-foreground'><LocalizedText text={"At least 12 characters. You will need to sign in again after changing it."} /></p></div>
+    <Button type='submit' disabled={saving}>{saving ? <LocalizedText text={"Updating…"} /> : <LocalizedText text={"Change password"} />}</Button>
   </form>
 }

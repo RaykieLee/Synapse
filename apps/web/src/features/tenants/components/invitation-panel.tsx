@@ -36,6 +36,7 @@ import {
   type TenantInvitation,
 } from '../types'
 import { EmptyState, TableSkeleton } from './shared'
+import { LocalizedText } from '@/components/localized-text'
 
 export function InvitationPanel({
   pending,
@@ -58,7 +59,6 @@ export function InvitationPanel({
   }) => void
   onRevoke: (invitation: TenantInvitation) => void
 }) {
-  const [kind, setKind] = useState<'email' | 'user_id'>('email')
   const [role, setRole] = useState<'admin' | 'member'>('member')
   const [target, setTarget] = useState('')
   const [copyMessage, setCopyMessage] = useState('')
@@ -74,43 +74,24 @@ export function InvitationPanel({
           event.preventDefault()
           const value = target.trim()
           if (!value) return
-          onCreate({
-            [kind]: value,
-            tenant_role: canInviteAdmin ? role : 'member',
-          })
+          onCreate({ email: value, tenant_role: canInviteAdmin ? role : 'member' })
         }}
       >
         <div className='space-y-2'>
-          <Label htmlFor='invite-target'>邀请对象</Label>
-          <div className='flex gap-2'>
-            <Select
-              value={kind}
-              onValueChange={(value) => setKind(value as 'email' | 'user_id')}
-            >
-              <SelectTrigger className='w-32'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='email'>邮箱</SelectItem>
-                <SelectItem value='user_id'>账号 ID</SelectItem>
-              </SelectContent>
-            </Select>
+          <Label htmlFor='invite-target'><LocalizedText text={"成员邮箱"} /></Label>
+          <div>
             <Input
               id='invite-target'
               required
               value={target}
               onChange={(event) => setTarget(event.target.value)}
-              type={kind === 'email' ? 'email' : 'text'}
-              inputMode={kind === 'user_id' ? 'numeric' : undefined}
-              pattern={kind === 'user_id' ? '[0-9]+' : undefined}
-              placeholder={
-                kind === 'email' ? 'name@example.com' : '全局账号 ID'
-              }
+              type='email'
+              placeholder='name@example.com'
             />
           </div>
         </div>
         <div className='space-y-2'>
-          <Label htmlFor='invite-role'>租户角色</Label>
+          <Label htmlFor='invite-role'><LocalizedText text={"租户角色"} /></Label>
           <Select
             value={canInviteAdmin ? role : 'member'}
             onValueChange={(value) => setRole(value as 'admin' | 'member')}
@@ -119,21 +100,20 @@ export function InvitationPanel({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value='member'>成员</SelectItem>
-              {canInviteAdmin && <SelectItem value='admin'>管理员</SelectItem>}
+              <SelectItem value='member'><LocalizedText text={"成员"} /></SelectItem>
+              {canInviteAdmin && <SelectItem value='admin'><LocalizedText text={"管理员"} /></SelectItem>}
             </SelectContent>
           </Select>
         </div>
         <div className='flex items-end'>
           <Button type='submit' className='w-full lg:w-auto' disabled={pending}>
-            <Link2 className='size-4' /> 创建邀请
-          </Button>
+            <Link2 className='size-4' /> <LocalizedText text={" 创建邀请\n          "} /></Button>
         </div>
       </form>
 
       {created ? (
         <div className='rounded-lg border border-primary/30 bg-primary/5 p-4'>
-          <p className='text-sm font-medium'>邀请链接已创建</p>
+          <p className='text-sm font-medium'><LocalizedText text={"邀请链接已创建"} /></p>
           <p className='mt-1 text-xs break-all text-muted-foreground'>
             {absoluteInviteLink(created.invite_link)}
           </p>
@@ -147,8 +127,7 @@ export function InvitationPanel({
                   .catch(() => setCopyMessage('复制失败，请手动复制'))
               }}
             >
-              <Copy className='size-4' /> 复制链接
-            </Button>
+              <Copy className='size-4' /> <LocalizedText text={" 复制链接\n            "} /></Button>
             <span role='status' className='text-xs text-muted-foreground'>
               {copyMessage}
             </span>
@@ -160,11 +139,11 @@ export function InvitationPanel({
         <Table>
           <TableHeader>
             <TableRow className='bg-muted/35 hover:bg-muted/35'>
-              <TableHead className='h-11 ps-4'>邀请对象</TableHead>
-              <TableHead>角色</TableHead>
-              <TableHead>到期时间</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead className='w-28 pe-4 text-end'>操作</TableHead>
+              <TableHead className='h-11 ps-4'><LocalizedText text={"邀请对象"} /></TableHead>
+              <TableHead><LocalizedText text={"角色"} /></TableHead>
+              <TableHead><LocalizedText text={"到期时间"} /></TableHead>
+              <TableHead><LocalizedText text={"状态"} /></TableHead>
+              <TableHead className='w-28 pe-4 text-end'><LocalizedText text={"操作"} /></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -178,7 +157,12 @@ export function InvitationPanel({
               invitations.map((invitation) => (
                 <TableRow key={invitation.invitation_id}>
                   <TableCell className='ps-4'>
-                    {invitation.email || `账号 ${invitation.target_user_id}`}
+                    {invitation.email || (
+                      <details className='text-sm'>
+                        <summary className='cursor-pointer'><LocalizedText text={"已有账号邀请"} /></summary>
+                        <code className='text-xs text-muted-foreground'>账号 ID {invitation.target_user_id}</code>
+                      </details>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant='outline'>
@@ -190,14 +174,13 @@ export function InvitationPanel({
                   </TableCell>
                   <TableCell>
                     {invitation.expired ? (
-                      <Badge variant='outline'>已过期</Badge>
+                      <Badge variant='outline'><LocalizedText text={"已过期"} /></Badge>
                     ) : (
                       <Badge
                         variant='outline'
                         className='border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300'
                       >
-                        待接受
-                      </Badge>
+                        <LocalizedText text={"\n                        待接受\n                      "} /></Badge>
                     )}
                   </TableCell>
                   <TableCell className='pe-4'>
@@ -207,8 +190,7 @@ export function InvitationPanel({
                       className='text-destructive hover:bg-destructive/10'
                       onClick={() => setRevokeTarget(invitation)}
                     >
-                      <Trash2 className='size-4' /> 撤销
-                    </Button>
+                      <Trash2 className='size-4' /> <LocalizedText text={" 撤销\n                    "} /></Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -232,23 +214,20 @@ export function InvitationPanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>撤销邀请</AlertDialogTitle>
+            <AlertDialogTitle><LocalizedText text={"撤销邀请"} /></AlertDialogTitle>
             <AlertDialogDescription>
-              撤销后，原邀请链接将不可使用。确定继续吗？
-            </AlertDialogDescription>
+              <LocalizedText text={"\n              撤销后，原邀请链接将不可使用。确定继续吗？\n            "} /></AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setRevokeTarget(null)}>
-              取消
-            </AlertDialogCancel>
+              <LocalizedText text={"\n              取消\n            "} /></AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (revokeTarget) onRevoke(revokeTarget)
                 setRevokeTarget(null)
               }}
             >
-              撤销邀请
-            </AlertDialogAction>
+              <LocalizedText text={"\n              撤销邀请\n            "} /></AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

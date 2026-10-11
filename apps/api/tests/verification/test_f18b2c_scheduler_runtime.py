@@ -11,10 +11,15 @@ from pathlib import Path
 from threading import Event, Lock
 
 import pytest
+
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import func, select
 
+pytestmark = [
+    pytest.mark.redis,
+    pytest.mark.integration,
+]
 
 def test_f18b2c_lifespan_pollers_execute_retry_and_stop_claimed_definitions(tmp_path, monkeypatch):
     db_path = tmp_path / "f18b2c-runtime.sqlite"

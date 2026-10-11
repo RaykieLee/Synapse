@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { useForm } from 'react-hook-form'
 import { ChevronDownIcon } from '@radix-ui/react-icons'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,6 +19,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { LocalizedText } from '@/components/localized-text'
 
 const appearanceFormSchema = z.object({
   theme: z.enum(['light', 'dark']),
@@ -56,10 +58,10 @@ export function AppearanceForm() {
           name='font'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Font</FormLabel>
+              <FormLabel><LocalizedText text={"Font"} /></FormLabel>
               <div className='relative w-max'>
                 <FormControl>
-                  <select
+                  <LocalizedNativeSelect
                     className={cn(
                       buttonVariants({ variant: 'outline' }),
                       'w-50 appearance-none font-normal capitalize',
@@ -72,13 +74,12 @@ export function AppearanceForm() {
                         {font}
                       </option>
                     ))}
-                  </select>
+                  </LocalizedNativeSelect>
                 </FormControl>
                 <ChevronDownIcon className='absolute inset-e-3 top-2.5 h-4 w-4 opacity-50' />
               </div>
               <FormDescription className='font-manrope'>
-                Set the font you want to use in the dashboard.
-              </FormDescription>
+                <LocalizedText text={"\n                Set the font you want to use in the dashboard.\n              "} /></FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -88,10 +89,9 @@ export function AppearanceForm() {
           name='theme'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Theme</FormLabel>
+              <FormLabel><LocalizedText text={"Theme"} /></FormLabel>
               <FormDescription>
-                Select the theme for the dashboard.
-              </FormDescription>
+                <LocalizedText text={"\n                Select the theme for the dashboard.\n              "} /></FormDescription>
               <FormMessage />
               <RadioGroup
                 onValueChange={field.onChange}
@@ -120,8 +120,7 @@ export function AppearanceForm() {
                       </div>
                     </div>
                     <span className='block w-full p-2 text-center font-normal'>
-                      Light
-                    </span>
+                      <LocalizedText text={"\n                      Light\n                    "} /></span>
                   </FormLabel>
                 </FormItem>
                 <FormItem>
@@ -146,8 +145,7 @@ export function AppearanceForm() {
                       </div>
                     </div>
                     <span className='block w-full p-2 text-center font-normal'>
-                      Dark
-                    </span>
+                      <LocalizedText text={"\n                      Dark\n                    "} /></span>
                   </FormLabel>
                 </FormItem>
               </RadioGroup>
@@ -155,7 +153,7 @@ export function AppearanceForm() {
           )}
         />
 
-        <Button type='submit'>Update preferences</Button>
+        <Button type='submit'><LocalizedText text={"Update preferences"} /></Button>
       </form>
     </Form>
   )

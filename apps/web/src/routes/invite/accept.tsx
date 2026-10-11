@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Input } from '@/components/ui/input'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
   acceptTenantInvitation,
@@ -7,6 +8,7 @@ import {
 } from '@/api/tenant-invitations'
 import { ApiProblem, api, type AuthUser } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
+import { LocalizedText } from '@/components/localized-text'
 
 
 export const Route = createFileRoute('/invite/accept')({
@@ -109,32 +111,32 @@ function InvitationAcceptPage() {
 
   return <main className="grid min-h-svh place-items-center bg-muted/30 p-4">
     <section className="w-full max-w-lg space-y-5 rounded-xl border bg-card p-6 shadow-sm">
-      <div><p className="text-sm font-medium text-primary">Synapse 租户邀请</p><h1 className="mt-1 text-2xl font-semibold">接受邀请</h1><p className="mt-2 text-sm text-muted-foreground">此链接只可使用一次，并且需要使用邀请指定的账号接受。接受租户邀请不会自动加入任何 Workspace。</p></div>
+      <div><p className="text-sm font-medium text-primary"><LocalizedText text={"Synapse 租户邀请"} /></p><h1 className="mt-1 text-2xl font-semibold"><LocalizedText text={"接受邀请"} /></h1><p className="mt-2 text-sm text-muted-foreground"><LocalizedText text={"此链接只可使用一次，并且需要使用邀请指定的账号接受。接受租户邀请不会自动加入任何 Workspace。"} /></p></div>
       {!token && <ErrorNotice message="邀请链接缺少 token。请向邀请方索取有效链接。" />}
       {error && <ErrorNotice message={error} />}
       {accepted ? <div className="space-y-3 rounded-md border border-emerald-600/30 bg-emerald-500/5 p-4">
-        <h2 className="font-medium">已加入租户</h2><p className="text-sm text-muted-foreground">租户 ID：{accepted.tenant_id} · 角色：{accepted.tenant_role}</p>
-        <p className="text-sm text-muted-foreground">当前没有自动创建 Workspace 成员关系。如需访问空间，请由空间管理员另行添加。</p>
-        <button className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground" onClick={() => void navigate({ to: '/tenants/$tenantId', params: { tenantId: accepted.tenant_id } })}>查看租户</button>
+        <h2 className="font-medium"><LocalizedText text={"已加入租户"} /></h2><p className="text-sm text-muted-foreground"><LocalizedText text={"租户 ID："} />{accepted.tenant_id} <LocalizedText text={" · 角色："} />{accepted.tenant_role}</p>
+        <p className="text-sm text-muted-foreground"><LocalizedText text={"当前没有自动创建 Workspace 成员关系。如需访问空间，请由空间管理员另行添加。"} /></p>
+        <button className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground" onClick={() => void navigate({ to: '/tenants/$tenantId', params: { tenantId: accepted.tenant_id } })}><LocalizedText text={"查看租户"} /></button>
       </div> : accessToken ? <div className="space-y-3">
-        <p className="text-sm">已登录。请确认这是接受此邀请的账号。</p>
-        <button className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" disabled={!token || busy} onClick={() => void accept()}>{busy ? '处理中…' : '接受租户邀请'}</button>
+        <p className="text-sm"><LocalizedText text={"已登录。请确认这是接受此邀请的账号。"} /></p>
+        <button className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" disabled={!token || busy} onClick={() => void accept()}>{busy ? <LocalizedText text={"处理中…"} /> : <LocalizedText text={"接受租户邀请"} />}</button>
       </div> : <div className="space-y-4">
-        <div className="flex gap-2 border-b pb-3"><button type="button" className={`px-2 py-1 text-sm ${authMode === 'signin' ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`} onClick={() => { setAuthMode('signin'); setError(''); setPassword(''); setConfirmPassword('') }}>已有账号，登录</button><button type="button" className={`px-2 py-1 text-sm ${authMode === 'register' ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`} onClick={() => { setAuthMode('register'); setError(''); setPassword(''); setConfirmPassword('') }}>没有账号，创建账号</button></div>
+        <div className="flex gap-2 border-b pb-3"><button type="button" className={`px-2 py-1 text-sm ${authMode === 'signin' ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`} onClick={() => { setAuthMode('signin'); setError(''); setPassword(''); setConfirmPassword('') }}><LocalizedText text={"已有账号，登录"} /></button><button type="button" className={`px-2 py-1 text-sm ${authMode === 'register' ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`} onClick={() => { setAuthMode('register'); setError(''); setPassword(''); setConfirmPassword('') }}><LocalizedText text={"没有账号，创建账号"} /></button></div>
         {authMode === 'signin' ? <form className="space-y-3" onSubmit={(event) => void signIn(event)}>
-          <label className="block space-y-1 text-sm"><span>用户名</span><input required autoComplete="username" className="h-10 w-full rounded-md border bg-background px-3" value={username} onChange={(event) => setUsername(event.target.value)} /></label>
-          <label className="block space-y-1 text-sm"><span>密码</span><input required type="password" autoComplete="current-password" className="h-10 w-full rounded-md border bg-background px-3" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-          <button className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" disabled={busy || !token}>{busy ? '正在登录…' : '登录并继续'}</button>
+          <label className="block space-y-1 text-sm"><span><LocalizedText text={"用户名"} /></span><Input required autoComplete="username" className="h-10 w-full rounded-md border bg-background px-3" value={username} onChange={(event) => setUsername(event.target.value)} /></label>
+          <label className="block space-y-1 text-sm"><span><LocalizedText text={"密码"} /></span><Input required type="password" autoComplete="current-password" className="h-10 w-full rounded-md border bg-background px-3" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+          <button className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" disabled={busy || !token}>{busy ? <LocalizedText text={"正在登录…"} /> : <LocalizedText text={"登录并继续"} />}</button>
         </form> : <form className="space-y-3" onSubmit={(event) => void register(event)}>
-          <p className="text-sm text-muted-foreground">新账号将绑定到此邀请指定的邮箱和租户。邮箱由邀请链接验证，无需填写；租户成员资格会与账号一并创建。</p>
-          <label className="block space-y-1 text-sm"><span>用户名</span><input required minLength={1} maxLength={64} autoComplete="username" className="h-10 w-full rounded-md border bg-background px-3" value={username} onChange={(event) => setUsername(event.target.value)} /><span className="block text-xs text-muted-foreground">最多 64 个字符，创建后不可更改。</span></label>
-          <label className="block space-y-1 text-sm"><span>创建密码</span><input required minLength={12} maxLength={256} type="password" autoComplete="new-password" className="h-10 w-full rounded-md border bg-background px-3" value={password} onChange={(event) => setPassword(event.target.value)} /><span className="block text-xs text-muted-foreground">至少 12 个字符。建议使用较长且唯一的密码。</span></label>
+          <p className="text-sm text-muted-foreground"><LocalizedText text={"新账号将绑定到此邀请指定的邮箱和租户。邮箱由邀请链接验证，无需填写；租户成员资格会与账号一并创建。"} /></p>
+          <label className="block space-y-1 text-sm"><span><LocalizedText text={"用户名"} /></span><Input required minLength={1} maxLength={64} autoComplete="username" className="h-10 w-full rounded-md border bg-background px-3" value={username} onChange={(event) => setUsername(event.target.value)} /><span className="block text-xs text-muted-foreground"><LocalizedText text={"最多 64 个字符，创建后不可更改。"} /></span></label>
+          <label className="block space-y-1 text-sm"><span><LocalizedText text={"创建密码"} /></span><Input required minLength={12} maxLength={256} type="password" autoComplete="new-password" className="h-10 w-full rounded-md border bg-background px-3" value={password} onChange={(event) => setPassword(event.target.value)} /><span className="block text-xs text-muted-foreground"><LocalizedText text={"至少 12 个字符。建议使用较长且唯一的密码。"} /></span></label>
           <PasswordStrength password={password} />
-          <label className="block space-y-1 text-sm"><span>确认密码</span><input required minLength={12} maxLength={256} type="password" autoComplete="new-password" className="h-10 w-full rounded-md border bg-background px-3" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
-          <button className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" disabled={busy || !token || password.length < 12 || password !== confirmPassword || !username.trim()}>{busy ? '正在创建账号并加入租户…' : '创建账号并加入租户'}</button>
+          <label className="block space-y-1 text-sm"><span><LocalizedText text={"确认密码"} /></span><Input required minLength={12} maxLength={256} type="password" autoComplete="new-password" className="h-10 w-full rounded-md border bg-background px-3" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
+          <button className="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" disabled={busy || !token || password.length < 12 || password !== confirmPassword || !username.trim()}>{busy ? <LocalizedText text={"正在创建账号并加入租户…"} /> : <LocalizedText text={"创建账号并加入租户"} />}</button>
         </form>}
       </div>}
-      <div className="border-t pt-3 text-sm"><Link className="underline" to="/sign-in" search={{ redirect: `${window.location.pathname}${window.location.search}` }}>返回登录页</Link></div>
+      <div className="border-t pt-3 text-sm"><Link className="underline" to="/sign-in" search={{ redirect: `${window.location.pathname}${window.location.search}` }}><LocalizedText text={"返回登录页"} /></Link></div>
     </section>
   </main>
 }
@@ -162,7 +164,7 @@ function PasswordStrength({ password }: { password: string }) {
   const variety = [/[a-z]/.test(password), /[A-Z]/.test(password), /\d/.test(password), /[^A-Za-z0-9]/.test(password)].filter(Boolean).length
   const strong = length && variety >= 3
   return <p aria-live="polite" className={`text-xs ${strong ? 'text-emerald-700 dark:text-emerald-400' : length ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
-    {password ? strong ? '密码强度：较强' : length ? '密码强度：建议增加大小写字母、数字或符号组合' : `密码至少 12 个字符（还差 ${12 - password.length} 个）` : '密码强度：建议混合使用大小写字母、数字和符号'}
+    {password ? strong ? <LocalizedText text={"密码强度：较强"} /> : length ? <LocalizedText text={"密码强度：建议增加大小写字母、数字或符号组合"} /> : `密码至少 12 个字符（还差 ${12 - password.length} 个）` : <LocalizedText text={"密码强度：建议混合使用大小写字母、数字和符号"} />}
   </p>
 }
 

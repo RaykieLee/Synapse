@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { LocalizedText } from '@/components/localized-text'
 
 type SidebarNavProps = React.HTMLAttributes<HTMLElement> & {
   items: {
@@ -41,7 +42,7 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
               <SelectItem key={item.href} value={item.href}>
                 <div className='flex gap-x-4 px-2 py-1'>
                   <span className='scale-125'>{item.icon}</span>
-                  <span className='text-md'>{item.title}</span>
+                  <span className='text-md'><LocalizedText text={item.title} /></span>
                 </div>
               </SelectItem>
             ))}
@@ -74,7 +75,7 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
               )}
             >
               <span className='me-2'>{item.icon}</span>
-              {item.title}
+              <LocalizedText text={item.title} />
             </Link>
           ))}
         </nav>

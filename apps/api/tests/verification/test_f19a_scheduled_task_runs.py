@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -13,6 +14,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import inspect, select
 from sqlalchemy.exc import IntegrityError
 
+pytestmark = [
+    pytest.mark.redis,
+]
 
 def _code(response) -> str | None:
     try:

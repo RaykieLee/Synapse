@@ -17,6 +17,7 @@ import {
   useWorkspaceDirectory,
 } from './directory'
 import type { Workspace } from './types'
+import { LocalizedText } from '@/components/localized-text'
 
 type WorkspaceContextValue = { workspace: Workspace; actorId: string }
 const WorkspaceContext = React.createContext<WorkspaceContextValue | null>(null)
@@ -112,31 +113,27 @@ export function WorkspaceRouteLayout() {
   if (!actor)
     return (
       <main className='p-6 text-sm text-muted-foreground'>
-        正在检查登录状态…
-      </main>
+        <LocalizedText text={"\n        正在检查登录状态…\n      "} /></main>
     )
   if (directory.workspaceQuery.isLoading)
     return (
       <main className='p-6 text-sm text-muted-foreground'>
-        正在加载空间上下文…
-      </main>
+        <LocalizedText text={"\n        正在加载空间上下文…\n      "} /></main>
     )
   if (!workspace)
     return (
       <main className='space-y-3 p-6'>
-        <h1 className='text-xl font-semibold'>空间不可用</h1>
+        <h1 className='text-xl font-semibold'><LocalizedText text={"空间不可用"} /></h1>
         <p className='text-sm text-muted-foreground'>
-          切换器只会显示当前可访问的空间。
-        </p>
+          <LocalizedText text={"\n          切换器只会显示当前可访问的空间。\n        "} /></p>
         <Link to='/' className='text-sm underline underline-offset-4'>
-          返回工作台
-        </Link>
+          <LocalizedText text={"\n          返回工作台\n        "} /></Link>
       </main>
     )
   if (detail.isError)
     return (
       <main className='space-y-3 p-6'>
-        <h1 className='text-xl font-semibold'>无法验证空间</h1>
+        <h1 className='text-xl font-semibold'><LocalizedText text={"无法验证空间"} /></h1>
         <p role='alert' className='text-sm text-destructive'>
           {detail.error.message}
         </p>

@@ -12,6 +12,7 @@ import {
 import teammates from './assets/digital-teammates.png'
 import { UserAuthForm } from './components/user-auth-form'
 import './sign-in.css'
+import { LocalizedText } from '@/components/localized-text'
 
 const information = {
   help: {
@@ -43,34 +44,31 @@ export function SignIn() {
           aria-label='Synapse 数字员工首页'
         >
           <img className='login-brand-mark' src={synapseMark} alt='' />
-          <span>数字员工</span>
+          <span><LocalizedText text={"数字员工"} /></span>
           <i aria-hidden='true' />
-          <span className='login-brand-caption'>AGENT WORKSPACE</span>
+          <span className='login-brand-caption'><LocalizedText text={"AGENT WORKSPACE"} /></span>
         </a>
         <button className='login-help-link' onClick={() => setInfo('help')}>
-          帮助中心 <ArrowUpRight size={17} aria-hidden='true' />
+          <LocalizedText text={"\n          帮助中心 "} /><ArrowUpRight size={17} aria-hidden='true' />
         </button>
       </header>
       <main className='login-main'>
         <section className='login-story' aria-labelledby='login-story-title'>
           <div className='login-story-copy'>
-            <p className='login-eyebrow'>YOUR NEXT TEAMMATE</p>
+            <p className='login-eyebrow'><LocalizedText text={"YOUR NEXT TEAMMATE"} /></p>
             <h1 id='login-story-title'>
-              你的下一位同事，
-              <br />
-              已经就位。
-            </h1>
+              <LocalizedText text={"\n              你的下一位同事，\n              "} /><br />
+              <LocalizedText text={"\n              已经就位。\n            "} /></h1>
             <p className='login-story-description'>
-              让数字员工融入团队，把时间留给更有价值的事。
-            </p>
+              <LocalizedText text={"\n              让数字员工融入团队，把时间留给更有价值的事。\n            "} /></p>
           </div>
           <div className='login-artwork' aria-hidden='true'>
             <div className='login-orbit' />
             <div className='login-orbit-satellite'>
               <i />
             </div>
-            <span className='login-cross login-cross-one'>＋</span>
-            <span className='login-cross login-cross-two'>＋</span>
+            <span className='login-cross login-cross-one'><LocalizedText text={"＋"} /></span>
+            <span className='login-cross login-cross-two'><LocalizedText text={"＋"} /></span>
             <img
               className='login-teammates'
               src={teammates}
@@ -85,11 +83,10 @@ export function SignIn() {
               ))}
             </div>
             <div className='login-agent-card'>
-              <span>Alex / 任务协作</span>
+              <span><LocalizedText text={"Alex / 任务协作"} /></span>
               <small>
                 <i />
-                在线
-              </small>
+                <LocalizedText text={"\n                在线\n              "} /></small>
             </div>
             <div className='login-chart-card'>
               <span />
@@ -98,11 +95,9 @@ export function SignIn() {
               <span />
             </div>
             <p className='login-art-note login-art-note-left'>
-              数据分析
-              <br />
-              报告生成
-              <br />
-              洞察建议<span>—</span>
+              <LocalizedText text={"\n              数据分析\n              "} /><br />
+              <LocalizedText text={"\n              报告生成\n              "} /><br />
+              <LocalizedText text={"\n              洞察建议"} /><span><LocalizedText text={"—"} /></span>
             </p>
             <div className='login-workflow-card'>
               <i />
@@ -111,47 +106,39 @@ export function SignIn() {
               <span />
             </div>
             <p className='login-art-note login-art-note-right'>
-              流程执行
-              <br />
-              任务跟进
-              <br />
-              自动反馈<span>—</span>
+              <LocalizedText text={"\n              流程执行\n              "} /><br />
+              <LocalizedText text={"\n              任务跟进\n              "} /><br />
+              <LocalizedText text={"\n              自动反馈"} /><span><LocalizedText text={"—"} /></span>
             </p>
             <div className='login-task-card'>
               <span>
                 <Check />
-                项目规划
-              </span>
+                <LocalizedText text={"\n                项目规划\n              "} /></span>
               <span>
                 <Check />
-                任务分配
-              </span>
+                <LocalizedText text={"\n                任务分配\n              "} /></span>
               <span>
                 <Check />
-                进度跟进
-              </span>
+                <LocalizedText text={"\n                进度跟进\n              "} /></span>
             </div>
           </div>
           <p className='login-story-footer'>
             <Sparkle size={22} fill='currentColor' aria-hidden='true' />
-            理解目标 · 连接工具 · 完成工作
-          </p>
+            <LocalizedText text={"\n            理解目标 · 连接工具 · 完成工作\n          "} /></p>
         </section>
         <section className='login-panel' aria-labelledby='login-title'>
           <div className='login-panel-heading'>
-            <h2 id='login-title'>欢迎回来</h2>
-            <p>登录你的数字员工工作空间</p>
+            <h2 id='login-title'><LocalizedText text={"欢迎回来"} /></h2>
+            <p><LocalizedText text={"登录你的数字员工工作空间"} /></p>
           </div>
           <UserAuthForm redirectTo={redirect} />
           <p className='login-legal'>
-            登录前请了解
-            <button onClick={() => setInfo('terms')}>《用户协议》</button>和
-            <button onClick={() => setInfo('privacy')}>《隐私政策》</button>
+            <LocalizedText text={"\n            登录前请了解\n            "} /><button onClick={() => setInfo('terms')}><LocalizedText text={"《用户协议》"} /></button><LocalizedText text={"和\n            "} /><button onClick={() => setInfo('privacy')}><LocalizedText text={"《隐私政策》"} /></button>
           </p>
         </section>
       </main>
       <footer className='login-page-footer'>
-        为人机协作而生。<span>Synapse</span>
+        <LocalizedText text={"\n        为人机协作而生。"} /><span><LocalizedText text={"Synapse"} /></span>
       </footer>
       <Dialog
         open={info !== null}

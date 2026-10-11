@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { formatMessage } from '@/lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Bot, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
@@ -12,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ApiProblem, api } from '@/lib/api'
 import { useWorkspace } from './context'
 import type { Workspace } from './types'
+import { LocalizedText } from '@/components/localized-text'
 
 type AgentData = {
   id: string
@@ -162,41 +164,41 @@ function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; 
     <main className='space-y-6 p-6'>
       <header className='flex flex-wrap items-start justify-between gap-4'>
         <div>
-          <Link className='inline-flex items-center gap-1 text-sm underline underline-offset-4' to='/w/$workspaceId' params={{ workspaceId: workspace.workspace_id }}><ArrowLeft className='size-3.5' />返回空间</Link>
-          <p className='mt-3 text-sm text-muted-foreground'>Workspace · {workspace.name}</p>
-          <h1 className='mt-1 text-2xl font-semibold'>智能体</h1>
-          <p className='mt-1 text-sm text-muted-foreground'>管理当前空间中的智能体定义。模型凭据和聊天会话在各自页面管理。</p>
+          <Link className='inline-flex items-center gap-1 text-sm underline underline-offset-4' to='/w/$workspaceId' params={{ workspaceId: workspace.workspace_id }}><ArrowLeft className='size-3.5' /><LocalizedText text={"返回空间"} /></Link>
+          <p className='mt-3 text-sm text-muted-foreground'><LocalizedText text={"Workspace · "} />{workspace.name}</p>
+          <h1 className='mt-1 text-2xl font-semibold'><LocalizedText text={"智能体"} /></h1>
+          <p className='mt-1 text-sm text-muted-foreground'><LocalizedText text={"管理当前空间中的智能体定义。模型凭据和聊天会话在各自页面管理。"} /></p>
         </div>
-        {canCreate && <Button onClick={openCreate}><Plus className='mr-2 size-4' />新建智能体</Button>}
+        {canCreate && <Button onClick={openCreate}><Plus className='mr-2 size-4' /><LocalizedText text={"新建智能体"} /></Button>}
       </header>
 
-      {workspace.status !== 'active' && <Alert><AlertDescription>此 Workspace 已归档，当前不能读取或修改智能体。</AlertDescription></Alert>}
+      {workspace.status !== 'active' && <Alert><AlertDescription><LocalizedText text={"此 Workspace 已归档，当前不能读取或修改智能体。"} /></AlertDescription></Alert>}
       {errorMessage && <Alert variant='destructive'><AlertDescription>{errorMessage}</AlertDescription></Alert>}
       {deleteAgent.isError && <Alert variant='destructive'><AlertDescription>{formatError(deleteAgent.error)}</AlertDescription></Alert>}
 
       <div className='grid gap-5 xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.4fr)]'>
         <Card>
-          <CardHeader><CardTitle>智能体列表</CardTitle><CardDescription>{agents.data?.total ?? 0} 个定义</CardDescription></CardHeader>
+          <CardHeader><CardTitle><LocalizedText text={"智能体列表"} /></CardTitle><CardDescription>{agents.data?.total ?? 0} <LocalizedText text={" 个定义"} /></CardDescription></CardHeader>
           <CardContent className='space-y-2'>
-            {agents.isLoading ? <p className='py-5 text-sm text-muted-foreground'>正在加载…</p> : agents.data?.agents.length ? agents.data.agents.map((agent) => (
+            {agents.isLoading ? <p className='py-5 text-sm text-muted-foreground'><LocalizedText text={"正在加载…"} /></p> : agents.data?.agents.length ? agents.data.agents.map((agent) => (
               <button key={agent.id} type='button' onClick={() => setSelectedId(agent.id)} className={`w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent ${selectedIdInScope === agent.id ? 'border-primary bg-accent' : ''}`}>
                 <span className='flex items-center gap-2 font-medium'><Bot className='size-4 text-muted-foreground' />{agent.data.name || '未命名智能体'}</span>
                 <span className='mt-1 block truncate text-xs text-muted-foreground'>{agent.data.system_prompt || '没有系统提示词'}</span>
               </button>
-            )) : !agents.isError && <div className='rounded-lg border border-dashed p-6 text-center'><Bot className='mx-auto size-8 text-muted-foreground' /><p className='mt-2 text-sm font-medium'>还没有智能体</p><p className='mt-1 text-xs text-muted-foreground'>创建一个定义后，可在聊天功能中选择使用。</p>{canCreate && <Button className='mt-4' size='sm' variant='outline' onClick={openCreate}><Plus className='mr-2 size-4' />创建智能体</Button>}</div>}
+            )) : !agents.isError && <div className='rounded-lg border border-dashed p-6 text-center'><Bot className='mx-auto size-8 text-muted-foreground' /><p className='mt-2 text-sm font-medium'><LocalizedText text={"还没有智能体"} /></p><p className='mt-1 text-xs text-muted-foreground'><LocalizedText text={"创建一个定义后，可在聊天功能中选择使用。"} /></p>{canCreate && <Button className='mt-4' size='sm' variant='outline' onClick={openCreate}><Plus className='mr-2 size-4' /><LocalizedText text={"创建智能体"} /></Button>}</div>}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>智能体详情</CardTitle><CardDescription>从左侧列表选择一个智能体查看完整定义。</CardDescription></CardHeader>
+          <CardHeader><CardTitle><LocalizedText text={"智能体详情"} /></CardTitle><CardDescription><LocalizedText text={"从左侧列表选择一个智能体查看完整定义。"} /></CardDescription></CardHeader>
           <CardContent>
-            {!selectedIdInScope ? <p className='py-8 text-center text-sm text-muted-foreground'>尚未选择智能体</p> : detail.isLoading ? <p className='py-8 text-sm text-muted-foreground'>正在加载详情…</p> : detail.isError ? <p role='alert' className='py-4 text-sm text-destructive'>{formatError(detail.error)}</p> : selected && <div className='space-y-5'>
-              <div className='flex flex-wrap items-start justify-between gap-3'><div><h2 className='text-xl font-semibold'>{selected.data.name}</h2><p className='mt-1 text-xs text-muted-foreground break-all'>ID：{selected.id}</p></div><div className='flex gap-2'>{selected.editable && workspace.status === 'active' && <><Button size='sm' variant='outline' onClick={() => openEdit(selected)}><Pencil className='mr-2 size-3.5' />编辑</Button><Button size='sm' variant='destructive' disabled={deleteAgent.isPending} onClick={() => { if (window.confirm(`确定删除智能体“${selected.data.name}”吗？`)) deleteAgent.mutate(selected.id) }}><Trash2 className='mr-2 size-3.5' />删除</Button></>}</div></div>
-              <section className='space-y-2'><h3 className='text-sm font-medium'>系统提示词</h3><pre className='max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm'>{selected.data.system_prompt || '（空）'}</pre></section>
+            {!selectedIdInScope ? <p className='py-8 text-center text-sm text-muted-foreground'><LocalizedText text={"尚未选择智能体"} /></p> : detail.isLoading ? <p className='py-8 text-sm text-muted-foreground'><LocalizedText text={"正在加载详情…"} /></p> : detail.isError ? <p role='alert' className='py-4 text-sm text-destructive'>{formatError(detail.error)}</p> : selected && <div className='space-y-5'>
+              <div className='flex flex-wrap items-start justify-between gap-3'><div><h2 className='text-xl font-semibold'>{selected.data.name}</h2><p className='mt-1 text-xs text-muted-foreground break-all'><LocalizedText text={"ID："} />{selected.id}</p></div><div className='flex gap-2'>{selected.editable && workspace.status === 'active' && <><Button size='sm' variant='outline' onClick={() => openEdit(selected)}><Pencil className='mr-2 size-3.5' /><LocalizedText text={"编辑"} /></Button><Button size='sm' variant='destructive' disabled={deleteAgent.isPending} onClick={() => { if (window.confirm(formatMessage('确定删除智能体“{name}”吗？', { name: selected.data.name }))) deleteAgent.mutate(selected.id) }}><Trash2 className='mr-2 size-3.5' /><LocalizedText text={"删除"} /></Button></>}</div></div>
+              <section className='space-y-2'><h3 className='text-sm font-medium'><LocalizedText text={"系统提示词"} /></h3><pre className='max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm'>{selected.data.system_prompt || '（空）'}</pre></section>
               <JsonSection title='上下文配置' value={selected.data.context_config} />
               <JsonSection title='ReAct 配置' value={selected.data.react_config} />
               <JsonSection title='邀请配置' value={selected.data.invite_config} />
-              {!selected.editable && <p className='text-sm text-muted-foreground'>你可以查看此智能体，但没有编辑或删除权限。</p>}
+              {!selected.editable && <p className='text-sm text-muted-foreground'><LocalizedText text={"你可以查看此智能体，但没有编辑或删除权限。"} /></p>}
             </div>}
           </CardContent>
         </Card>
@@ -204,16 +206,16 @@ function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; 
 
       <Dialog open={editor !== null} onOpenChange={(open) => { if (!open && !editorPending) setEditor(null) }}>
         <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>
-          <DialogHeader><DialogTitle>{editor?.mode === 'edit' ? '编辑智能体' : '新建智能体'}</DialogTitle><DialogDescription>配置属于当前 Workspace 的智能体定义。JSON 配置需填写对象。</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editor?.mode === 'edit' ? <LocalizedText text={"编辑智能体"} /> : <LocalizedText text={"新建智能体"} />}</DialogTitle><DialogDescription><LocalizedText text={"配置属于当前 Workspace 的智能体定义。JSON 配置需填写对象。"} /></DialogDescription></DialogHeader>
           <div className='space-y-4'>
-            <div className='space-y-2'><Label htmlFor='agent-name'>名称</Label><Input id='agent-name' maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></div>
-            <div className='space-y-2'><Label htmlFor='agent-system-prompt'>系统提示词</Label><Textarea id='agent-system-prompt' className='min-h-28' value={draft.systemPrompt} onChange={(event) => setDraft((current) => ({ ...current, systemPrompt: event.target.value }))} /></div>
+            <div className='space-y-2'><Label htmlFor='agent-name'><LocalizedText text={"名称"} /></Label><Input id='agent-name' maxLength={160} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></div>
+            <div className='space-y-2'><Label htmlFor='agent-system-prompt'><LocalizedText text={"系统提示词"} /></Label><Textarea id='agent-system-prompt' className='min-h-28' value={draft.systemPrompt} onChange={(event) => setDraft((current) => ({ ...current, systemPrompt: event.target.value }))} /></div>
             <JsonEditor id='agent-context-config' label='上下文配置 JSON' value={draft.contextConfig} onChange={(value) => setDraft((current) => ({ ...current, contextConfig: value }))} />
             <JsonEditor id='agent-react-config' label='ReAct 配置 JSON' value={draft.reactConfig} onChange={(value) => setDraft((current) => ({ ...current, reactConfig: value }))} />
             <JsonEditor id='agent-invite-config' label='邀请配置 JSON' value={draft.inviteConfig} onChange={(value) => setDraft((current) => ({ ...current, inviteConfig: value }))} />
           </div>
           {(formError || createAgent.isError || updateAgent.isError) && <Alert variant='destructive'><AlertDescription>{formError || formatError(createAgent.error ?? updateAgent.error)}</AlertDescription></Alert>}
-          <DialogFooter><Button variant='outline' disabled={editorPending} onClick={() => setEditor(null)}>取消</Button><Button disabled={editorPending || !draft.name.trim()} onClick={submit}>{editorPending ? '保存中…' : editor?.mode === 'edit' ? '保存修改' : '创建智能体'}</Button></DialogFooter>
+          <DialogFooter><Button variant='outline' disabled={editorPending} onClick={() => setEditor(null)}><LocalizedText text={"取消"} /></Button><Button disabled={editorPending || !draft.name.trim()} onClick={submit}>{editorPending ? <LocalizedText text={"保存中…"} /> : editor?.mode === 'edit' ? <LocalizedText text={"保存修改"} /> : <LocalizedText text={"创建智能体"} />}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </main>
@@ -221,9 +223,9 @@ function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; 
 }
 
 function JsonSection({ title, value }: { title: string; value: unknown }) {
-  return <section className='space-y-2'><h3 className='text-sm font-medium'>{title}</h3><pre className='max-h-52 overflow-auto rounded-md bg-muted p-3 text-xs'>{JSON.stringify(value ?? {}, null, 2)}</pre></section>
+  return <section className='space-y-2'><h3 className='text-sm font-medium'><LocalizedText text={title} /></h3><pre className='max-h-52 overflow-auto rounded-md bg-muted p-3 text-xs'>{JSON.stringify(value ?? {}, null, 2)}</pre></section>
 }
 
 function JsonEditor({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (value: string) => void }) {
-  return <div className='space-y-2'><Label htmlFor={id}>{label}</Label><Textarea id={id} className='min-h-28 font-mono text-xs' spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} /></div>
+  return <div className='space-y-2'><Label htmlFor={id}><LocalizedText text={label} /></Label><Textarea id={id} className='min-h-28 font-mono text-xs' spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} /></div>
 }

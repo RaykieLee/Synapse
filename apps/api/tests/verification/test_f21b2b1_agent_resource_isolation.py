@@ -5,10 +5,14 @@ import asyncio
 from datetime import datetime, timezone
 
 import pytest
+
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 
+pytestmark = [
+    pytest.mark.redis,
+]
 
 def test_f21b2b1_agent_definitions_and_session_references(tmp_path, monkeypatch, request):
     import os

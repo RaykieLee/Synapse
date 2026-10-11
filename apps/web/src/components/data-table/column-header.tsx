@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { LocalizedText } from '@/components/localized-text'
 
 type DataTableColumnHeaderProps<TData, TValue> =
   React.HTMLAttributes<HTMLDivElement> & {
@@ -52,19 +53,16 @@ export function DataTableColumnHeader<TData, TValue>({
         <DropdownMenuContent align='start'>
           <DropdownMenuItem onClick={() => column.toggleSorting(false)}>
             <ArrowUpIcon className='size-3.5 text-muted-foreground/70' />
-            Asc
-          </DropdownMenuItem>
+            <LocalizedText text={"\n            Asc\n          "} /></DropdownMenuItem>
           <DropdownMenuItem onClick={() => column.toggleSorting(true)}>
             <ArrowDownIcon className='size-3.5 text-muted-foreground/70' />
-            Desc
-          </DropdownMenuItem>
+            <LocalizedText text={"\n            Desc\n          "} /></DropdownMenuItem>
           {column.getCanHide() && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => column.toggleVisibility(false)}>
                 <EyeNoneIcon className='size-3.5 text-muted-foreground/70' />
-                Hide
-              </DropdownMenuItem>
+                <LocalizedText text={"\n                Hide\n              "} /></DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>

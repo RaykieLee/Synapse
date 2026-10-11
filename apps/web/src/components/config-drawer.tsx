@@ -26,6 +26,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { useSidebar } from './ui/sidebar'
+import { LocalizedText } from '@/components/localized-text'
 
 export function ConfigDrawer() {
   const { setOpen } = useSidebar()
@@ -54,10 +55,9 @@ export function ConfigDrawer() {
       </SheetTrigger>
       <SheetContent className='flex flex-col'>
         <SheetHeader className='pb-0 text-start'>
-          <SheetTitle>Theme Settings</SheetTitle>
+          <SheetTitle><LocalizedText text={"Theme Settings"} /></SheetTitle>
           <SheetDescription>
-            Adjust the appearance and layout to suit your preferences.
-          </SheetDescription>
+            <LocalizedText text={"\n            Adjust the appearance and layout to suit your preferences.\n          "} /></SheetDescription>
         </SheetHeader>
         <div className='space-y-6 overflow-y-auto px-4'>
           <ThemeConfig />
@@ -71,8 +71,7 @@ export function ConfigDrawer() {
             onClick={handleReset}
             aria-label='Reset all settings to default values'
           >
-            Reset
-          </Button>
+            <LocalizedText text={"\n            Reset\n          "} /></Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>
@@ -210,8 +209,7 @@ function ThemeConfig() {
         ))}
       </Radio>
       <div id='theme-description' className='sr-only'>
-        Choose between system preference, light mode, or dark mode
-      </div>
+        <LocalizedText text={"\n        Choose between system preference, light mode, or dark mode\n      "} /></div>
     </div>
   )
 }
@@ -254,8 +252,7 @@ function SidebarConfig() {
         ))}
       </Radio>
       <div id='sidebar-description' className='sr-only'>
-        Choose between inset, floating, or standard sidebar layout
-      </div>
+        <LocalizedText text={"\n        Choose between inset, floating, or standard sidebar layout\n      "} /></div>
     </div>
   )
 }
@@ -312,8 +309,7 @@ function LayoutConfig() {
         ))}
       </Radio>
       <div id='layout-description' className='sr-only'>
-        Choose between default expanded, compact icon-only, or full layout mode
-      </div>
+        <LocalizedText text={"\n        Choose between default expanded, compact icon-only, or full layout mode\n      "} /></div>
     </div>
   )
 }
@@ -355,8 +351,7 @@ function DirConfig() {
         ))}
       </Radio>
       <div id='direction-description' className='sr-only'>
-        Choose between left-to-right or right-to-left site direction
-      </div>
+        <LocalizedText text={"\n        Choose between left-to-right or right-to-left site direction\n      "} /></div>
     </div>
   )
 }

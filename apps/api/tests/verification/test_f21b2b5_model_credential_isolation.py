@@ -5,11 +5,15 @@ import asyncio
 from datetime import datetime, timezone
 
 import pytest
+
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from app.tenancy.context import WorkspaceContext
 
+pytestmark = [
+    pytest.mark.redis,
+]
 
 def test_f21b2b5_credentials_encrypted_scoped_and_runtime_resolved(tmp_path, monkeypatch, request, caplog):
     import os

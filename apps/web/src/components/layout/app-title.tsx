@@ -8,6 +8,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { Button } from '../ui/button'
+import { LocalizedText } from '@/components/localized-text'
 
 export function AppTitle() {
   const { setOpenMobile } = useSidebar()
@@ -25,8 +26,8 @@ export function AppTitle() {
               onClick={() => setOpenMobile(false)}
               className='grid flex-1 text-start text-sm leading-tight'
             >
-              <span className='truncate font-bold'>Synapse</span>
-              <span className='truncate text-xs'>Workspace</span>
+              <span className='truncate font-bold'><LocalizedText text={"Synapse"} /></span>
+              <span className='truncate text-xs'><LocalizedText text={"Workspace"} /></span>
             </Link>
             <ToggleSidebar />
           </div>
@@ -58,7 +59,7 @@ function ToggleSidebar({
     >
       <X className='md:hidden' />
       <Menu className='max-md:hidden' />
-      <span className='sr-only'>Toggle Sidebar</span>
+      <span className='sr-only'><LocalizedText text={"Toggle Sidebar"} /></span>
     </Button>
   )
 }

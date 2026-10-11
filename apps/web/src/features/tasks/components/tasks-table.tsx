@@ -27,6 +27,7 @@ import { priorities, statuses } from '../data/data'
 import { type Task } from '../data/schema'
 import { DataTableBulkActions } from './data-table-bulk-actions'
 import { tasksColumns as columns } from './tasks-columns'
+import { LocalizedText } from '@/components/localized-text'
 
 const route = getRouteApi('/_authenticated/tasks/')
 
@@ -183,8 +184,7 @@ export function TasksTable({ data }: DataTableProps) {
                   colSpan={columns.length}
                   className='h-24 text-center'
                 >
-                  No results.
-                </TableCell>
+                  <LocalizedText text={"\n                  No results.\n                "} /></TableCell>
               </TableRow>
             )}
           </TableBody>

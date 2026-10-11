@@ -10,6 +10,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { LocalizedText } from '@/components/localized-text'
 
 type DataTableBulkActionsProps<TData> = {
   table: Table<TData>
@@ -167,11 +168,11 @@ export function DataTableBulkActions<TData>({
                 title='Clear selection (Escape)'
               >
                 <X />
-                <span className='sr-only'>Clear selection</span>
+                <span className='sr-only'><LocalizedText text={"Clear selection"} /></span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Clear selection (Escape)</p>
+              <p><LocalizedText text={"Clear selection (Escape)"} /></p>
             </TooltipContent>
           </Tooltip>
 
@@ -194,10 +195,9 @@ export function DataTableBulkActions<TData>({
             </Badge>{' '}
             <span className='hidden sm:inline'>
               {entityName}
-              {selectedCount > 1 ? 's' : ''}
+              {selectedCount > 1 ? <LocalizedText text={"s"} /> : <LocalizedText text={""} />}
             </span>{' '}
-            selected
-          </div>
+            <LocalizedText text={"\n            selected\n          "} /></div>
 
           <Separator
             className='h-5'

@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 
+
 type MainProps = React.HTMLAttributes<HTMLElement> & {
   fixed?: boolean
   fluid?: boolean
@@ -9,7 +10,7 @@ type MainProps = React.HTMLAttributes<HTMLElement> & {
 export function Main({ fixed, className, fluid, ...props }: MainProps) {
   return (
     <main
-      data-layout={fixed ? 'fixed' : 'auto'}
+      data-layout={fixed ? "fixed" : "auto"}
       className={cn(
         'px-4 py-6',
 

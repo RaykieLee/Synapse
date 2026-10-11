@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/sheet'
 import { SelectDropdown } from '@/components/select-dropdown'
 import { type Task } from '../data/schema'
+import { LocalizedText } from '@/components/localized-text'
 
 type TaskMutateDrawerProps = {
   open: boolean
@@ -73,13 +74,10 @@ export function TasksMutateDrawer({
     >
       <SheetContent className='flex flex-col'>
         <SheetHeader className='text-start'>
-          <SheetTitle>{isUpdate ? 'Update' : 'Create'} Task</SheetTitle>
+          <SheetTitle>{isUpdate ? <LocalizedText text={"Update"} /> : <LocalizedText text={"Create"} />} <LocalizedText text={" Task"} /></SheetTitle>
           <SheetDescription>
-            {isUpdate
-              ? 'Update the task by providing necessary info.'
-              : 'Add a new task by providing necessary info.'}
-            Click save when you&apos;re done.
-          </SheetDescription>
+            {isUpdate ? <LocalizedText text={"Update the task by providing necessary info."} /> : <LocalizedText text={"Add a new task by providing necessary info."} />}
+            <LocalizedText text={"\n            Click save when you&apos;re done.\n          "} /></SheetDescription>
         </SheetHeader>
         <Form {...form}>
           <form
@@ -92,7 +90,7 @@ export function TasksMutateDrawer({
               name='title'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title</FormLabel>
+                  <FormLabel><LocalizedText text={"Title"} /></FormLabel>
                   <FormControl>
                     <Input {...field} placeholder='Enter a title' />
                   </FormControl>
@@ -105,7 +103,7 @@ export function TasksMutateDrawer({
               name='status'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Status</FormLabel>
+                  <FormLabel><LocalizedText text={"Status"} /></FormLabel>
                   <SelectDropdown
                     defaultValue={field.value}
                     onValueChange={field.onChange}
@@ -127,7 +125,7 @@ export function TasksMutateDrawer({
               name='label'
               render={({ field }) => (
                 <FormItem className='relative'>
-                  <FormLabel>Label</FormLabel>
+                  <FormLabel><LocalizedText text={"Label"} /></FormLabel>
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
@@ -139,20 +137,19 @@ export function TasksMutateDrawer({
                           <RadioGroupItem value='documentation' />
                         </FormControl>
                         <FormLabel className='font-normal'>
-                          Documentation
-                        </FormLabel>
+                          <LocalizedText text={"\n                          Documentation\n                        "} /></FormLabel>
                       </FormItem>
                       <FormItem className='flex items-center'>
                         <FormControl>
                           <RadioGroupItem value='feature' />
                         </FormControl>
-                        <FormLabel className='font-normal'>Feature</FormLabel>
+                        <FormLabel className='font-normal'><LocalizedText text={"Feature"} /></FormLabel>
                       </FormItem>
                       <FormItem className='flex items-center'>
                         <FormControl>
                           <RadioGroupItem value='bug' />
                         </FormControl>
-                        <FormLabel className='font-normal'>Bug</FormLabel>
+                        <FormLabel className='font-normal'><LocalizedText text={"Bug"} /></FormLabel>
                       </FormItem>
                     </RadioGroup>
                   </FormControl>
@@ -165,7 +162,7 @@ export function TasksMutateDrawer({
               name='priority'
               render={({ field }) => (
                 <FormItem className='relative'>
-                  <FormLabel>Priority</FormLabel>
+                  <FormLabel><LocalizedText text={"Priority"} /></FormLabel>
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
@@ -176,19 +173,19 @@ export function TasksMutateDrawer({
                         <FormControl>
                           <RadioGroupItem value='high' />
                         </FormControl>
-                        <FormLabel className='font-normal'>High</FormLabel>
+                        <FormLabel className='font-normal'><LocalizedText text={"High"} /></FormLabel>
                       </FormItem>
                       <FormItem className='flex items-center'>
                         <FormControl>
                           <RadioGroupItem value='medium' />
                         </FormControl>
-                        <FormLabel className='font-normal'>Medium</FormLabel>
+                        <FormLabel className='font-normal'><LocalizedText text={"Medium"} /></FormLabel>
                       </FormItem>
                       <FormItem className='flex items-center'>
                         <FormControl>
                           <RadioGroupItem value='low' />
                         </FormControl>
-                        <FormLabel className='font-normal'>Low</FormLabel>
+                        <FormLabel className='font-normal'><LocalizedText text={"Low"} /></FormLabel>
                       </FormItem>
                     </RadioGroup>
                   </FormControl>
@@ -200,11 +197,10 @@ export function TasksMutateDrawer({
         </Form>
         <SheetFooter className='gap-2'>
           <SheetClose asChild>
-            <Button variant='outline'>Close</Button>
+            <Button variant='outline'><LocalizedText text={"Close"} /></Button>
           </SheetClose>
           <Button form='tasks-form' type='submit'>
-            Save changes
-          </Button>
+            <LocalizedText text={"\n            Save changes\n          "} /></Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

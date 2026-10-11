@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { LocalizedText } from '@/components/localized-text'
 
 type SelectDropdownProps = {
   onValueChange?: (value: string) => void
@@ -46,8 +47,7 @@ export function SelectDropdown({
             <div className='flex items-center justify-center gap-2'>
               <Loader className='h-5 w-5 animate-spin' />
               {'  '}
-              Loading...
-            </div>
+              <LocalizedText text={"\n              Loading...\n            "} /></div>
           </SelectItem>
         ) : (
           items?.map(({ label, value }) => (

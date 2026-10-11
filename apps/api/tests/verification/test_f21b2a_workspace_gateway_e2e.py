@@ -12,11 +12,17 @@ from pathlib import Path
 
 import httpx
 import pytest
+
 from alembic import command
 from alembic.config import Config
 from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 
+pytestmark = [
+    pytest.mark.redis,
+    pytest.mark.windows_symlink,
+    pytest.mark.integration,
+]
 
 def test_f21b2a_real_gateway_file_list_download_and_scope(tmp_path, monkeypatch):
     import os

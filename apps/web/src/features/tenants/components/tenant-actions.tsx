@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toIsoInput, toLocalInput } from './create-tenant-dialog'
+import { LocalizedText } from '@/components/localized-text'
 
 export function EditTenantNameDialog({
   tenant,
@@ -27,12 +28,11 @@ export function EditTenantNameDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button variant='outline' size='sm' onClick={() => setOpen(true)}>
-        <Pencil className='size-4' /> 编辑名称
-      </Button>
+        <Pencil className='size-4' /> <LocalizedText text={" 编辑名称\n      "} /></Button>
       <DialogContent className='sm:max-w-md'>
         <DialogHeader>
-          <DialogTitle>编辑租户名称</DialogTitle>
-          <DialogDescription>名称会显示给租户内所有成员。</DialogDescription>
+          <DialogTitle><LocalizedText text={"编辑租户名称"} /></DialogTitle>
+          <DialogDescription><LocalizedText text={"名称会显示给租户内所有成员。"} /></DialogDescription>
         </DialogHeader>
         <form
           className='space-y-4'
@@ -44,7 +44,7 @@ export function EditTenantNameDialog({
           }}
         >
           <div className='space-y-2'>
-            <Label htmlFor='tenant-name-edit'>租户名称</Label>
+            <Label htmlFor='tenant-name-edit'><LocalizedText text={"租户名称"} /></Label>
             <Input
               id='tenant-name-edit'
               name='name'
@@ -59,9 +59,8 @@ export function EditTenantNameDialog({
               variant='outline'
               onClick={() => setOpen(false)}
             >
-              取消
-            </Button>
-            <Button type='submit'>保存名称</Button>
+              <LocalizedText text={"\n              取消\n            "} /></Button>
+            <Button type='submit'><LocalizedText text={"保存名称"} /></Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -84,14 +83,12 @@ export function EditTenantValidityDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button variant='outline' size='sm' onClick={() => setOpen(true)}>
-        <CalendarRange className='size-4' /> 编辑有效期
-      </Button>
+        <CalendarRange className='size-4' /> <LocalizedText text={" 编辑有效期\n      "} /></Button>
       <DialogContent className='sm:max-w-md'>
         <DialogHeader>
-          <DialogTitle>编辑租户有效期</DialogTitle>
+          <DialogTitle><LocalizedText text={"编辑租户有效期"} /></DialogTitle>
           <DialogDescription>
-            有效期决定租户可以被访问的时间边界。
-          </DialogDescription>
+            <LocalizedText text={"\n            有效期决定租户可以被访问的时间边界。\n          "} /></DialogDescription>
         </DialogHeader>
         <form
           className='space-y-4'
@@ -115,7 +112,7 @@ export function EditTenantValidityDialog({
         >
           <div className='grid gap-4 sm:grid-cols-2'>
             <div className='space-y-2'>
-              <Label htmlFor='validity-from-edit'>有效期开始</Label>
+              <Label htmlFor='validity-from-edit'><LocalizedText text={"有效期开始"} /></Label>
               <Input
                 id='validity-from-edit'
                 name='valid_from'
@@ -124,7 +121,7 @@ export function EditTenantValidityDialog({
               />
             </div>
             <div className='space-y-2'>
-              <Label htmlFor='validity-until-edit'>有效期结束</Label>
+              <Label htmlFor='validity-until-edit'><LocalizedText text={"有效期结束"} /></Label>
               <Input
                 id='validity-until-edit'
                 name='valid_until'
@@ -140,9 +137,8 @@ export function EditTenantValidityDialog({
               variant='outline'
               onClick={() => setOpen(false)}
             >
-              取消
-            </Button>
-            <Button type='submit'>保存有效期</Button>
+              <LocalizedText text={"\n              取消\n            "} /></Button>
+            <Button type='submit'><LocalizedText text={"保存有效期"} /></Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -163,17 +159,16 @@ export function TenantStatusActions({
   return (
     <>
       <Button
-        variant={tenant.status === 'active' ? 'outline' : 'secondary'}
+        variant={tenant.status === 'active' ? "outline" : "secondary"}
         size='sm'
         onClick={() =>
           onChange(tenant.status === 'active' ? 'suspended' : 'active')
         }
       >
-        {tenant.status === 'active' ? '停用租户' : '重新启用'}
+        {tenant.status === 'active' ? <LocalizedText text={"停用租户"} /> : <LocalizedText text={"重新启用"} />}
       </Button>
       <Button variant='outline' size='sm' onClick={() => onArchive(tenant)}>
-        <Archive className='size-4' /> 归档
-      </Button>
+        <Archive className='size-4' /> <LocalizedText text={" 归档\n      "} /></Button>
     </>
   )
 }

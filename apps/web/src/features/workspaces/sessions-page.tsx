@@ -1,4 +1,6 @@
 import * as React from 'react'
+import { LocalizedNativeSelect } from '@/components/localized-native-select'
+import { formatMessage, useLocaleText } from '@/lib/i18n'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { InfiniteData } from '@tanstack/react-query'
 import { ArrowLeft, Bot, Loader2, MessageSquare, Paperclip, Plus, Send, Settings2, Square, Trash2 } from 'lucide-react'
@@ -14,6 +16,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { Textarea } from '@/components/ui/textarea'
 import { useWorkspace } from './context'
 import type { Workspace } from './types'
+import { LocalizedText } from '@/components/localized-text'
 
 type AgentView = { id: string; data: { name: string }; editable: boolean }
 type AgentList = { agents: AgentView[]; total: number }
@@ -172,45 +175,45 @@ function WorkspaceSessionsContent({ workspace, actorId }: { workspace: Workspace
     <main className='space-y-6 p-6'>
       <header className='flex flex-wrap items-start justify-between gap-4'>
         <div>
-          <Link className='inline-flex items-center gap-1 text-sm underline underline-offset-4' to='/w/$workspaceId' params={{ workspaceId: workspace.workspace_id }}><ArrowLeft className='size-3.5' />返回空间</Link>
-          <p className='mt-3 text-sm text-muted-foreground'>Workspace · {workspace.name}</p>
-          <h1 className='mt-1 text-2xl font-semibold'>会话管理</h1>
-          <p className='mt-1 text-sm text-muted-foreground'>按智能体查看、创建和管理当前 Workspace 中的会话，并在此收发消息。</p>
+          <Link className='inline-flex items-center gap-1 text-sm underline underline-offset-4' to='/w/$workspaceId' params={{ workspaceId: workspace.workspace_id }}><ArrowLeft className='size-3.5' /><LocalizedText text={"返回空间"} /></Link>
+          <p className='mt-3 text-sm text-muted-foreground'><LocalizedText text={"Workspace · "} />{workspace.name}</p>
+          <h1 className='mt-1 text-2xl font-semibold'><LocalizedText text={"会话管理"} /></h1>
+          <p className='mt-1 text-sm text-muted-foreground'><LocalizedText text={"按智能体查看、创建和管理当前 Workspace 中的会话，并在此收发消息。"} /></p>
         </div>
-        <Link to='/w/$workspaceId/agents' params={{ workspaceId: workspace.workspace_id }}><Button variant='outline'><Bot className='mr-2 size-4' />智能体管理</Button></Link>
+        <Link to='/w/$workspaceId/agents' params={{ workspaceId: workspace.workspace_id }}><Button variant='outline'><Bot className='mr-2 size-4' /><LocalizedText text={"智能体管理"} /></Button></Link>
       </header>
 
-      {workspace.status !== 'active' && <Alert><AlertDescription>此 Workspace 已归档，当前不能读取或修改会话。</AlertDescription></Alert>}
+      {workspace.status !== 'active' && <Alert><AlertDescription><LocalizedText text={"此 Workspace 已归档，当前不能读取或修改会话。"} /></AlertDescription></Alert>}
       {agents.isError && <Alert variant='destructive'><AlertDescription>{formatError(agents.error)}</AlertDescription></Alert>}
       {sessions.isError && <Alert variant='destructive'><AlertDescription>{formatError(sessions.error)}</AlertDescription></Alert>}
       {deleteSession.isError && <Alert variant='destructive'><AlertDescription>{formatError(deleteSession.error)}</AlertDescription></Alert>}
 
       <section className='flex flex-wrap items-end justify-between gap-4 rounded-xl border bg-card p-5'>
-        <div className='min-w-64 space-y-2'><Label htmlFor='sessions-agent-select'>智能体</Label><select id='sessions-agent-select' className='h-10 w-full rounded-md border bg-background px-3 text-sm' value={agentId} onChange={(event) => { setAgentId(event.target.value); setSessionId(null) }} disabled={agents.isLoading || !availableAgents.length}><option value=''>请选择智能体</option>{availableAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.data.name}</option>)}</select></div>
-        {canWrite && <Button onClick={openCreate} disabled={!selectedAgent}><Plus className='mr-2 size-4' />新建会话</Button>}
+        <div className='min-w-64 space-y-2'><Label htmlFor='sessions-agent-select'><LocalizedText text={"智能体"} /></Label><LocalizedNativeSelect id='sessions-agent-select' className='h-10 w-full rounded-md border bg-background px-3 text-sm' value={agentId} onChange={(event) => { setAgentId(event.target.value); setSessionId(null) }} disabled={agents.isLoading || !availableAgents.length}><option value=''><LocalizedText text={"请选择智能体"} /></option>{availableAgents.map((agent) => <option key={agent.id} value={agent.id}>{agent.data.name}</option>)}</LocalizedNativeSelect></div>
+        {canWrite && <Button onClick={openCreate} disabled={!selectedAgent}><Plus className='mr-2 size-4' /><LocalizedText text={"新建会话"} /></Button>}
       </section>
 
-      {!agents.isLoading && !agents.isError && !availableAgents.length && <Card><CardContent className='py-10 text-center'><Bot className='mx-auto size-8 text-muted-foreground' /><h2 className='mt-3 font-semibold'>请先创建智能体</h2><p className='mt-1 text-sm text-muted-foreground'>会话必须关联当前 Workspace 中可访问的智能体。</p><Link className='mt-4 inline-block' to='/w/$workspaceId/agents' params={{ workspaceId: workspace.workspace_id }}><Button variant='outline'>打开智能体管理</Button></Link></CardContent></Card>}
+      {!agents.isLoading && !agents.isError && !availableAgents.length && <Card><CardContent className='py-10 text-center'><Bot className='mx-auto size-8 text-muted-foreground' /><h2 className='mt-3 font-semibold'><LocalizedText text={"请先创建智能体"} /></h2><p className='mt-1 text-sm text-muted-foreground'><LocalizedText text={"会话必须关联当前 Workspace 中可访问的智能体。"} /></p><Link className='mt-4 inline-block' to='/w/$workspaceId/agents' params={{ workspaceId: workspace.workspace_id }}><Button variant='outline'><LocalizedText text={"打开智能体管理"} /></Button></Link></CardContent></Card>}
 
       {selectedAgent && <div className='grid gap-5 xl:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.1fr)]'>
         <Card>
-          <CardHeader><CardTitle>会话列表</CardTitle><CardDescription>{selectedAgent.data.name} · {sessions.data?.total ?? 0} 个会话</CardDescription></CardHeader>
+          <CardHeader><CardTitle><LocalizedText text={"会话列表"} /></CardTitle><CardDescription>{selectedAgent.data.name} <LocalizedText text={" · "} />{sessions.data?.total ?? 0} <LocalizedText text={" 个会话"} /></CardDescription></CardHeader>
           <CardContent className='space-y-2'>
-            {sessions.isLoading ? <p className='py-5 text-sm text-muted-foreground'>正在加载…</p> : entries.length ? entries.map((entry) => <button key={entry.session.id} type='button' onClick={() => setSessionId(entry.session.id)} className={`w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent ${sessionId === entry.session.id ? 'border-primary bg-accent' : ''}`}>
+            {sessions.isLoading ? <p className='py-5 text-sm text-muted-foreground'><LocalizedText text={"正在加载…"} /></p> : entries.length ? entries.map((entry) => <button key={entry.session.id} type='button' onClick={() => setSessionId(entry.session.id)} className={`w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent ${sessionId === entry.session.id ? 'border-primary bg-accent' : ''}`}>
               <span className='flex items-center justify-between gap-2'><span className='flex min-w-0 items-center gap-2 font-medium'><MessageSquare className='size-4 shrink-0 text-muted-foreground' /><span className='truncate'>{entry.session.config.name || '未命名会话'}</span></span><span className='shrink-0 text-xs text-muted-foreground'>{statusLabel[entry.status] ?? entry.status}</span></span>
-              <span className='mt-1 block truncate text-xs text-muted-foreground'>{entry.session.origin.type === 'user' ? '手动创建' : `来源：${entry.session.origin.type}`} · {entry.session.id}</span>
-            </button>) : !sessions.isError && <div className='rounded-lg border border-dashed p-6 text-center'><p className='text-sm font-medium'>还没有会话</p><p className='mt-1 text-xs text-muted-foreground'>为此智能体创建一个会话。</p>{canWrite && <Button className='mt-4' size='sm' variant='outline' onClick={openCreate}><Plus className='mr-2 size-4' />创建会话</Button>}</div>}
+              <span className='mt-1 block truncate text-xs text-muted-foreground'>{entry.session.origin.type === 'user' ? <LocalizedText text={"手动创建"} /> : `来源：${entry.session.origin.type}`} <LocalizedText text={" · "} />{entry.session.id}</span>
+            </button>) : !sessions.isError && <div className='rounded-lg border border-dashed p-6 text-center'><p className='text-sm font-medium'><LocalizedText text={"还没有会话"} /></p><p className='mt-1 text-xs text-muted-foreground'><LocalizedText text={"为此智能体创建一个会话。"} /></p>{canWrite && <Button className='mt-4' size='sm' variant='outline' onClick={openCreate}><Plus className='mr-2 size-4' /><LocalizedText text={"创建会话"} /></Button>}</div>}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>会话信息</CardTitle><CardDescription>选择会话查看状态和配置。</CardDescription></CardHeader>
+          <CardHeader><CardTitle><LocalizedText text={"会话信息"} /></CardTitle><CardDescription><LocalizedText text={"选择会话查看状态和配置。"} /></CardDescription></CardHeader>
           <CardContent>
-            {!sessionId ? <p className='py-8 text-center text-sm text-muted-foreground'>尚未选择会话</p> : !selected ? <p className='py-8 text-sm text-muted-foreground'>正在同步会话列表…</p> : <div className='space-y-5'>
-              <div className='flex flex-wrap items-start justify-between gap-3'><div><h2 className='text-xl font-semibold'>{selected.session.config.name || '未命名会话'}</h2><p className='mt-1 break-all text-xs text-muted-foreground'>ID：{selected.session.id}</p></div>{selectedIsUserSession && canWrite && <div className='flex gap-2'><Button size='sm' variant='outline' disabled={selected.is_running} onClick={openEdit}><Settings2 className='mr-2 size-3.5' />重命名 / 配置</Button><Button size='sm' variant='destructive' disabled={selected.is_running || deleteSession.isPending} onClick={() => { if (window.confirm(`确定删除会话“${selected.session.config.name}”吗？`)) deleteSession.mutate(selected.session.id) }}><Trash2 className='mr-2 size-3.5' />删除</Button></div>}</div>
-              <dl className='grid gap-3 text-sm sm:grid-cols-2'><div><dt className='text-muted-foreground'>智能体</dt><dd className='mt-1'>{selectedAgent.data.name}</dd></div><div><dt className='text-muted-foreground'>来源</dt><dd className='mt-1'>{selected.session.origin.type === 'user' ? '手动创建' : selected.session.origin.type}</dd></div><div><dt className='text-muted-foreground'>状态</dt><dd className='mt-1'>{statusLabel[selected.status] ?? selected.status}</dd></div><div><dt className='text-muted-foreground'>权限模式</dt><dd className='mt-1'>{selected.session.state.permission_context?.mode ?? 'default'}</dd></div><div className='sm:col-span-2'><dt className='text-muted-foreground'>Workspace 绑定</dt><dd className='mt-1 break-all'>{selected.session.config.workspace_id}</dd></div>{selected.session.config.cwd && <div className='sm:col-span-2'><dt className='text-muted-foreground'>当前工作目录</dt><dd className='mt-1 break-all'>{selected.session.config.cwd}</dd></div>}</dl>
-              {!selectedIsUserSession && <p className='text-sm text-muted-foreground'>此会话由系统流程或团队创建，仅可查看；手动会话可在此重命名、调整权限模式或删除。</p>}
-              {selected.is_running && <p className='text-sm text-muted-foreground'>会话运行期间暂不能修改或删除。</p>}
+            {!sessionId ? <p className='py-8 text-center text-sm text-muted-foreground'><LocalizedText text={"尚未选择会话"} /></p> : !selected ? <p className='py-8 text-sm text-muted-foreground'><LocalizedText text={"正在同步会话列表…"} /></p> : <div className='space-y-5'>
+              <div className='flex flex-wrap items-start justify-between gap-3'><div><h2 className='text-xl font-semibold'>{selected.session.config.name || '未命名会话'}</h2><p className='mt-1 break-all text-xs text-muted-foreground'><LocalizedText text={"ID："} />{selected.session.id}</p></div>{selectedIsUserSession && canWrite && <div className='flex gap-2'><Button size='sm' variant='outline' disabled={selected.is_running} onClick={openEdit}><Settings2 className='mr-2 size-3.5' /><LocalizedText text={"重命名 / 配置"} /></Button><Button size='sm' variant='destructive' disabled={selected.is_running || deleteSession.isPending} onClick={() => { if (window.confirm(formatMessage('确定删除会话“{name}”吗？', { name: selected.session.config.name }))) deleteSession.mutate(selected.session.id) }}><Trash2 className='mr-2 size-3.5' /><LocalizedText text={"删除"} /></Button></div>}</div>
+              <dl className='grid gap-3 text-sm sm:grid-cols-2'><div><dt className='text-muted-foreground'><LocalizedText text={"智能体"} /></dt><dd className='mt-1'>{selectedAgent.data.name}</dd></div><div><dt className='text-muted-foreground'><LocalizedText text={"来源"} /></dt><dd className='mt-1'>{selected.session.origin.type === 'user' ? <LocalizedText text={"手动创建"} /> : selected.session.origin.type}</dd></div><div><dt className='text-muted-foreground'><LocalizedText text={"状态"} /></dt><dd className='mt-1'>{statusLabel[selected.status] ?? selected.status}</dd></div><div><dt className='text-muted-foreground'><LocalizedText text={"权限模式"} /></dt><dd className='mt-1'>{selected.session.state.permission_context?.mode ?? 'default'}</dd></div><div className='sm:col-span-2'><dt className='text-muted-foreground'><LocalizedText text={"Workspace 绑定"} /></dt><dd className='mt-1 break-all'>{selected.session.config.workspace_id}</dd></div>{selected.session.config.cwd && <div className='sm:col-span-2'><dt className='text-muted-foreground'><LocalizedText text={"当前工作目录"} /></dt><dd className='mt-1 break-all'>{selected.session.config.cwd}</dd></div>}</dl>
+              {!selectedIsUserSession && <p className='text-sm text-muted-foreground'><LocalizedText text={"此会话由系统流程或团队创建，仅可查看；手动会话可在此重命名、调整权限模式或删除。"} /></p>}
+              {selected.is_running && <p className='text-sm text-muted-foreground'><LocalizedText text={"会话运行期间暂不能修改或删除。"} /></p>}
             </div>}
           </CardContent>
         </Card>
@@ -237,10 +240,10 @@ function WorkspaceSessionsContent({ workspace, actorId }: { workspace: Workspace
 
       <Dialog open={editor !== null} onOpenChange={(open) => { if (!open && !createSession.isPending && !updateSession.isPending) setEditor(null) }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editor === 'create' ? '新建会话' : '重命名 / 配置会话'}</DialogTitle><DialogDescription>{editor === 'create' ? `为“${selectedAgent?.data.name ?? ''}”创建会话。留空时由服务端生成名称。` : '正在运行的会话不能修改配置。'}</DialogDescription></DialogHeader>
-          <div className='space-y-4'><div className='space-y-2'><Label htmlFor='session-name'>会话名称</Label><Input id='session-name' maxLength={200} value={draftName} onChange={(event) => setDraftName(event.target.value)} placeholder='例如：产品方案讨论' /></div>{editor === 'edit' && <div className='space-y-2'><Label htmlFor='session-permission'>工具权限模式</Label><select id='session-permission' className='h-10 w-full rounded-md border bg-background px-3 text-sm' value={draftPermission} onChange={(event) => setDraftPermission(event.target.value)}>{permissionModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select><p className='text-xs text-muted-foreground'>权限模式会影响智能体工具的批准方式；BYPASS 会跳过多数确认，请谨慎使用。</p></div>}</div>
+          <DialogHeader><DialogTitle>{editor === 'create' ? <LocalizedText text={"新建会话"} /> : <LocalizedText text={"重命名 / 配置会话"} />}</DialogTitle><DialogDescription>{editor === 'create' ? `为“${selectedAgent?.data.name ?? ''}”创建会话。留空时由服务端生成名称。` : <LocalizedText text={"正在运行的会话不能修改配置。"} />}</DialogDescription></DialogHeader>
+          <div className='space-y-4'><div className='space-y-2'><Label htmlFor='session-name'><LocalizedText text={"会话名称"} /></Label><Input id='session-name' maxLength={200} value={draftName} onChange={(event) => setDraftName(event.target.value)} placeholder='例如：产品方案讨论' /></div>{editor === 'edit' && <div className='space-y-2'><Label htmlFor='session-permission'><LocalizedText text={"工具权限模式"} /></Label><LocalizedNativeSelect id='session-permission' className='h-10 w-full rounded-md border bg-background px-3 text-sm' value={draftPermission} onChange={(event) => setDraftPermission(event.target.value)}>{permissionModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</LocalizedNativeSelect><p className='text-xs text-muted-foreground'><LocalizedText text={"权限模式会影响智能体工具的批准方式；BYPASS 会跳过多数确认，请谨慎使用。"} /></p></div>}</div>
           {(formError || mutationError) && <Alert variant='destructive'><AlertDescription>{formError || formatError(mutationError)}</AlertDescription></Alert>}
-          <DialogFooter><Button variant='outline' disabled={createSession.isPending || updateSession.isPending} onClick={() => setEditor(null)}>取消</Button><Button disabled={createSession.isPending || updateSession.isPending || (editor === 'edit' && !draftName.trim())} onClick={submit}>{createSession.isPending || updateSession.isPending ? '保存中…' : editor === 'create' ? '创建会话' : '保存修改'}</Button></DialogFooter>
+          <DialogFooter><Button variant='outline' disabled={createSession.isPending || updateSession.isPending} onClick={() => setEditor(null)}><LocalizedText text={"取消"} /></Button><Button disabled={createSession.isPending || updateSession.isPending || (editor === 'edit' && !draftName.trim())} onClick={submit}>{createSession.isPending || updateSession.isPending ? <LocalizedText text={"保存中…"} /> : editor === 'create' ? <LocalizedText text={"创建会话"} /> : <LocalizedText text={"保存修改"} />}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </main>
@@ -253,26 +256,27 @@ function TeamOverview({ team, isLeaderSession, leaderTasks, onOpenSession }: {
   leaderTasks: AgentTask[]
   onOpenSession: (agentId: string, sessionId: string) => void
 }) {
+  const t = useLocaleText()
   const completed = leaderTasks.filter((task) => task.state === 'completed').length
   const progress = leaderTasks.length ? Math.round(completed / leaderTasks.length * 100) : 0
   return <Card>
     <CardHeader>
-      <CardTitle>子智能体团队</CardTitle>
-      <CardDescription>{team.team.data.name}{team.team.data.description ? ` · ${team.team.data.description}` : ''} · {team.members.length + (team.leader_agent ? 1 : 0)} 位成员</CardDescription>
+      <CardTitle><LocalizedText text={"子智能体团队"} /></CardTitle>
+      <CardDescription>{team.team.data.name}{team.team.data.description ? ` · ${team.team.data.description}` : <LocalizedText text={""} />} <LocalizedText text={" · "} />{team.members.length + (team.leader_agent ? 1 : 0)} <LocalizedText text={" 位成员"} /></CardDescription>
     </CardHeader>
     <CardContent className='space-y-5'>
-      <section aria-label='团队成员' className='space-y-2'>
-        <h3 className='text-sm font-medium'>成员与关联会话</h3>
-        {team.leader_agent && <div className='flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm'><span>{team.leader_agent.data.name} <span className='text-muted-foreground'>· 负责人</span></span><span className='text-xs text-muted-foreground'>当前会话</span></div>}
+      <section aria-label={t('团队成员')} className='space-y-2'>
+        <h3 className='text-sm font-medium'><LocalizedText text={"成员与关联会话"} /></h3>
+        {team.leader_agent && <div className='flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm'><span>{team.leader_agent.data.name} <span className='text-muted-foreground'><LocalizedText text={"· 负责人"} /></span></span><span className='text-xs text-muted-foreground'><LocalizedText text={"当前会话"} /></span></div>}
         {team.members.length ? team.members.map(({ agent, session_id }) => <div key={`${agent.id}:${session_id ?? ''}`} className='flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm'>
-          <span>{agent.data.name} <span className='text-muted-foreground'>· 子智能体</span></span>
-          {session_id ? <button type='button' className='break-all text-left text-xs text-primary underline underline-offset-4' onClick={() => onOpenSession(agent.id, session_id)}>打开关联会话 · {session_id}</button> : <span className='text-xs text-muted-foreground'>暂无关联会话</span>}
-        </div>) : <p className='text-sm text-muted-foreground'>团队当前没有子智能体成员。</p>}
+          <span>{agent.data.name} <span className='text-muted-foreground'><LocalizedText text={"· 子智能体"} /></span></span>
+          {session_id ? <button type='button' className='break-all text-left text-xs text-primary underline underline-offset-4' onClick={() => onOpenSession(agent.id, session_id)}><LocalizedText text={"打开关联会话 · "} />{session_id}</button> : <span className='text-xs text-muted-foreground'><LocalizedText text={"暂无关联会话"} /></span>}
+        </div>) : <p className='text-sm text-muted-foreground'><LocalizedText text={"团队当前没有子智能体成员。"} /></p>}
       </section>
-      <section aria-label='任务进度' className='space-y-2'>
-        <div className='flex items-center justify-between gap-3'><h3 className='text-sm font-medium'>负责人任务</h3><span className='text-xs text-muted-foreground'>{completed}/{leaderTasks.length} 已完成 · {progress}%</span></div>
+      <section aria-label={t('任务进度')} className='space-y-2'>
+        <div className='flex items-center justify-between gap-3'><h3 className='text-sm font-medium'><LocalizedText text={"负责人任务"} /></h3><span className='text-xs text-muted-foreground'>{completed}<LocalizedText text={"/"} />{leaderTasks.length} <LocalizedText text={" 已完成 · "} />{progress}<LocalizedText text={"%"} /></span></div>
         <div className='h-2 overflow-hidden rounded-full bg-muted' role='progressbar' aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><div className='h-full bg-primary transition-all' style={{ width: `${progress}%` }} /></div>
-        {!isLeaderSession ? <p className='text-sm text-muted-foreground'>当前查看的是子智能体会话；打开负责人会话可查看团队任务进度。</p> : leaderTasks.length ? <ul className='space-y-2'>{leaderTasks.map((task) => <li key={task.id} className='flex flex-wrap items-start justify-between gap-2 rounded-md border p-3 text-sm'><span>{task.subject}{task.owner && <span className='ml-2 text-xs text-muted-foreground'>· {task.owner}</span>}</span><span className='shrink-0 text-xs text-muted-foreground'>{task.state === 'completed' ? '已完成' : task.state === 'in_progress' ? '进行中' : '待处理'}</span></li>)}</ul> : <p className='text-sm text-muted-foreground'>AgentScope 尚未为此负责人会话创建任务。</p>}
+        {!isLeaderSession ? <p className='text-sm text-muted-foreground'><LocalizedText text={"当前查看的是子智能体会话；打开负责人会话可查看团队任务进度。"} /></p> : leaderTasks.length ? <ul className='space-y-2'>{leaderTasks.map((task) => <li key={task.id} className='flex flex-wrap items-start justify-between gap-2 rounded-md border p-3 text-sm'><span>{task.subject}{task.owner && <span className='ml-2 text-xs text-muted-foreground'><LocalizedText text={"· "} />{task.owner}</span>}</span><span className='shrink-0 text-xs text-muted-foreground'>{task.state === 'completed' ? <LocalizedText text={"已完成"} /> : task.state === 'in_progress' ? <LocalizedText text={"进行中"} /> : <LocalizedText text={"待处理"} />}</span></li>)}</ul> : <p className='text-sm text-muted-foreground'><LocalizedText text={"AgentScope 尚未为此负责人会话创建任务。"} /></p>}
       </section>
     </CardContent>
   </Card>
@@ -497,6 +501,7 @@ function SessionMessagesPanel({
   initialStatus: SessionStatus
   sessionListKey: readonly unknown[]
 }) {
+  const t = useLocaleText()
   const client = useQueryClient()
   const headers = React.useMemo(() => ({ 'X-Workspace-ID': workspace.workspace_id }), [workspace.workspace_id])
   const [text, setText] = React.useState('')
@@ -1240,67 +1245,67 @@ function SessionMessagesPanel({
 
   return (
     <Card>
-      <CardHeader><CardTitle>消息</CardTitle><CardDescription>{sessionName} · 文本与 Workspace 附件</CardDescription></CardHeader>
+      <CardHeader><CardTitle><LocalizedText text={"消息"} /></CardTitle><CardDescription>{sessionName} <LocalizedText text={" · 文本与 Workspace 附件"} /></CardDescription></CardHeader>
       <CardContent className='space-y-4'>
         {(sendError || historyError || attachments.isError) && <Alert variant='destructive'><AlertDescription>{sendError || historyError || formatError(attachments.error)}</AlertDescription></Alert>}
-        {accessDenied || historyAccessDenied ? <p role='alert' className='py-10 text-center text-sm text-destructive'>当前会话已不可访问，消息内容已清除。</p> : <>
-          {history.data?.pages[0]?.has_more && <Button type='button' variant='outline' size='sm' disabled={history.isFetchingPreviousPage} onClick={() => void history.fetchPreviousPage()}>{history.isFetchingPreviousPage ? '正在加载…' : '加载更早消息'}</Button>}
+        {accessDenied || historyAccessDenied ? <p role='alert' className='py-10 text-center text-sm text-destructive'><LocalizedText text={"当前会话已不可访问，消息内容已清除。"} /></p> : <>
+          {history.data?.pages[0]?.has_more && <Button type='button' variant='outline' size='sm' disabled={history.isFetchingPreviousPage} onClick={() => void history.fetchPreviousPage()}>{history.isFetchingPreviousPage ? <LocalizedText text={"正在加载…"} /> : <LocalizedText text={"加载更早消息"} />}</Button>}
           <div className='max-h-[55vh] min-h-64 space-y-3 overflow-y-auto rounded-lg border bg-muted/20 p-4'>
-            {history.isLoading ? <p className='py-10 text-center text-sm text-muted-foreground'>正在加载消息…</p> : allMessages.length ? allMessages.map((message) => <MessageBubble key={message.id} message={message} />) : !history.isError && <p className='py-10 text-center text-sm text-muted-foreground'>还没有消息。发送第一条消息开始对话。</p>}
-            {visibleLiveReplies.map((reply) => <article key={reply.id} className='mr-auto max-w-[90%] rounded-xl border bg-card p-3'><header className='mb-2 flex items-center justify-between gap-3 text-xs text-muted-foreground'><span>{reply.name}</span><span className='flex items-center gap-1'><Loader2 className='size-3 animate-spin' />实时回复</span></header><div className='space-y-2 text-sm'>{reply.blocks.map((block) => <p key={block.id} className='whitespace-pre-wrap break-words'>{block.text}</p>)}</div></article>)}
-            {sending && <div className='flex items-center gap-2 text-sm text-muted-foreground'><Loader2 className='size-4 animate-spin' />正在生成回复…</div>}
+            {history.isLoading ? <p className='py-10 text-center text-sm text-muted-foreground'><LocalizedText text={"正在加载消息…"} /></p> : allMessages.length ? allMessages.map((message) => <MessageBubble key={message.id} message={message} />) : !history.isError && <p className='py-10 text-center text-sm text-muted-foreground'><LocalizedText text={"还没有消息。发送第一条消息开始对话。"} /></p>}
+            {visibleLiveReplies.map((reply) => <article key={reply.id} className='mr-auto max-w-[90%] rounded-xl border bg-card p-3'><header className='mb-2 flex items-center justify-between gap-3 text-xs text-muted-foreground'><span>{reply.name}</span><span className='flex items-center gap-1'><Loader2 className='size-3 animate-spin' /><LocalizedText text={"实时回复"} /></span></header><div className='space-y-2 text-sm'>{reply.blocks.map((block) => <p key={block.id} className='whitespace-pre-wrap break-words'>{block.text}</p>)}</div></article>)}
+            {sending && <div className='flex items-center gap-2 text-sm text-muted-foreground'><Loader2 className='size-4 animate-spin' /><LocalizedText text={"正在生成回复…"} /></div>}
           </div>
-          {activeConfirmations.length > 0 && <section aria-label='工具权限确认' className='space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4'><div><h3 className='font-medium'>需要确认工具操作</h3><p className='mt-1 text-sm text-muted-foreground'>请检查工具名称和参数摘要。允许后该工具会继续执行；工具可能读取、修改数据或访问外部系统。</p></div>{activeConfirmations.map((request) => {
+          {activeConfirmations.length > 0 && <section aria-label={t('工具权限确认')} className='space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4'><div><h3 className='font-medium'><LocalizedText text={"需要确认工具操作"} /></h3><p className='mt-1 text-sm text-muted-foreground'><LocalizedText text={"请检查工具名称和参数摘要。允许后该工具会继续执行；工具可能读取、修改数据或访问外部系统。"} /></p></div>{activeConfirmations.map((request) => {
             const busy = request.status === 'submitting' || confirmationInFlight.current.has(request.key)
             const disabled = busy || request.status === 'stale' || accessDenied
             return <article key={request.key} className='space-y-3 rounded-md border bg-background p-3'>
-              <div className='flex flex-wrap items-center justify-between gap-2'><span className='font-medium'>{request.toolCall.name}</span><span className='text-xs text-muted-foreground'>{request.status === 'stale' ? '请求已失效' : busy ? '正在提交…' : '等待你的决定'}</span></div>
-              <details><summary className='cursor-pointer text-xs text-muted-foreground'>查看脱敏参数摘要</summary><pre className='mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs'>{summarizeToolArguments(request.toolCall.input)}</pre></details>
+              <div className='flex flex-wrap items-center justify-between gap-2'><span className='font-medium'>{request.toolCall.name}</span><span className='text-xs text-muted-foreground'>{request.status === 'stale' ? <LocalizedText text={"请求已失效"} /> : busy ? <LocalizedText text={"正在提交…"} /> : <LocalizedText text={"等待你的决定"} />}</span></div>
+              <details><summary className='cursor-pointer text-xs text-muted-foreground'><LocalizedText text={"查看脱敏参数摘要"} /></summary><pre className='mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs'>{summarizeToolArguments(request.toolCall.input)}</pre></details>
               {request.error && <p role='alert' className={`text-sm ${request.status === 'stale' ? 'text-muted-foreground' : 'text-destructive'}`}>{request.error}</p>}
-              <div className='flex justify-end gap-2'>{request.status === 'stale' ? <Button type='button' size='sm' variant='outline' onClick={() => { resolvedConfirmationKeys.current.add(request.key); setConfirmationRequests((current) => current.filter((item) => item.key !== request.key)) }}>关闭</Button> : <><Button type='button' size='sm' variant='outline' disabled={disabled} onClick={() => void submitConfirmation(request, false)}>拒绝</Button><Button type='button' size='sm' variant='destructive' disabled={disabled} onClick={() => void submitConfirmation(request, true)}>{busy ? <Loader2 className='mr-2 size-3.5 animate-spin' /> : null}允许并继续</Button></>}</div>
+              <div className='flex justify-end gap-2'>{request.status === 'stale' ? <Button type='button' size='sm' variant='outline' onClick={() => { resolvedConfirmationKeys.current.add(request.key); setConfirmationRequests((current) => current.filter((item) => item.key !== request.key)) }}><LocalizedText text={"关闭"} /></Button> : <><Button type='button' size='sm' variant='outline' disabled={disabled} onClick={() => void submitConfirmation(request, false)}><LocalizedText text={"拒绝"} /></Button><Button type='button' size='sm' variant='destructive' disabled={disabled} onClick={() => void submitConfirmation(request, true)}>{busy ? <Loader2 className='mr-2 size-3.5 animate-spin' /> : null}<LocalizedText text={"允许并继续"} /></Button></>}</div>
             </article>
           })}</section>}
-          {activeExternalRequests.length > 0 && <section aria-label='外部任务结果' className='space-y-3 rounded-lg border border-sky-500/40 bg-sky-500/5 p-4'><div><h3 className='font-medium'>等待提交外部任务结果</h3><p className='mt-1 text-sm text-muted-foreground'>这些任务需要由外部执行器处理。请只提交任务结果；不要输入密码、访问令牌、密钥或其他凭据。提交内容会保存到当前会话。</p></div>{activeExternalRequests.map((request) => {
+          {activeExternalRequests.length > 0 && <section aria-label={t('外部任务结果')} className='space-y-3 rounded-lg border border-sky-500/40 bg-sky-500/5 p-4'><div><h3 className='font-medium'><LocalizedText text={"等待提交外部任务结果"} /></h3><p className='mt-1 text-sm text-muted-foreground'><LocalizedText text={"这些任务需要由外部执行器处理。请只提交任务结果；不要输入密码、访问令牌、密钥或其他凭据。提交内容会保存到当前会话。"} /></p></div>{activeExternalRequests.map((request) => {
             const busy = request.status === 'submitting' || externalInFlight.current.has(request.key)
             const disabled = busy || request.status === 'stale' || accessDenied
             return <article key={request.key} className='space-y-3 rounded-md border bg-background p-3'>
-              <div className='flex flex-wrap items-center justify-between gap-2'><span className='font-medium'>{request.toolCall.name}</span><span className='text-xs text-muted-foreground'>{request.status === 'stale' ? '请求已失效' : busy ? '正在提交…' : '等待外部结果'}</span></div>
-              <details><summary className='cursor-pointer text-xs text-muted-foreground'>查看脱敏任务参数摘要</summary><pre className='mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs'>{summarizeToolArguments(request.toolCall.input)}</pre></details>
-              {request.status !== 'stale' && <div className='space-y-2'><Label htmlFor={`external-result-${request.key}`}>外部任务说明 / 结果</Label><Textarea id={`external-result-${request.key}`} maxLength={MAX_EXTERNAL_RESULT_CHARS} className='min-h-24 resize-y' value={request.output} disabled={disabled} placeholder='填写外部执行器返回的文本结果…' onChange={(event) => setExternalRequests((current) => current.map((item) => item.key === request.key ? { ...item, output: event.target.value, error: undefined } : item))} /><p className='text-xs text-muted-foreground'>最多 {MAX_EXTERNAL_RESULT_CHARS} 个字符。常见凭据格式会在发送前脱敏。</p></div>}
+              <div className='flex flex-wrap items-center justify-between gap-2'><span className='font-medium'>{request.toolCall.name}</span><span className='text-xs text-muted-foreground'>{request.status === 'stale' ? <LocalizedText text={"请求已失效"} /> : busy ? <LocalizedText text={"正在提交…"} /> : <LocalizedText text={"等待外部结果"} />}</span></div>
+              <details><summary className='cursor-pointer text-xs text-muted-foreground'><LocalizedText text={"查看脱敏任务参数摘要"} /></summary><pre className='mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs'>{summarizeToolArguments(request.toolCall.input)}</pre></details>
+              {request.status !== 'stale' && <div className='space-y-2'><Label htmlFor={`external-result-${request.key}`}><LocalizedText text={"外部任务说明 / 结果"} /></Label><Textarea id={`external-result-${request.key}`} maxLength={MAX_EXTERNAL_RESULT_CHARS} className='min-h-24 resize-y' value={request.output} disabled={disabled} placeholder='填写外部执行器返回的文本结果…' onChange={(event) => setExternalRequests((current) => current.map((item) => item.key === request.key ? { ...item, output: event.target.value, error: undefined } : item))} /><p className='text-xs text-muted-foreground'><LocalizedText text={"最多 "} />{MAX_EXTERNAL_RESULT_CHARS} <LocalizedText text={" 个字符。常见凭据格式会在发送前脱敏。"} /></p></div>}
               {request.error && <p role='alert' className={`text-sm ${request.status === 'stale' ? 'text-muted-foreground' : 'text-destructive'}`}>{request.error}</p>}
-              <div className='flex justify-end gap-2'>{request.status === 'stale' ? <Button type='button' size='sm' variant='outline' onClick={() => { resolvedExternalKeys.current.add(request.key); setExternalRequests((current) => current.filter((item) => item.key !== request.key)) }}>关闭</Button> : <><Button type='button' size='sm' variant='outline' disabled={disabled} onClick={() => void submitExternalResult(request, true)}>取消外部任务</Button><Button type='button' size='sm' disabled={disabled || !request.output.trim()} onClick={() => void submitExternalResult(request)}>{busy ? <Loader2 className='mr-2 size-3.5 animate-spin' /> : null}提交结果</Button></>}</div>
+              <div className='flex justify-end gap-2'>{request.status === 'stale' ? <Button type='button' size='sm' variant='outline' onClick={() => { resolvedExternalKeys.current.add(request.key); setExternalRequests((current) => current.filter((item) => item.key !== request.key)) }}><LocalizedText text={"关闭"} /></Button> : <><Button type='button' size='sm' variant='outline' disabled={disabled} onClick={() => void submitExternalResult(request, true)}><LocalizedText text={"取消外部任务"} /></Button><Button type='button' size='sm' disabled={disabled || !request.output.trim()} onClick={() => void submitExternalResult(request)}>{busy ? <Loader2 className='mr-2 size-3.5 animate-spin' /> : null}<LocalizedText text={"提交结果"} /></Button></>}</div>
             </article>
           })}</section>}
-          {toolTimeline.length > 0 && <section aria-label='工具执行时间线' className='space-y-2 rounded-lg border p-3'><h3 className='text-sm font-medium'>工具执行</h3>{toolTimeline.map((tool) => {
+          {toolTimeline.length > 0 && <section aria-label={t('工具执行时间线')} className='space-y-2 rounded-lg border p-3'><h3 className='text-sm font-medium'><LocalizedText text={"工具执行"} /></h3>{toolTimeline.map((tool) => {
             const result = tool.resultText ? redactToolText(tool.resultText) : ''
             return <article key={tool.id} className='space-y-2 rounded-md border bg-card p-3'>
               <header className='flex flex-wrap items-center justify-between gap-2 text-sm'><span className='font-medium'>{tool.name}</span><div className='flex items-center gap-2'><span className='text-xs text-muted-foreground'>{tool.startedAt && `开始 ${formatTimelineTime(tool.startedAt)}`}{tool.finishedAt && ` · 结束 ${formatTimelineTime(tool.finishedAt)}`}</span><span className={`rounded-full px-2 py-0.5 text-xs ${tool.state === 'error' ? 'bg-destructive/10 text-destructive' : tool.state === 'success' ? 'bg-primary/10 text-primary' : tool.state === 'awaiting_confirmation' || tool.state === 'awaiting_external_result' ? 'bg-amber-500/10 text-amber-700' : 'bg-muted text-muted-foreground'}`}>{toolStateLabel(tool.state)}</span></div></header>
-              {tool.state === 'error' && <p className='text-sm text-destructive'>{result ? `${result.slice(0, 240)}${result.length > 240 ? '…' : ''}` : '工具执行失败，服务端未返回可显示的错误详情。'}</p>}
-              {tool.argumentsSummary && <details><summary className='cursor-pointer text-xs text-muted-foreground'>查看脱敏参数摘要</summary><pre className='mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs'>{tool.argumentsSummary}</pre></details>}
-              {result && ['success', 'error', 'interrupted', 'denied', 'finished'].includes(tool.state) && <details><summary className='cursor-pointer text-xs text-muted-foreground'>查看脱敏工具结果{tool.resultTruncated ? '（已截断）' : ''}</summary><pre className='mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs'>{result}{tool.resultTruncated ? '\n…结果过长，已截断' : ''}</pre></details>}
+              {tool.state === 'error' && <p className='text-sm text-destructive'>{result ? `${result.slice(0, 240)}${result.length > 240 ? '…' : ''}` : <LocalizedText text={"工具执行失败，服务端未返回可显示的错误详情。"} />}</p>}
+              {tool.argumentsSummary && <details><summary className='cursor-pointer text-xs text-muted-foreground'><LocalizedText text={"查看脱敏参数摘要"} /></summary><pre className='mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs'>{tool.argumentsSummary}</pre></details>}
+              {result && ['success', 'error', 'interrupted', 'denied', 'finished'].includes(tool.state) && <details><summary className='cursor-pointer text-xs text-muted-foreground'><LocalizedText text={"查看脱敏工具结果"} />{tool.resultTruncated ? <LocalizedText text={"（已截断）"} /> : <LocalizedText text={""} />}</summary><pre className='mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs'>{result}{tool.resultTruncated ? <LocalizedText text={"\n…结果过长，已截断"} /> : <LocalizedText text={""} />}</pre></details>}
             </article>
           })}</section>}
-          {streamError && <div className='flex flex-wrap items-center justify-between gap-2 text-sm text-destructive'><span>{streamError}</span><Button type='button' size='sm' variant='outline' onClick={() => setStreamRetry((value) => value + 1)}>重试消息流</Button></div>}
+          {streamError && <div className='flex flex-wrap items-center justify-between gap-2 text-sm text-destructive'><span>{streamError}</span><Button type='button' size='sm' variant='outline' onClick={() => setStreamRetry((value) => value + 1)}><LocalizedText text={"重试消息流"} /></Button></div>}
           <div className='space-y-3 rounded-lg border p-3'>
-            <Textarea aria-label='输入消息' placeholder='输入消息…' className='min-h-24 resize-y border-0 shadow-none focus-visible:ring-0' value={text} disabled={sending || submitting || accessDenied} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send() } }} />
+            <Textarea aria-label={t('输入消息')} placeholder='输入消息…' className='min-h-24 resize-y border-0 shadow-none focus-visible:ring-0' value={text} disabled={sending || submitting || accessDenied} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send() } }} />
             <div className='flex flex-wrap items-center justify-between gap-3 border-t pt-3'>
               <div className='min-w-0 flex-1'>
                 <details>
-                  <summary className='flex cursor-pointer list-none items-center gap-2 text-sm text-muted-foreground'><Paperclip className='size-4' />引用 Workspace 附件{selectedAttachments.length ? `（${selectedAttachments.length}）` : ''}</summary>
+                  <summary className='flex cursor-pointer list-none items-center gap-2 text-sm text-muted-foreground'><Paperclip className='size-4' /><LocalizedText text={"引用 Workspace 附件"} />{selectedAttachments.length ? `（${selectedAttachments.length}）` : <LocalizedText text={""} />}</summary>
                   <div className='mt-2 max-h-36 space-y-1 overflow-y-auto rounded border p-2'>
-                    {attachments.isLoading ? <p className='text-xs text-muted-foreground'>正在加载附件…</p> : attachments.data?.items.length ? attachments.data.items.map((attachment) => <label key={attachment.attachment_id} className='flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent'><input type='checkbox' checked={selectedAttachments.includes(attachment.attachment_id)} disabled={sending || submitting || (!selectedAttachments.includes(attachment.attachment_id) && pickedBytes + attachment.size_bytes > MAX_CHAT_ATTACHMENT_BYTES)} onChange={() => toggleAttachment(attachment.attachment_id)} /><span className='min-w-0 flex-1 truncate'>{attachment.filename}</span><span className='shrink-0 text-muted-foreground'>{formatBytes(attachment.size_bytes)}</span></label>) : !attachments.isError && <p className='text-xs text-muted-foreground'>当前 Workspace 没有可引用的附件。</p>}
+                    {attachments.isLoading ? <p className='text-xs text-muted-foreground'><LocalizedText text={"正在加载附件…"} /></p> : attachments.data?.items.length ? attachments.data.items.map((attachment) => <label key={attachment.attachment_id} className='flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent'><Input type='checkbox' checked={selectedAttachments.includes(attachment.attachment_id)} disabled={sending || submitting || (!selectedAttachments.includes(attachment.attachment_id) && pickedBytes + attachment.size_bytes > MAX_CHAT_ATTACHMENT_BYTES)} onChange={() => toggleAttachment(attachment.attachment_id)} /><span className='min-w-0 flex-1 truncate'>{attachment.filename}</span><span className='shrink-0 text-muted-foreground'>{formatBytes(attachment.size_bytes)}</span></label>) : !attachments.isError && <p className='text-xs text-muted-foreground'><LocalizedText text={"当前 Workspace 没有可引用的附件。"} /></p>}
                   </div>
-                  <p className='mt-1 text-xs text-muted-foreground'>选中的文件内容会作为消息附件发送，合计上限 5 MiB。</p>
+                  <p className='mt-1 text-xs text-muted-foreground'><LocalizedText text={"选中的文件内容会作为消息附件发送，合计上限 5 MiB。"} /></p>
                 </details>
-                {pickedBytes > MAX_CHAT_ATTACHMENT_BYTES && <p role='alert' className='mt-1 text-xs text-destructive'>附件总大小超过 5 MiB。</p>}
+                {pickedBytes > MAX_CHAT_ATTACHMENT_BYTES && <p role='alert' className='mt-1 text-xs text-destructive'><LocalizedText text={"附件总大小超过 5 MiB。"} /></p>}
               </div>
               <div className='flex gap-2'>
-                {(sending || initiallyRunning || initialStatus === 'awaiting_permission' || initialStatus === 'awaiting_external_result' || runStatus.data?.status === 'running' || runStatus.data?.status === 'awaiting_permission' || runStatus.data?.status === 'awaiting_external_result') && <Button type='button' size='sm' variant='destructive' disabled={interruptPending || accessDenied} onClick={() => void interrupt()}>{interruptPending ? <Loader2 className='mr-2 size-4 animate-spin' /> : <Square className='mr-2 size-3.5 fill-current' />}{interruptPending ? '正在请求中断…' : stopRequested ? '等待停止…' : '中断生成'}</Button>}
-                <Button type='button' disabled={sending || submitting || accessDenied || (!text.trim() && !pickedAttachments.length) || pickedBytes > MAX_CHAT_ATTACHMENT_BYTES} onClick={() => void send()}>{sending || submitting ? <Loader2 className='mr-2 size-4 animate-spin' /> : <Send className='mr-2 size-4' />}{submitting ? '提交中…' : sending ? '生成中…' : '发送'}</Button>
+                {(sending || initiallyRunning || initialStatus === 'awaiting_permission' || initialStatus === 'awaiting_external_result' || runStatus.data?.status === 'running' || runStatus.data?.status === 'awaiting_permission' || runStatus.data?.status === 'awaiting_external_result') && <Button type='button' size='sm' variant='destructive' disabled={interruptPending || accessDenied} onClick={() => void interrupt()}>{interruptPending ? <Loader2 className='mr-2 size-4 animate-spin' /> : <Square className='mr-2 size-3.5 fill-current' />}{interruptPending ? <LocalizedText text={"正在请求中断…"} /> : stopRequested ? <LocalizedText text={"等待停止…"} /> : <LocalizedText text={"中断生成"} />}</Button>}
+                <Button type='button' disabled={sending || submitting || accessDenied || (!text.trim() && !pickedAttachments.length) || pickedBytes > MAX_CHAT_ATTACHMENT_BYTES} onClick={() => void send()}>{sending || submitting ? <Loader2 className='mr-2 size-4 animate-spin' /> : <Send className='mr-2 size-4' />}{submitting ? <LocalizedText text={"提交中…"} /> : sending ? <LocalizedText text={"生成中…"} /> : <LocalizedText text={"发送"} />}</Button>
               </div>
             </div>
           </div>
-          <p className='text-xs text-muted-foreground'>{streamConnected ? '实时消息流已连接。待确认工具请求仅作用于当前 Workspace 和会话。' : '正在连接实时消息流；已收到的助手文本和工具状态会保留，连接失败时可重试。'}</p>
+          <p className='text-xs text-muted-foreground'>{streamConnected ? <LocalizedText text={"实时消息流已连接。待确认工具请求仅作用于当前 Workspace 和会话。"} /> : <LocalizedText text={"正在连接实时消息流；已收到的助手文本和工具状态会保留，连接失败时可重试。"} />}</p>
         </>}
       </CardContent>
     </Card>
@@ -1312,10 +1317,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   const visibleBlocks = message.content.filter((block) => block.type === 'text' || block.type === 'data')
   return (
     <article className={`max-w-[90%] rounded-xl border p-3 ${user ? 'ml-auto bg-primary/5' : 'mr-auto bg-card'}`}>
-      <header className='mb-2 flex items-center justify-between gap-3 text-xs text-muted-foreground'><span>{user ? '我' : message.role === 'assistant' ? '智能体' : '系统'}</span><time>{message.created_at ? new Date(message.created_at).toLocaleString() : ''}</time></header>
+      <header className='mb-2 flex items-center justify-between gap-3 text-xs text-muted-foreground'><span>{user ? <LocalizedText text={"我"} /> : message.role === 'assistant' ? <LocalizedText text={"智能体"} /> : <LocalizedText text={"系统"} />}</span><time>{message.created_at ? new Date(message.created_at).toLocaleString() : <LocalizedText text={""} />}</time></header>
       <div className='space-y-2 text-sm'>
         {visibleBlocks.map((block, index) => block.type === 'text' ? <p key={`${message.id}:${index}`} className='whitespace-pre-wrap break-words'>{block.text}</p> : <div key={`${message.id}:${index}`} className='rounded border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground'><Paperclip className='mr-1 inline size-3.5' />{block.name || block.source?.media_type || '附件'}</div>)}
-        {!visibleBlocks.length && <p className='text-xs text-muted-foreground'>此消息包含尚未支持展示的内容。</p>}
+        {!visibleBlocks.length && <p className='text-xs text-muted-foreground'><LocalizedText text={"此消息包含尚未支持展示的内容。"} /></p>}
       </div>
     </article>
   )

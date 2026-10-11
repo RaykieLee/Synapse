@@ -26,6 +26,7 @@ import { roles } from '../data/data'
 import { type User } from '../data/schema'
 import { DataTableBulkActions } from './data-table-bulk-actions'
 import { usersColumns as columns } from './users-columns'
+import { LocalizedText } from '@/components/localized-text'
 
 type DataTableProps = {
   data: User[]
@@ -180,8 +181,7 @@ export function UsersTable({ data, search, navigate }: DataTableProps) {
                   colSpan={columns.length}
                   className='h-24 text-center'
                 >
-                  No results.
-                </TableCell>
+                  <LocalizedText text={"\n                  No results.\n                "} /></TableCell>
               </TableRow>
             )}
           </TableBody>

@@ -1,9 +1,13 @@
 import { useState } from 'react'
+import { LocalizedNativeSelect } from '@/components/localized-native-select'
+import { Input } from '@/components/ui/input'
+import { formatMessage } from '@/lib/i18n'
 import { Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
+import { LocalizedText } from '@/components/localized-text'
 
 type TenantRole = {
   role_id: string
@@ -96,16 +100,16 @@ export function TenantRolesPage() {
     onError: (cause) => setError(errorText(cause)),
   })
 
-  if (tenant.isLoading) return <main className="p-6">正在加载租户…</main>
-  if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}>返回租户</Link><ErrorBox message={errorText(tenant.error)} /></main>
-  if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}>返回租户</Link><ErrorBox message="仅租户所有者或管理员可以管理租户角色。" /></main>
+  if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
+  if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message={errorText(tenant.error)} /></main>
+  if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message="仅租户所有者或管理员可以管理租户角色。" /></main>
 
   const totalPages = Math.max(1, Math.ceil((roles.data?.total ?? 0) / 20))
   return <main className="space-y-5 p-6">
-    <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}>← 返回 {tenant.data?.name}</Link>
+    <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"← 返回 "} />{tenant.data?.name}</Link>
     <header className="flex flex-wrap items-start justify-between gap-3">
-      <div><h1 className="text-2xl font-semibold">租户角色</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">管理自定义角色的租户权限和菜单授权。内置租户身份及 Workspace 角色保持独立；此页不分配角色给成员，也不改变动态导航。</p></div>
-      <button className={primary} onClick={() => { setError(''); setDraft(emptyDraft()) }}>创建角色</button>
+      <div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户角色"} /></h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground"><LocalizedText text={"管理自定义角色的租户权限和菜单授权。内置租户身份及 Workspace 角色保持独立；此页不分配角色给成员，也不改变动态导航。"} /></p></div>
+      <button className={primary} onClick={() => { setError(''); setDraft(emptyDraft()) }}><LocalizedText text={"创建角色"} /></button>
     </header>
     {error && <ErrorBox message={error} />}
     {draft && <RoleEditor
@@ -126,11 +130,11 @@ export function TenantRolesPage() {
     />}
     <section className={`${panel} space-y-4`}>
       <div className="flex flex-wrap gap-3">
-        <input className={`${input} min-w-56 flex-1`} value={search} placeholder="搜索角色名称或标识" onChange={(event) => { setSearch(event.target.value); setPage(1) }} />
-        <select aria-label="角色状态筛选" className={input} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }}><option value="">全部状态</option><option value="active">启用</option><option value="disabled">停用</option></select>
+        <Input className={`${input} min-w-56 flex-1`} value={search} placeholder="搜索角色名称或标识" onChange={(event) => { setSearch(event.target.value); setPage(1) }} />
+        <LocalizedNativeSelect aria-label="角色状态筛选" className={input} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }}><option value=""><LocalizedText text={"全部状态"} /></option><option value="active"><LocalizedText text={"启用"} /></option><option value="disabled"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect>
       </div>
-      {roles.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground">正在加载角色…</p> : roles.isError ? <ErrorBox message={errorText(roles.error)} /> : roles.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3">角色</th><th className="p-3">权限标识</th><th className="p-3">授权集合</th><th className="p-3">状态</th><th className="p-3">操作</th></tr></thead><tbody>{roles.data.items.map((role) => <tr className="border-b align-top last:border-0" key={`${role.tenant_id}:${role.role_id}`}><td className="p-3"><span className="font-medium">{role.role_name}</span><span className="block text-xs text-muted-foreground">顺序 {role.role_sort} · 租户 {role.tenant_id}</span></td><td className="p-3"><code>{role.role_key}</code></td><td className="max-w-xs p-3 text-muted-foreground">{role.permissions.length ? role.permissions.map(permissionLabel).join('、') : '无授权'}</td><td className="p-3">{role.status === 'active' ? '启用' : '停用'}</td><td className="space-x-3 whitespace-nowrap p-3"><button className="underline" onClick={() => { setError(''); setDraft(toDraft(role)) }}>编辑</button><button className="underline disabled:opacity-50" disabled={role.status !== 'active'} onClick={() => { setError(''); setMenuRole(role) }}>菜单授权</button><button className="underline" disabled={toggle.isPending} onClick={() => toggle.mutate({ roleId: role.role_id, next: role.status === 'active' ? 'disabled' : 'active' })}>{role.status === 'active' ? '停用' : '启用'}</button><button className="text-destructive underline" disabled={remove.isPending} onClick={() => { if (window.confirm(`软删除角色“${role.role_name}”？`)) remove.mutate(role.role_id) }}>删除</button></td></tr>)}</tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground">暂无租户角色</p>}
-      <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">共 {roles.data?.total ?? 0} 个角色</span><div className="flex items-center gap-2"><button className={button} disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</button><span>{page} / {totalPages}</span><button className={button} disabled={page >= totalPages} onClick={() => setPage(page + 1)}>下一页</button></div></div>
+      {roles.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载角色…"} /></p> : roles.isError ? <ErrorBox message={errorText(roles.error)} /> : roles.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"角色"} /></th><th className="p-3"><LocalizedText text={"权限标识"} /></th><th className="p-3"><LocalizedText text={"授权集合"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{roles.data.items.map((role) => <tr className="border-b align-top last:border-0" key={`${role.tenant_id}:${role.role_id}`}><td className="p-3"><span className="font-medium">{role.role_name}</span><span className="block text-xs text-muted-foreground"><LocalizedText text={"顺序 "} />{role.role_sort} <LocalizedText text={" · 租户 "} />{role.tenant_id}</span></td><td className="p-3"><code>{role.role_key}</code></td><td className="max-w-xs p-3 text-muted-foreground">{role.permissions.length ? role.permissions.map(permissionLabel).join('、') : <LocalizedText text={"无授权"} />}</td><td className="p-3">{role.status === 'active' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td><td className="space-x-3 whitespace-nowrap p-3"><button className="underline" onClick={() => { setError(''); setDraft(toDraft(role)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={role.status !== 'active'} onClick={() => { setError(''); setMenuRole(role) }}><LocalizedText text={"菜单授权"} /></button><button className="underline" disabled={toggle.isPending} onClick={() => toggle.mutate({ roleId: role.role_id, next: role.status === 'active' ? 'disabled' : 'active' })}>{role.status === 'active' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline" disabled={remove.isPending} onClick={() => { if (window.confirm(formatMessage('软删除角色“{name}”？', { name: role.role_name }))) remove.mutate(role.role_id) }}><LocalizedText text={"删除"} /></button></td></tr>)}</tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无租户角色"} /></p>}
+      <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground"><LocalizedText text={"共 "} />{roles.data?.total ?? 0} <LocalizedText text={" 个角色"} /></span><div className="flex items-center gap-2"><button className={button} disabled={page <= 1} onClick={() => setPage(page - 1)}><LocalizedText text={"上一页"} /></button><span>{page} <LocalizedText text={" / "} />{totalPages}</span><button className={button} disabled={page >= totalPages} onClick={() => setPage(page + 1)}><LocalizedText text={"下一页"} /></button></div></div>
     </section>
   </main>
 }
@@ -157,11 +161,11 @@ function RoleEditor({ draft, pending, onChange, onCancel, onSave }: {
     set('permissions', [...selected])
   }
   return <form className={`${panel} space-y-4`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
-    <h2 className="font-semibold">{draft.role_id ? '编辑角色' : '创建角色'}</h2>
-    <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-sm"><span>角色名称</span><input autoFocus required maxLength={30} className={`${input} w-full`} value={draft.role_name} onChange={(event) => set('role_name', event.target.value)} /></label><label className="space-y-1 text-sm"><span>角色标识</span><input required maxLength={64} pattern="[a-z][a-z0-9_]{0,63}" className={`${input} w-full`} value={draft.role_key} onChange={(event) => set('role_key', event.target.value)} /><span className="block text-xs text-muted-foreground">小写字母开头，仅含小写字母、数字和下划线</span></label><label className="space-y-1 text-sm"><span>排序</span><input type="number" min={0} className={`${input} w-full`} value={draft.role_sort} onChange={(event) => set('role_sort', Number(event.target.value))} /></label><label className="space-y-1 text-sm"><span>状态</span><select className={`${input} w-full`} value={draft.status} onChange={(event) => set('status', event.target.value as RolePayload['status'])}><option value="active">启用</option><option value="disabled">停用</option></select></label></div>
-    <fieldset><legend className="mb-2 text-sm font-medium">租户授权集合</legend><div className="grid gap-2 sm:grid-cols-2">{permissions.map((permission) => <label key={permission.key} className="flex items-center gap-2 rounded-md border p-3 text-sm"><input type="checkbox" checked={draft.permissions.includes(permission.key)} onChange={() => togglePermission(permission.key)} /><span>{permission.label}</span><code className="ml-auto text-xs text-muted-foreground">{permission.key}</code></label>)}</div></fieldset>
-    <label className="block space-y-1 text-sm"><span>备注</span><textarea maxLength={500} rows={3} className="w-full rounded-md border bg-background p-3" value={draft.remark ?? ''} onChange={(event) => set('remark', event.target.value)} /></label>
-    <div className="flex gap-2"><button className={primary} disabled={pending || !draft.role_name.trim() || !draft.role_key.trim()}>{pending ? '保存中…' : '保存角色'}</button><button type="button" className={button} onClick={onCancel}>取消</button></div>
+    <h2 className="font-semibold">{draft.role_id ? <LocalizedText text={"编辑角色"} /> : <LocalizedText text={"创建角色"} />}</h2>
+    <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-sm"><span><LocalizedText text={"角色名称"} /></span><Input autoFocus required maxLength={30} className={`${input} w-full`} value={draft.role_name} onChange={(event) => set('role_name', event.target.value)} /></label><label className="space-y-1 text-sm"><span><LocalizedText text={"角色标识"} /></span><Input required maxLength={64} pattern="[a-z][a-z0-9_]{0,63}" className={`${input} w-full`} value={draft.role_key} onChange={(event) => set('role_key', event.target.value)} /><span className="block text-xs text-muted-foreground"><LocalizedText text={"小写字母开头，仅含小写字母、数字和下划线"} /></span></label><label className="space-y-1 text-sm"><span><LocalizedText text={"排序"} /></span><Input type="number" min={0} className={`${input} w-full`} value={draft.role_sort} onChange={(event) => set('role_sort', Number(event.target.value))} /></label><label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={`${input} w-full`} value={draft.status} onChange={(event) => set('status', event.target.value as RolePayload['status'])}><option value="active"><LocalizedText text={"启用"} /></option><option value="disabled"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label></div>
+    <fieldset><legend className="mb-2 text-sm font-medium"><LocalizedText text={"租户授权集合"} /></legend><div className="grid gap-2 sm:grid-cols-2">{permissions.map((permission) => <label key={permission.key} className="flex items-center gap-2 rounded-md border p-3 text-sm"><Input type="checkbox" checked={draft.permissions.includes(permission.key)} onChange={() => togglePermission(permission.key)} /><span>{permission.label}</span><code className="ml-auto text-xs text-muted-foreground">{permission.key}</code></label>)}</div></fieldset>
+    <label className="block space-y-1 text-sm"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={3} className="w-full rounded-md border bg-background p-3" value={draft.remark ?? ''} onChange={(event) => set('remark', event.target.value)} /></label>
+    <div className="flex gap-2"><button className={primary} disabled={pending || !draft.role_name.trim() || !draft.role_key.trim()}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存角色"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
   </form>
 }
 
@@ -205,14 +209,14 @@ function RoleMenuEditor({ tenantId, actorId, role, onCancel, onError, onSaved }:
     setSelected(checked ? [...new Set([...selectedIds, menuId])] : selectedIds.filter((id) => id !== menuId))
   }
   return <section className={`${panel} space-y-4`}>
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">{role.role_name} · 菜单授权</h2><p className="mt-1 text-sm text-muted-foreground">仅当前租户启用菜单可勾选。停用或已删除的历史授权仅供查看；保存时会从授权集合中移除。</p></div><button type="button" className={button} onClick={onCancel}>关闭</button></header>
-    {menuTree.isLoading || roleMenus.isLoading ? <p className="py-5 text-sm text-muted-foreground">正在加载菜单授权…</p> : menuTree.isError ? <ErrorBox message={errorText(menuTree.error)} /> : roleMenus.isError ? <ErrorBox message={errorText(roleMenus.error)} /> : <>
-      {historical.length > 0 && <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3"><h3 className="text-sm font-medium">不可重新勾选的历史授权</h3><ul className="space-y-1 text-sm text-muted-foreground">{historical.map((menuId) => {
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">{role.role_name} <LocalizedText text={" · 菜单授权"} /></h2><p className="mt-1 text-sm text-muted-foreground"><LocalizedText text={"仅当前租户启用菜单可勾选。停用或已删除的历史授权仅供查看；保存时会从授权集合中移除。"} /></p></div><button type="button" className={button} onClick={onCancel}><LocalizedText text={"关闭"} /></button></header>
+    {menuTree.isLoading || roleMenus.isLoading ? <p className="py-5 text-sm text-muted-foreground"><LocalizedText text={"正在加载菜单授权…"} /></p> : menuTree.isError ? <ErrorBox message={errorText(menuTree.error)} /> : roleMenus.isError ? <ErrorBox message={errorText(roleMenus.error)} /> : <>
+      {historical.length > 0 && <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3"><h3 className="text-sm font-medium"><LocalizedText text={"不可重新勾选的历史授权"} /></h3><ul className="space-y-1 text-sm text-muted-foreground">{historical.map((menuId) => {
         const menu = menuById.get(menuId)
         return <li key={menuId}>{menu ? `${menu.menu_name}（已停用，ID ${menuId}）` : `已删除菜单（ID ${menuId}）`}</li>
       })}</ul></div>}
-      {menuTree.data?.items.length ? <div className="max-h-[55vh] space-y-2 overflow-auto rounded-md border p-3">{menuTree.data.items.map((menu) => <MenuGrantNode key={menu.menu_id} menu={menu} depth={0} selected={selectedIds} onToggle={toggleMenu} />)}</div> : <p className="rounded-md border p-5 text-center text-sm text-muted-foreground">当前租户没有可配置菜单</p>}
-      <div className="flex flex-wrap items-center gap-3"><button type="button" className={primary} disabled={!menuTree.data || !roleMenus.data || save.isPending} onClick={() => save.mutate(selectedIds)}>{save.isPending ? '保存中…' : '保存授权'}</button><span className="text-sm text-muted-foreground">已选 {selectedIds.length} 个启用菜单</span></div>
+      {menuTree.data?.items.length ? <div className="max-h-[55vh] space-y-2 overflow-auto rounded-md border p-3">{menuTree.data.items.map((menu) => <MenuGrantNode key={menu.menu_id} menu={menu} depth={0} selected={selectedIds} onToggle={toggleMenu} />)}</div> : <p className="rounded-md border p-5 text-center text-sm text-muted-foreground"><LocalizedText text={"当前租户没有可配置菜单"} /></p>}
+      <div className="flex flex-wrap items-center gap-3"><button type="button" className={primary} disabled={!menuTree.data || !roleMenus.data || save.isPending} onClick={() => save.mutate(selectedIds)}>{save.isPending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存授权"} />}</button><span className="text-sm text-muted-foreground"><LocalizedText text={"已选 "} />{selectedIds.length} <LocalizedText text={" 个启用菜单"} /></span></div>
     </>}
   </section>
 }
@@ -226,8 +230,8 @@ function MenuGrantNode({ menu, depth, selected, onToggle }: {
   const enabled = menu.status === '0'
   return <div>
     <label className={`flex items-center gap-2 rounded-md border p-2 text-sm ${enabled ? '' : 'text-muted-foreground opacity-70'}`} style={{ marginLeft: `${depth * 1.25}rem` }}>
-      <input type="checkbox" disabled={!enabled} checked={enabled && selected.includes(menu.menu_id)} onChange={(event) => onToggle(menu.menu_id, event.target.checked)} />
-      <span>{menu.menu_name}</span><span className="text-xs text-muted-foreground">{menu.menu_type === 'M' ? '目录' : menu.menu_type === 'C' ? '页面' : '操作'}{enabled ? '' : ' · 已停用'}</span>{menu.path && <code className="ml-auto text-xs text-muted-foreground">{menu.path}</code>}
+      <Input type="checkbox" disabled={!enabled} checked={enabled && selected.includes(menu.menu_id)} onChange={(event) => onToggle(menu.menu_id, event.target.checked)} />
+      <span>{menu.menu_name}</span><span className="text-xs text-muted-foreground">{menu.menu_type === 'M' ? <LocalizedText text={"目录"} /> : menu.menu_type === 'C' ? <LocalizedText text={"页面"} /> : <LocalizedText text={"操作"} />}{enabled ? <LocalizedText text={""} /> : <LocalizedText text={" · 已停用"} />}</span>{menu.path && <code className="ml-auto text-xs text-muted-foreground">{menu.path}</code>}
     </label>
     {menu.children.map((child) => <MenuGrantNode key={child.menu_id} menu={child} depth={depth + 1} selected={selected} onToggle={onToggle} />)}
   </div>

@@ -19,10 +19,10 @@ from app.schemas.tenant_invitations import (
     InvitationRegister,
     InvitationRegisterResponse,
 )
-from app.services.errors import GoneError
 from app.services.results import ActorContext
 from app.services.tenant_invitations import (
     CreatedInvitationResult,
+    InvitationExpiredResult,
     TenantInvitationService,
 )
 
@@ -97,12 +97,9 @@ def register_and_accept_invitation(
     request: Request,
     service: TenantInvitationService = Depends(get_invitation_service),
 ):
-    try:
-        result = service.register_and_accept(body)
-    except GoneError as exc:
-        # Returning rather than re-raising lets the request dependency commit the
-        # terminal expired status while still producing the 410 problem response.
-        return _problem_response(request, exc)
+    result = service.register_and_accept(body)
+    if isinstance(result, InvitationExpiredResult):
+        return _expired_response(request, result)
 
     access_token = issue_token(
         int(result.user.user_id),
@@ -134,16 +131,16 @@ def accept_invitation(
     user: User = Depends(get_current_user),
     service: TenantInvitationService = Depends(get_invitation_service),
 ):
-    try:
-        return service.accept_invitation(body, user)
-    except GoneError as exc:
-        return _problem_response(request, exc)
+    result = service.accept_invitation(body, user)
+    if isinstance(result, InvitationExpiredResult):
+        return _expired_response(request, result)
+    return result
 
 
-def _problem_response(request: Request, exc: GoneError):
+def _expired_response(request: Request, result: InvitationExpiredResult):
     return problem(
         410,
-        exc.code,
-        str(exc) or None,
+        result.code,
+        result.detail,
         request_id=getattr(request.state, "request_id", None),
     )

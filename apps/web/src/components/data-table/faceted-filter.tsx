@@ -19,6 +19,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
+import { LocalizedText } from '@/components/localized-text'
 
 type DataTableFacetedFilterProps<TData, TValue> = {
   column?: Column<TData, TValue>
@@ -59,8 +60,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                     variant='secondary'
                     className='rounded-sm px-1 font-normal'
                   >
-                    {selectedValues.size} selected
-                  </Badge>
+                    {selectedValues.size} <LocalizedText text={" selected\n                  "} /></Badge>
                 ) : (
                   options
                     .filter((option) => selectedValues.has(option.value))
@@ -83,7 +83,7 @@ export function DataTableFacetedFilter<TData, TValue>({
         <Command>
           <CommandInput placeholder={title} />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty><LocalizedText text={"No results found."} /></CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
                 const isSelected = selectedValues.has(option.value)
@@ -133,8 +133,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                     onSelect={() => column?.setFilterValue(undefined)}
                     className='justify-center text-center'
                   >
-                    Clear filters
-                  </CommandItem>
+                    <LocalizedText text={"\n                    Clear filters\n                  "} /></CommandItem>
                 </CommandGroup>
               </>
             )}

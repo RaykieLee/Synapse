@@ -9,6 +9,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
+import { LocalizedText } from '@/components/localized-text'
 
 type DataTableViewOptionsProps<TData> = {
   table: Table<TData>
@@ -26,11 +27,10 @@ export function DataTableViewOptions<TData>({
           className='ms-auto hidden h-8 lg:flex'
         >
           <MixerHorizontalIcon className='size-4' />
-          View
-        </Button>
+          <LocalizedText text={"\n          View\n        "} /></Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-37.5'>
-        <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+        <DropdownMenuLabel><LocalizedText text={"Toggle columns"} /></DropdownMenuLabel>
         <DropdownMenuSeparator />
         {table
           .getAllColumns()

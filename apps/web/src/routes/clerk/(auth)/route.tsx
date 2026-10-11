@@ -2,6 +2,7 @@ import { createFileRoute, Link, Outlet } from '@tanstack/react-router'
 import { ClerkFullLogo } from '@/assets/clerk-full-logo'
 import { Logo } from '@/assets/logo'
 import { LearnMore } from '@/components/learn-more'
+import { LocalizedText } from '@/components/localized-text'
 
 export const Route = createFileRoute('/clerk/(auth)')({
   component: ClerkAuthLayout,
@@ -18,18 +19,15 @@ function ClerkAuthLayout() {
           className='relative z-20 flex items-center text-lg font-medium'
         >
           <Logo className='me-2' />
-          Synapse
-        </Link>
+          <LocalizedText text={"\n          Synapse\n        "} /></Link>
 
         <ClerkFullLogo className='relative m-auto size-96' />
 
         <div className='relative z-20 mt-auto'>
           <blockquote className='space-y-2'>
             <p className='text-lg'>
-              &ldquo; Lorem ipsum dolor sit amet consectetur adipisicing elit.
-              Sint, magni debitis inventore asperiores velit! &rdquo;
-            </p>
-            <footer className='text-sm'>John Doe</footer>
+              <LocalizedText text={"\n              &ldquo; Lorem ipsum dolor sit amet consectetur adipisicing elit.\n              Sint, magni debitis inventore asperiores velit! &rdquo;\n            "} /></p>
+            <footer className='text-sm'><LocalizedText text={"John Doe"} /></footer>
           </blockquote>
         </div>
       </div>
@@ -42,16 +40,14 @@ function ClerkAuthLayout() {
             }}
             contentProps={{ side: 'top', align: 'end', className: 'w-auto' }}
           >
-            Welcome to the example Clerk auth page. <br />
-            Back to{' '}
+            <LocalizedText text={"\n            Welcome to the example Clerk auth page. "} /><br />
+            <LocalizedText text={"\n            Back to"} />{' '}
             <Link
               to='/'
               className='underline decoration-dashed underline-offset-2'
             >
-              Dashboard
-            </Link>{' '}
-            ?
-          </LearnMore>
+              <LocalizedText text={"\n              Dashboard\n            "} /></Link>{' '}
+            <LocalizedText text={"\n            ?\n          "} /></LearnMore>
           <Outlet />
         </div>
       </div>

@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { SelectDropdown } from '@/components/select-dropdown'
 import { roles } from '../data/data'
+import { LocalizedText } from '@/components/localized-text'
 
 const formSchema = z.object({
   email: z.email({
@@ -68,12 +69,9 @@ export function UsersInviteDialog({
       <DialogContent className='sm:max-w-md'>
         <DialogHeader className='text-start'>
           <DialogTitle className='flex items-center gap-2'>
-            <MailPlus /> Invite User
-          </DialogTitle>
+            <MailPlus /> <LocalizedText text={" Invite User\n          "} /></DialogTitle>
           <DialogDescription>
-            Invite new user to join your team by sending them an email
-            invitation. Assign a role to define their access level.
-          </DialogDescription>
+            <LocalizedText text={"\n            Invite new user to join your team by sending them an email\n            invitation. Assign a role to define their access level.\n          "} /></DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form
@@ -86,7 +84,7 @@ export function UsersInviteDialog({
               name='email'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel><LocalizedText text={"Email"} /></FormLabel>
                   <FormControl>
                     <Input
                       type='email'
@@ -103,7 +101,7 @@ export function UsersInviteDialog({
               name='role'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role</FormLabel>
+                  <FormLabel><LocalizedText text={"Role"} /></FormLabel>
                   <SelectDropdown
                     defaultValue={field.value}
                     onValueChange={field.onChange}
@@ -122,7 +120,7 @@ export function UsersInviteDialog({
               name='desc'
               render={({ field }) => (
                 <FormItem className=''>
-                  <FormLabel>Description (optional)</FormLabel>
+                  <FormLabel><LocalizedText text={"Description (optional)"} /></FormLabel>
                   <FormControl>
                     <Textarea
                       className='resize-none'
@@ -138,10 +136,10 @@ export function UsersInviteDialog({
         </Form>
         <DialogFooter className='gap-y-2'>
           <DialogClose asChild>
-            <Button variant='outline'>Cancel</Button>
+            <Button variant='outline'><LocalizedText text={"Cancel"} /></Button>
           </DialogClose>
           <Button type='submit' form='user-invite-form'>
-            Invite <Send />
+            <LocalizedText text={"\n            Invite "} /><Send />
           </Button>
         </DialogFooter>
       </DialogContent>

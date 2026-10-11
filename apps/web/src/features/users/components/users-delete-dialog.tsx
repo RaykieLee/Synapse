@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { type User } from '../data/schema'
+import { LocalizedText } from '@/components/localized-text'
 
 type UserDeleteDialogProps = {
   open: boolean
@@ -41,8 +42,7 @@ export function UsersDeleteDialog({
             className='me-1 inline-block stroke-destructive'
             size={18}
           />{' '}
-          Delete User
-        </span>
+          <LocalizedText text={"\n          Delete User\n        "} /></span>
       }
       desc={
         <form
@@ -54,19 +54,16 @@ export function UsersDeleteDialog({
           className='space-y-4'
         >
           <p className='mb-2'>
-            Are you sure you want to delete{' '}
-            <span className='font-bold'>{currentRow.username}</span>?
-            <br />
-            This action will permanently remove the user with the role of{' '}
+            <LocalizedText text={"\n            Are you sure you want to delete"} />{' '}
+            <span className='font-bold'>{currentRow.username}</span><LocalizedText text={"?\n            "} /><br />
+            <LocalizedText text={"\n            This action will permanently remove the user with the role of"} />{' '}
             <span className='font-bold'>
               {currentRow.role.toUpperCase()}
             </span>{' '}
-            from the system. This cannot be undone.
-          </p>
+            <LocalizedText text={"\n            from the system. This cannot be undone.\n          "} /></p>
 
           <Label className='my-2'>
-            Username:
-            <Input
+            <LocalizedText text={"\n            Username:\n            "} /><Input
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder='Enter username to confirm deletion.'
@@ -75,10 +72,9 @@ export function UsersDeleteDialog({
           </Label>
 
           <Alert variant='destructive'>
-            <AlertTitle>Warning!</AlertTitle>
+            <AlertTitle><LocalizedText text={"Warning!"} /></AlertTitle>
             <AlertDescription>
-              Please be careful, this operation can not be rolled back.
-            </AlertDescription>
+              <LocalizedText text={"\n              Please be careful, this operation can not be rolled back.\n            "} /></AlertDescription>
           </Alert>
         </form>
       }

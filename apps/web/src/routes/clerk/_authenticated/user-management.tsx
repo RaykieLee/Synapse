@@ -21,6 +21,7 @@ import { UsersPrimaryButtons } from '@/features/users/components/users-primary-b
 import { UsersProvider } from '@/features/users/components/users-provider'
 import { UsersTable } from '@/features/users/components/users-table'
 import { users } from '@/features/users/data/users'
+import { LocalizedText } from '@/components/localized-text'
 
 export const Route = createFileRoute('/clerk/_authenticated/user-management')({
   component: UserManagement,
@@ -57,30 +58,26 @@ function UserManagement() {
       <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
         <div className='flex flex-wrap items-end justify-between gap-2'>
           <div>
-            <h2 className='text-2xl font-bold tracking-tight'>User List</h2>
+            <h2 className='text-2xl font-bold tracking-tight'><LocalizedText text={"User List"} /></h2>
             <div className='flex gap-1'>
               <p className='text-muted-foreground'>
-                Manage your users and their roles here.
-              </p>
+                <LocalizedText text={"\n                Manage your users and their roles here.\n              "} /></p>
               <LearnMore
                 open={opened}
                 onOpenChange={setOpened}
                 contentProps={{ side: 'right' }}
               >
                 <p>
-                  This is the same as{' '}
+                  <LocalizedText text={"\n                  This is the same as"} />{' '}
                   <Link
                     to='/users'
                     className='text-blue-500 underline decoration-dashed underline-offset-2'
                   >
-                    '/users'
-                  </Link>
+                    <LocalizedText text={"\n                    '/users'\n                  "} /></Link>
                 </p>
 
                 <p className='mt-4'>
-                  You can sign out or manage/delete your account via the User
-                  Profile menu in the top-right corner of the page.
-                  <ExternalLink className='inline-block size-4' />
+                  <LocalizedText text={"\n                  You can sign out or manage/delete your account via the User\n                  Profile menu in the top-right corner of the page.\n                  "} /><ExternalLink className='inline-block size-4' />
                 </p>
               </LearnMore>
             </div>
@@ -123,52 +120,43 @@ function Unauthorized() {
   return (
     <div className='h-svh'>
       <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
-        <h1 className='text-[7rem] leading-tight font-bold'>401</h1>
-        <span className='font-medium'>Unauthorized Access</span>
+        <h1 className='text-[7rem] leading-tight font-bold'><LocalizedText text={"401"} /></h1>
+        <span className='font-medium'><LocalizedText text={"Unauthorized Access"} /></span>
         <p className='text-center text-muted-foreground'>
-          You must be authenticated via Clerk{' '}
+          <LocalizedText text={"\n          You must be authenticated via Clerk"} />{' '}
           <sup>
             <LearnMore open={opened} onOpenChange={setOpened}>
               <p>
-                This is the same as{' '}
+                <LocalizedText text={"\n                This is the same as"} />{' '}
                 <Link
                   to='/users'
                   className='text-blue-500 underline decoration-dashed underline-offset-2'
                 >
-                  '/users'
-                </Link>
-                .{' '}
+                  <LocalizedText text={"\n                  '/users'\n                "} /></Link>
+                <LocalizedText text={"\n                ."} />{' '}
               </p>
-              <p>You must first sign in using Clerk to access this route. </p>
+              <p><LocalizedText text={"You must first sign in using Clerk to access this route. "} /></p>
 
               <p className='mt-4'>
-                After signing in, you'll be able to sign out or delete your
-                account via the User Profile dropdown on this page.
-              </p>
+                <LocalizedText text={"\n                After signing in, you'll be able to sign out or delete your\n                account via the User Profile dropdown on this page.\n              "} /></p>
             </LearnMore>
           </sup>
           <br />
-          to access this resource.
-        </p>
+          <LocalizedText text={"\n          to access this resource.\n        "} /></p>
         <div className='mt-6 flex gap-4'>
           <Button variant='outline' onClick={() => history.go(-1)}>
-            Go Back
-          </Button>
+            <LocalizedText text={"\n            Go Back\n          "} /></Button>
           <Button onClick={() => navigate({ to: '/clerk/sign-in' })}>
-            <ClerkLogo className='invert' /> Sign in
-          </Button>
+            <ClerkLogo className='invert' /> <LocalizedText text={" Sign in\n          "} /></Button>
         </div>
         <div className='mt-4 h-8 text-center'>
           {!cancelled && !opened && (
             <>
               <p>
-                {countdown > 0
-                  ? `Redirecting to Sign In page in ${countdown}s`
-                  : `Redirecting...`}
+                {countdown > 0 ? `Redirecting to Sign In page in ${countdown}s` : <LocalizedText text={"Redirecting..."} />}
               </p>
               <Button variant='link' onClick={() => setCancelled(true)}>
-                Cancel Redirect
-              </Button>
+                <LocalizedText text={"\n                Cancel Redirect\n              "} /></Button>
             </>
           )}
         </div>

@@ -20,6 +20,7 @@ import {
   InputOTPSlot,
   InputOTPSeparator,
 } from '@/components/ui/input-otp'
+import { LocalizedText } from '@/components/localized-text'
 
 const formSchema = z.object({
   otp: z
@@ -64,7 +65,7 @@ export function OtpForm({ className, ...props }: OtpFormProps) {
           name='otp'
           render={({ field }) => (
             <FormItem>
-              <FormLabel className='sr-only'>One-Time Password</FormLabel>
+              <FormLabel className='sr-only'><LocalizedText text={"One-Time Password"} /></FormLabel>
               <FormControl>
                 <InputOTP
                   maxLength={6}
@@ -92,8 +93,7 @@ export function OtpForm({ className, ...props }: OtpFormProps) {
           )}
         />
         <Button className='mt-2' disabled={otp.length < 6 || isLoading}>
-          Verify
-        </Button>
+          <LocalizedText text={"\n          Verify\n        "} /></Button>
       </form>
     </Form>
   )

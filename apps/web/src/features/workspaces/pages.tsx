@@ -1,4 +1,6 @@
 import * as React from 'react'
+import { LocalizedNativeSelect } from '@/components/localized-native-select'
+import { formatMessage } from '@/lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
@@ -19,6 +21,7 @@ import {
   type WorkspaceRole,
   type WorkspaceStatus,
 } from './types'
+import { LocalizedText } from '@/components/localized-text'
 
 const panel = 'rounded-xl border bg-card p-5'
 const scopedKey = (actorId: string, workspace: Workspace, resource: string) =>
@@ -38,75 +41,70 @@ export function WorkspaceHome() {
     <main className='space-y-6 p-6'>
       <header>
         <p className='text-sm text-muted-foreground'>
-          Workspace · {workspace.slug}
+          <LocalizedText text={"\n          Workspace · "} />{workspace.slug}
         </p>
         <h1 className='mt-1 text-2xl font-semibold'>{workspace.name}</h1>
         <p className='mt-2 text-sm text-muted-foreground'>
-          {statusLabel[workspace.status]} · 我的空间角色：
-          {roleLabel[workspace.workspace_role]}
+          {statusLabel[workspace.status]} <LocalizedText text={" · 我的空间角色：\n          "} />{roleLabel[workspace.workspace_role]}
         </p>
       </header>
       {workspace.status === 'archived' && (
         <section className={`${panel} border-amber-500/40`}>
-          <h2 className='font-semibold'>此空间已归档</h2>
+          <h2 className='font-semibold'><LocalizedText text={"此空间已归档"} /></h2>
           <p className='mt-1 text-sm text-muted-foreground'>
-            空间成员和资源关系已保留。所有者或管理员可以在设置中恢复。
-          </p>
+            <LocalizedText text={"\n            空间成员和资源关系已保留。所有者或管理员可以在设置中恢复。\n          "} /></p>
           {manager && (
             <Link
               className='mt-3 inline-block text-sm underline underline-offset-4'
               to='/w/$workspaceId/settings'
               params={{ workspaceId: workspace.workspace_id }}
             >
-              打开空间设置
-            </Link>
+              <LocalizedText text={"\n              打开空间设置\n            "} /></Link>
           )}
         </section>
       )}
       <section className={panel}>
-        <h2 className='font-semibold'>空间资源</h2>
+        <h2 className='font-semibold'><LocalizedText text={"空间资源"} /></h2>
         <p className='mt-1 text-sm text-muted-foreground'>
-          智能体定义、会话和文件按当前 Workspace 作用域隔离。
-        </p>
+          <LocalizedText text={"\n          智能体定义、会话和文件按当前 Workspace 作用域隔离。\n        "} /></p>
         <div className='mt-4 flex flex-wrap gap-2'>
           <Link
             to='/w/$workspaceId/agents'
             params={{ workspaceId: workspace.workspace_id }}
           >
-            <Button variant='outline'>智能体管理</Button>
+            <Button variant='outline'><LocalizedText text={"智能体管理"} /></Button>
           </Link>
           <Link
             to='/w/$workspaceId/sessions'
             params={{ workspaceId: workspace.workspace_id }}
           >
-            <Button variant='outline'>会话管理</Button>
+            <Button variant='outline'><LocalizedText text={"会话管理"} /></Button>
           </Link>
           <Link
             to='/w/$workspaceId/attachments'
             params={{ workspaceId: workspace.workspace_id }}
           >
-            <Button variant='outline'>附件</Button>
+            <Button variant='outline'><LocalizedText text={"附件"} /></Button>
           </Link>
         </div>
       </section>
       <section className={panel}>
-        <h2 className='font-semibold'>空间管理</h2>
+        <h2 className='font-semibold'><LocalizedText text={"空间管理"} /></h2>
         <p className='mt-1 text-sm text-muted-foreground'>
-          空间成员资格独立于租户成员资格；只有加入该空间的成员才能访问其业务资源。
-        </p>
+          <LocalizedText text={"\n          空间成员资格独立于租户成员资格；只有加入该空间的成员才能访问其业务资源。\n        "} /></p>
         <div className='mt-4 flex flex-wrap gap-2'>
           <Link
             to='/w/$workspaceId/members'
             params={{ workspaceId: workspace.workspace_id }}
           >
-            <Button variant='outline'>成员管理</Button>
+            <Button variant='outline'><LocalizedText text={"成员管理"} /></Button>
           </Link>
           {manager && (
             <Link
               to='/w/$workspaceId/settings'
               params={{ workspaceId: workspace.workspace_id }}
             >
-              <Button variant='outline'>空间设置</Button>
+              <Button variant='outline'><LocalizedText text={"空间设置"} /></Button>
             </Link>
           )}
         </div>
@@ -166,15 +164,14 @@ export function WorkspaceSettings() {
           to='/w/$workspaceId'
           params={{ workspaceId: workspace.workspace_id }}
         >
-          ← 返回空间
-        </Link>
-        <p className='mt-3 text-sm text-muted-foreground'>Workspace 设置</p>
+          <LocalizedText text={"\n          ← 返回空间\n        "} /></Link>
+        <p className='mt-3 text-sm text-muted-foreground'><LocalizedText text={"Workspace 设置"} /></p>
         <h1 className='text-2xl font-semibold'>{workspace.name}</h1>
       </header>
       <section className={`${panel} max-w-2xl space-y-4`}>
-        <h2 className='font-semibold'>基本信息</h2>
+        <h2 className='font-semibold'><LocalizedText text={"基本信息"} /></h2>
         <div className='space-y-2'>
-          <Label htmlFor='workspace-name-edit'>名称</Label>
+          <Label htmlFor='workspace-name-edit'><LocalizedText text={"名称"} /></Label>
           <Input
             id='workspace-name-edit'
             value={name}
@@ -183,7 +180,7 @@ export function WorkspaceSettings() {
           />
         </div>
         <div className='space-y-2'>
-          <Label htmlFor='workspace-icon-edit'>图标标识（可选）</Label>
+          <Label htmlFor='workspace-icon-edit'><LocalizedText text={"图标标识（可选）"} /></Label>
           <Input
             id='workspace-icon-edit'
             value={icon}
@@ -193,19 +190,19 @@ export function WorkspaceSettings() {
         </div>
         <div className='grid gap-2 text-sm sm:grid-cols-2'>
           <div>
-            <span className='text-muted-foreground'>空间标识：</span>
+            <span className='text-muted-foreground'><LocalizedText text={"空间标识："} /></span>
             {workspace.slug}
           </div>
           <div>
-            <span className='text-muted-foreground'>租户 ID：</span>
+            <span className='text-muted-foreground'><LocalizedText text={"租户 ID："} /></span>
             {workspace.tenant_id}
           </div>
           <div>
-            <span className='text-muted-foreground'>空间 ID：</span>
+            <span className='text-muted-foreground'><LocalizedText text={"空间 ID："} /></span>
             {workspace.workspace_id}
           </div>
           <div>
-            <span className='text-muted-foreground'>状态：</span>
+            <span className='text-muted-foreground'><LocalizedText text={"状态："} /></span>
             {statusLabel[workspace.status]}
           </div>
         </div>
@@ -215,22 +212,21 @@ export function WorkspaceSettings() {
             update.mutate({ name: name.trim(), icon: icon.trim() || null })
           }
         >
-          {update.isPending ? '保存中…' : '保存设置'}
+          {update.isPending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存设置"} />}
         </Button>
       </section>
       <section className={`${panel} max-w-2xl`}>
-        <h2 className='font-semibold'>归档空间</h2>
+        <h2 className='font-semibold'><LocalizedText text={"归档空间"} /></h2>
         <p className='mt-1 text-sm text-muted-foreground'>
-          归档后空间不会出现在普通空间列表中，成员关系和资源保留。所有者或管理员可以从切换器的管理列表恢复。
-        </p>
+          <LocalizedText text={"\n          归档后空间不会出现在普通空间列表中，成员关系和资源保留。所有者或管理员可以从切换器的管理列表恢复。\n        "} /></p>
         <Button
           className='mt-4'
-          variant={workspace.status === 'active' ? 'destructive' : 'default'}
+          variant={workspace.status === 'active' ? "destructive" : "default"}
           disabled={setStatus.isPending}
           onClick={() => {
             if (
               workspace.status === 'active' &&
-              !window.confirm(`确定归档“${workspace.name}”吗？`)
+              !window.confirm(formatMessage('确定归档“{name}”吗？', { name: workspace.name }))
             )
               return
             setStatus.mutate(
@@ -238,7 +234,7 @@ export function WorkspaceSettings() {
             )
           }}
         >
-          {workspace.status === 'active' ? '归档空间' : '恢复空间'}
+          {workspace.status === 'active' ? <LocalizedText text={"归档空间"} /> : <LocalizedText text={"恢复空间"} />}
         </Button>
       </section>
       {error && (
@@ -334,25 +330,22 @@ export function WorkspaceMembers() {
           to='/w/$workspaceId'
           params={{ workspaceId: workspace.workspace_id }}
         >
-          ← 返回空间
-        </Link>
+          <LocalizedText text={"\n          ← 返回空间\n        "} /></Link>
         <p className='mt-3 text-sm text-muted-foreground'>
-          Workspace · {workspace.name}
+          <LocalizedText text={"\n          Workspace · "} />{workspace.name}
         </p>
-        <h1 className='text-2xl font-semibold'>空间成员</h1>
+        <h1 className='text-2xl font-semibold'><LocalizedText text={"空间成员"} /></h1>
         <p className='mt-1 text-sm text-muted-foreground'>
-          成员必须是所属租户的 active 成员。租户成员不会自动加入所有空间。
-        </p>
+          <LocalizedText text={"\n          成员必须是所属租户的 active 成员。租户成员不会自动加入所有空间。\n        "} /></p>
       </header>
       {canEdit && (
         <section className={`${panel} space-y-3`}>
-          <h2 className='font-semibold'>添加或恢复成员</h2>
+          <h2 className='font-semibold'><LocalizedText text={"添加或恢复成员"} /></h2>
           <p className='text-sm text-muted-foreground'>
-            输入现有全局账号 ID；API 会校验其当前租户成员资格。
-          </p>
+            <LocalizedText text={"\n            输入现有全局账号 ID；API 会校验其当前租户成员资格。\n          "} /></p>
           <div className='flex flex-wrap items-end gap-3'>
             <div className='space-y-2'>
-              <Label htmlFor='workspace-member-id'>用户 ID</Label>
+              <Label htmlFor='workspace-member-id'><LocalizedText text={"用户 ID"} /></Label>
               <Input
                 id='workspace-member-id'
                 inputMode='numeric'
@@ -363,8 +356,8 @@ export function WorkspaceMembers() {
               />
             </div>
             <div className='space-y-2'>
-              <Label htmlFor='workspace-member-role'>角色</Label>
-              <select
+              <Label htmlFor='workspace-member-role'><LocalizedText text={"角色"} /></Label>
+              <LocalizedNativeSelect
                 id='workspace-member-role'
                 className='h-9 rounded-md border bg-background px-3 text-sm'
                 value={targetRole}
@@ -372,11 +365,11 @@ export function WorkspaceMembers() {
                   setTargetRole(event.target.value as WorkspaceRole)
                 }
               >
-                <option value='member'>成员</option>
-                <option value='viewer'>只读成员</option>
-                <option value='admin'>管理员</option>
-                {isOwner && <option value='owner'>所有者</option>}
-              </select>
+                <option value='member'><LocalizedText text={"成员"} /></option>
+                <option value='viewer'><LocalizedText text={"只读成员"} /></option>
+                <option value='admin'><LocalizedText text={"管理员"} /></option>
+                {isOwner && <option value='owner'><LocalizedText text={"所有者"} /></option>}
+              </LocalizedNativeSelect>
             </div>
             <Button
               disabled={!/^\d+$/.test(targetId) || changeRole.isPending}
@@ -387,15 +380,15 @@ export function WorkspaceMembers() {
                 })
               }
             >
-              {changeRole.isPending ? '保存中…' : '加入空间'}
+              {changeRole.isPending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"加入空间"} />}
             </Button>
           </div>
         </section>
       )}
       <section className={panel}>
-        <h2 className='font-semibold'>成员列表</h2>
+        <h2 className='font-semibold'><LocalizedText text={"成员列表"} /></h2>
         {members.isLoading ? (
-          <p className='py-5 text-sm text-muted-foreground'>正在加载…</p>
+          <p className='py-5 text-sm text-muted-foreground'><LocalizedText text={"正在加载…"} /></p>
         ) : members.isError ? (
           <p role='alert' className='py-5 text-sm text-destructive'>
             {members.error.message}
@@ -405,11 +398,11 @@ export function WorkspaceMembers() {
             <table className='w-full text-left text-sm'>
               <thead>
                 <tr className='border-b text-muted-foreground'>
-                  <th className='p-3'>成员</th>
-                  <th className='p-3'>用户 ID</th>
-                  <th className='p-3'>角色</th>
-                  <th className='p-3'>状态</th>
-                  {canManage && <th className='p-3'>操作</th>}
+                  <th className='p-3'><LocalizedText text={"成员"} /></th>
+                  <th className='p-3'><LocalizedText text={"用户 ID"} /></th>
+                  <th className='p-3'><LocalizedText text={"角色"} /></th>
+                  <th className='p-3'><LocalizedText text={"状态"} /></th>
+                  {canManage && <th className='p-3'><LocalizedText text={"操作"} /></th>}
                 </tr>
               </thead>
               <tbody>
@@ -431,7 +424,7 @@ export function WorkspaceMembers() {
                         {canEdit &&
                         !protectedOwner &&
                         member.status === 'active' ? (
-                          <select
+                          <LocalizedNativeSelect
                             aria-label={`${member.user_name} 空间角色`}
                             className='rounded border bg-background p-1'
                             value={member.workspace_role}
@@ -443,21 +436,17 @@ export function WorkspaceMembers() {
                               })
                             }
                           >
-                            <option value='member'>成员</option>
-                            <option value='viewer'>只读成员</option>
-                            <option value='admin'>管理员</option>
-                            {isOwner && <option value='owner'>所有者</option>}
-                          </select>
+                            <option value='member'><LocalizedText text={"成员"} /></option>
+                            <option value='viewer'><LocalizedText text={"只读成员"} /></option>
+                            <option value='admin'><LocalizedText text={"管理员"} /></option>
+                            {isOwner && <option value='owner'><LocalizedText text={"所有者"} /></option>}
+                          </LocalizedNativeSelect>
                         ) : (
                           roleLabel[member.workspace_role]
                         )}
                       </td>
                       <td className='p-3'>
-                        {member.status === 'active'
-                          ? '有效'
-                          : member.status === 'removed'
-                            ? '已移除'
-                            : member.status}
+                        {member.status === 'active' ? <LocalizedText text={"有效"} /> : member.status === 'removed' ? <LocalizedText text={"已移除"} /> : member.status}
                       </td>
                       {canManage && (
                         <td className='space-x-3 p-3'>
@@ -471,14 +460,13 @@ export function WorkspaceMembers() {
                               onClick={() => {
                                 if (
                                   window.confirm(
-                                    `确定从空间移除“${member.nick_name || member.user_name}”吗？`
+                                    formatMessage('确定从空间移除“{name}”吗？', { name: member.nick_name || member.user_name })
                                   )
                                 )
                                   remove.mutate(member.user_id)
                               }}
                             >
-                              移除
-                            </button>
+                              <LocalizedText text={"\n                              移除\n                            "} /></button>
                           ) : (
                             workspace.status === 'active' && (
                               <button
@@ -494,8 +482,7 @@ export function WorkspaceMembers() {
                                   })
                                 }
                               >
-                                重新加入
-                              </button>
+                                <LocalizedText text={"\n                                重新加入\n                              "} /></button>
                             )
                           )}
                           {isOwner &&
@@ -508,14 +495,13 @@ export function WorkspaceMembers() {
                                   setNewOwnerId(member.user_id)
                                   if (
                                     window.confirm(
-                                      `将空间所有权转交给“${member.nick_name || member.user_name}”？你将变为空间管理员。`
+                                      formatMessage('将空间所有权转交给“{name}”？你将变为空间管理员。', { name: member.nick_name || member.user_name })
                                     )
                                   )
                                     transfer.mutate(member.user_id)
                                 }}
                               >
-                                转移所有权
-                              </button>
+                                <LocalizedText text={"\n                                转移所有权\n                              "} /></button>
                             )}
                         </td>
                       )}
@@ -525,7 +511,7 @@ export function WorkspaceMembers() {
               </tbody>
             </table>
             <div className='mt-4 flex items-center justify-between text-sm'>
-              <span>共 {members.data.total} 人</span>
+              <span><LocalizedText text={"共 "} />{members.data.total} <LocalizedText text={" 人"} /></span>
               <div className='flex gap-2'>
                 <Button
                   size='sm'
@@ -533,34 +519,30 @@ export function WorkspaceMembers() {
                   disabled={page <= 1}
                   onClick={() => setPage((value) => value - 1)}
                 >
-                  上一页
-                </Button>
+                  <LocalizedText text={"\n                  上一页\n                "} /></Button>
                 <Button
                   size='sm'
                   variant='outline'
                   disabled={page * 20 >= members.data.total}
                   onClick={() => setPage((value) => value + 1)}
                 >
-                  下一页
-                </Button>
+                  <LocalizedText text={"\n                  下一页\n                "} /></Button>
               </div>
             </div>
           </div>
         ) : (
           <p className='py-5 text-center text-sm text-muted-foreground'>
-            暂无成员
-          </p>
+            <LocalizedText text={"\n            暂无成员\n          "} /></p>
         )}
       </section>
       {isOwner && workspace.status === 'active' && (
         <section className={`${panel} max-w-xl space-y-3`}>
-          <h2 className='font-semibold'>转移空间所有权</h2>
+          <h2 className='font-semibold'><LocalizedText text={"转移空间所有权"} /></h2>
           <p className='text-sm text-muted-foreground'>
-            新所有者必须已经是该空间的 active 成员。转移完成后你会成为管理员。
-          </p>
+            <LocalizedText text={"\n            新所有者必须已经是该空间的 active 成员。转移完成后你会成为管理员。\n          "} /></p>
           <div className='flex items-end gap-3'>
             <div className='space-y-2'>
-              <Label htmlFor='new-owner-id'>新所有者用户 ID</Label>
+              <Label htmlFor='new-owner-id'><LocalizedText text={"新所有者用户 ID"} /></Label>
               <Input
                 id='new-owner-id'
                 inputMode='numeric'
@@ -573,11 +555,11 @@ export function WorkspaceMembers() {
               variant='outline'
               disabled={!/^\d+$/.test(newOwnerId) || transfer.isPending}
               onClick={() => {
-                if (window.confirm('确认转移空间所有权？'))
+                if (window.confirm(formatMessage('确认转移空间所有权？', {})))
                   transfer.mutate(newOwnerId)
               }}
             >
-              {transfer.isPending ? '转移中…' : '确认转移'}
+              {transfer.isPending ? <LocalizedText text={"转移中…"} /> : <LocalizedText text={"确认转移"} />}
             </Button>
           </div>
         </section>
@@ -594,10 +576,9 @@ export function WorkspaceMembers() {
 function NoPermission() {
   return (
     <main className='space-y-3 p-6'>
-      <h1 className='text-xl font-semibold'>没有管理权限</h1>
+      <h1 className='text-xl font-semibold'><LocalizedText text={"没有管理权限"} /></h1>
       <p className='text-sm text-muted-foreground'>
-        当前 Workspace 角色无权管理此页面。
-      </p>
+        <LocalizedText text={"\n        当前 Workspace 角色无权管理此页面。\n      "} /></p>
     </main>
   )
 }

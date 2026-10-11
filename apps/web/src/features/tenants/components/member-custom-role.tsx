@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import type { Member } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import type { TenantRoleRecord } from '../types'
+import { LocalizedText } from '@/components/localized-text'
+import { useLocaleText } from '@/lib/i18n'
 
 function errorText(error: unknown) {
   if (error instanceof ApiProblem)
@@ -30,6 +33,7 @@ export function MemberCustomRoleCell({
   canManage: boolean
   onError: (message: string) => void
 }) {
+  const t = useLocaleText()
   const client = useQueryClient()
   const canAssign =
     member.status === 'active' && member.tenant_role === 'member'
@@ -91,24 +95,24 @@ export function MemberCustomRoleCell({
   })
 
   if (!canAssign)
-    return <span className='text-xs text-muted-foreground'>—</span>
+    return <span className='text-xs text-muted-foreground'><LocalizedText text={"—"} /></span>
   if (canManage && !canAssign) {
-    return <span className='text-xs text-muted-foreground'>需成员角色</span>
+    return <span className='text-xs text-muted-foreground'><LocalizedText text={"需成员角色"} /></span>
   }
   if (assignment.isLoading || (canManage && rolesLoading)) {
-    return <span className='text-xs text-muted-foreground'>加载中…</span>
+    return <span className='text-xs text-muted-foreground'><LocalizedText text={"加载中…"} /></span>
   }
   if (assignment.isError) {
     return (
       <span role='alert' className='text-xs text-destructive'>
-        读取失败：{errorText(assignment.error)}
+        <LocalizedText text={"\n        读取失败："} />{errorText(assignment.error)}
       </span>
     )
   }
   if (canManage && rolesError) {
     return (
       <span role='alert' className='text-xs text-destructive'>
-        角色列表加载失败：{rolesError}
+        <LocalizedText text={"\n        角色列表加载失败："} />{rolesError}
       </span>
     )
   }
@@ -123,8 +127,8 @@ export function MemberCustomRoleCell({
   const selected = assignment.data?.role?.role_id ?? ''
   return (
     <div className='flex flex-wrap items-center gap-2'>
-      <select
-        aria-label={`${member.user_name}自定义角色`}
+      <LocalizedNativeSelect
+        aria-label={`${member.user_name} ${t('自定义角色')}`}
         className='h-8 max-w-44 rounded-md border bg-background px-2 text-xs shadow-xs'
         value={selected}
         disabled={assign.isPending || revoke.isPending}
@@ -133,14 +137,14 @@ export function MemberCustomRoleCell({
         }}
       >
         <option value=''>
-          {assignment.data?.role ? '选择其他角色…' : '未分配'}
+          {assignment.data?.role ? <LocalizedText text={"选择其他角色…"} /> : <LocalizedText text={"未分配"} />}
         </option>
         {roles.map((role) => (
           <option key={role.role_id} value={role.role_id}>
             {role.role_name}
           </option>
         ))}
-      </select>
+      </LocalizedNativeSelect>
       {assignment.data?.role ? (
         <button
           type='button'
@@ -148,11 +152,10 @@ export function MemberCustomRoleCell({
           disabled={assign.isPending || revoke.isPending}
           onClick={() => revoke.mutate()}
         >
-          撤销
-        </button>
+          <LocalizedText text={"\n          撤销\n        "} /></button>
       ) : null}
       {assign.isPending || revoke.isPending ? (
-        <span className='text-xs text-muted-foreground'>保存中…</span>
+        <span className='text-xs text-muted-foreground'><LocalizedText text={"保存中…"} /></span>
       ) : null}
     </div>
   )

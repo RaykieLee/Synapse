@@ -14,8 +14,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SignOutDialog } from '@/components/sign-out-dialog'
 import { useAuthStore } from '@/stores/auth-store'
+import { translate, useLocale } from '@/lib/i18n'
+import { LocalizedText } from '@/components/localized-text'
 
 export function ProfileDropdown() {
+  const locale = useLocale()
   const [open, setOpen] = useDialogState()
   const user = useAuthStore((s) => s.auth.user)
   const name = user?.nick_name || user?.user_name || 'Account'
@@ -45,26 +48,25 @@ export function ProfileDropdown() {
           <DropdownMenuGroup>
             <DropdownMenuItem asChild>
               <Link to='/settings'>
-                Profile
-                <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+                {translate('Profile', locale)}
+                <DropdownMenuShortcut><LocalizedText text={"⇧⌘P"} /></DropdownMenuShortcut>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to='/settings/account'>Account</Link>
+              <Link to='/settings/account'>{translate('Account', locale)}</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to='/settings'>
-                Settings
-                <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                {translate('Settings', locale)}
+                <DropdownMenuShortcut><LocalizedText text={"⌘S"} /></DropdownMenuShortcut>
               </Link>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant='destructive' onClick={() => setOpen(true)}>
-            Sign out
+            {translate('Sign out', locale)}
             <DropdownMenuShortcut className='text-current'>
-              ⇧⌘Q
-            </DropdownMenuShortcut>
+              <LocalizedText text={"\n              ⇧⌘Q\n            "} /></DropdownMenuShortcut>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

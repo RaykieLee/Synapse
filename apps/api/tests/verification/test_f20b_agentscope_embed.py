@@ -1,4 +1,5 @@
 """Live same-process AgentScope/FastAPI mounting, auth override and lifespan test."""
+
 import socket
 import threading
 import time
@@ -7,12 +8,16 @@ from pathlib import Path
 
 import httpx
 import pytest
+
 import uvicorn
 from alembic import command
 from alembic.config import Config
 from fastapi import Depends
 from sqlalchemy import inspect
 
+pytestmark = [
+    pytest.mark.redis,
+]
 
 def test_f20b_agentscope_embed_live(tmp_path, monkeypatch):
     redis_host = __import__("os").environ.get("F20B_REDIS_HOST", "127.0.0.1")

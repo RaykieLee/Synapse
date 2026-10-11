@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { LocalizedText } from '@/components/localized-text'
 
 type TopNavProps = React.HTMLAttributes<HTMLElement> & {
   links: {
@@ -29,7 +30,7 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
             className={cn('md:size-7 lg:hidden', className)}
           >
             <Menu />
-            <span className='sr-only'>Toggle navigation menu</span>
+            <span className='sr-only'><LocalizedText text={"Toggle navigation menu"} /></span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side='bottom' align='start'>
@@ -37,7 +38,7 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
             <DropdownMenuItem key={`${title}-${href}`} asChild>
               <Link
                 to={href}
-                className={!isActive ? 'text-muted-foreground' : ''}
+                className={!isActive ? "text-muted-foreground" : ""}
                 disabled={disabled}
               >
                 {title}

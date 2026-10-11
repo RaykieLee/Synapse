@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Input } from '@/components/ui/input'
 import { Fragment } from 'react/jsx-runtime'
 import { format } from 'date-fns'
 import {
@@ -29,6 +30,7 @@ import { NewChat } from './components/new-chat'
 import { type ChatUser, type Convo } from './data/chat-types'
 // Fake Data
 import { conversations } from './data/convo.json'
+import { LocalizedText } from '@/components/localized-text'
 
 export function Chats() {
   const [search, setSearch] = useState('')
@@ -80,7 +82,7 @@ export function Chats() {
             <div className='sticky top-0 z-10 -mx-4 bg-background px-4 pb-3 shadow-md sm:static sm:z-auto sm:mx-0 sm:p-0 sm:shadow-none'>
               <div className='flex items-center justify-between py-2'>
                 <div className='flex gap-2'>
-                  <h1 className='text-2xl font-bold'>Inbox</h1>
+                  <h1 className='text-2xl font-bold'><LocalizedText text={"Inbox"} /></h1>
                   <MessagesSquare size={20} />
                 </div>
 
@@ -101,8 +103,8 @@ export function Chats() {
                 )}
               >
                 <SearchIcon size={15} className='me-2 stroke-slate-500' />
-                <span className='sr-only'>Search</span>
-                <input
+                <span className='sr-only'><LocalizedText text={"Search"} /></span>
+                <Input
                   type='text'
                   className='w-full flex-1 bg-inherit text-sm focus-visible:outline-hidden'
                   placeholder='Search chat...'
@@ -296,8 +298,8 @@ export function Chats() {
                       </Button>
                     </div>
                     <label className='flex-1'>
-                      <span className='sr-only'>Chat Text Box</span>
-                      <input
+                      <span className='sr-only'><LocalizedText text={"Chat Text Box"} /></span>
+                      <Input
                         type='text'
                         placeholder='Type your messages...'
                         className='h-8 w-full bg-inherit focus-visible:outline-hidden'
@@ -312,8 +314,7 @@ export function Chats() {
                     </Button>
                   </div>
                   <Button className='h-full sm:hidden'>
-                    <Send size={18} /> Send
-                  </Button>
+                    <Send size={18} /> <LocalizedText text={" Send\n                  "} /></Button>
                 </form>
               </div>
             </div>
@@ -328,14 +329,12 @@ export function Chats() {
                   <MessagesSquare className='size-8' />
                 </div>
                 <div className='space-y-2 text-center'>
-                  <h1 className='text-xl font-semibold'>Your messages</h1>
+                  <h1 className='text-xl font-semibold'><LocalizedText text={"Your messages"} /></h1>
                   <p className='text-sm text-muted-foreground'>
-                    Send a message to start a chat.
-                  </p>
+                    <LocalizedText text={"\n                    Send a message to start a chat.\n                  "} /></p>
                 </div>
                 <Button onClick={() => setCreateConversationDialog(true)}>
-                  Send message
-                </Button>
+                  <LocalizedText text={"\n                  Send message\n                "} /></Button>
               </div>
             </div>
           )}

@@ -1,7 +1,9 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { translate, useLocale } from '@/lib/i18n'
 
 function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
+  const locale = useLocale()
   return (
     <textarea
       data-slot='textarea'
@@ -10,6 +12,8 @@ function Textarea({ className, ...props }: React.ComponentProps<'textarea'>) {
         className
       )}
       {...props}
+      placeholder={props.placeholder ? translate(props.placeholder, locale) : props.placeholder}
+      aria-label={props['aria-label'] ? translate(props['aria-label'], locale) : undefined}
     />
   )
 }

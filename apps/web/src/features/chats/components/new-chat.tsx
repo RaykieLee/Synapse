@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { type ChatUser } from '../data/chat-types'
+import { LocalizedText } from '@/components/localized-text'
 
 type User = Omit<ChatUser, 'messages'>
 
@@ -53,11 +54,11 @@ export function NewChat({ users, onOpenChange, open }: NewChatProps) {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className='sm:max-w-150'>
         <DialogHeader>
-          <DialogTitle>New message</DialogTitle>
+          <DialogTitle><LocalizedText text={"New message"} /></DialogTitle>
         </DialogHeader>
         <div className='flex flex-col gap-4'>
           <div className='flex flex-wrap items-baseline-last gap-2'>
-            <span className='min-h-6 text-sm text-muted-foreground'>To:</span>
+            <span className='min-h-6 text-sm text-muted-foreground'><LocalizedText text={"To:"} /></span>
             {selectedUsers.map((user) => (
               <Badge key={user.id} variant='default'>
                 {user.fullName}
@@ -81,7 +82,7 @@ export function NewChat({ users, onOpenChange, open }: NewChatProps) {
               className='text-foreground'
             />
             <CommandList>
-              <CommandEmpty>No people found.</CommandEmpty>
+              <CommandEmpty><LocalizedText text={"No people found."} /></CommandEmpty>
               <CommandGroup>
                 {users.map((user) => (
                   <CommandItem
@@ -118,8 +119,7 @@ export function NewChat({ users, onOpenChange, open }: NewChatProps) {
             onClick={() => showSubmittedData(selectedUsers)}
             disabled={selectedUsers.length === 0}
           >
-            Chat
-          </Button>
+            <LocalizedText text={"\n            Chat\n          "} /></Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { getWorkspace } from '@/api/workspaces'
+import { translate, useLocale } from '@/lib/i18n'
 import { useAuthStore } from '@/stores/auth-store'
 import { api } from '@/lib/api'
 import { useLayout } from '@/context/layout-provider'
@@ -32,11 +33,10 @@ import {
   TeamSwitcher,
   useWorkspaceDirectory,
 } from '@/features/workspaces/directory'
-import { AppTitle } from './app-title'
 import { sidebarData } from './data/sidebar-data'
 import { NavGroup } from './nav-group'
 import { NavUser } from './nav-user'
-import type { NavGroup as NavGroupType, NavLink } from './types'
+import type { NavGroup as NavGroupType, NavItem, NavLink } from './types'
 
 type NavigationMenu = {
   menu_id: string
@@ -136,6 +136,7 @@ function toNavLinks(menus: NavigationMenu[], prefix = ''): NavLink[] {
 }
 
 export function AppSidebar() {
+  const locale = useLocale()
   const { collapsible, variant } = useLayout()
   const authUser = useAuthStore((state) => state.auth.user)
   const queryClient = useQueryClient()
@@ -243,21 +244,21 @@ export function AppSidebar() {
         ...workspaceSystemGroups(
           activeWorkspaceId!,
           authUser?.platform_role === 'platform_admin'
-        ),
+        ).map((group) => localizeStaticGroup(group, locale)),
       ]
     : sidebarData.navGroups.map((group) => ({
         ...group,
+        title: translate(group.title, locale),
         items: group.items.filter(
           (item) =>
             item.title !== 'Users' ||
             authUser?.platform_role === 'platform_admin'
-        ),
+        ).map((item) => localizeStaticItem(item, locale)),
       }))
 
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
       <SidebarHeader>
-        <AppTitle />
         <TeamSwitcher />
       </SidebarHeader>
       <SidebarContent>
@@ -277,4 +278,19 @@ export function AppSidebar() {
       <SidebarRail />
     </Sidebar>
   )
+}
+
+function localizeStaticGroup(group: NavGroupType, locale: ReturnType<typeof useLocale>): NavGroupType {
+  if (group.title === '工作空间') return { ...group, title: translate(group.title, locale) }
+  return {
+    ...group,
+    title: translate(group.title, locale),
+    items: group.items.map((item) => localizeStaticItem(item, locale)),
+  }
+}
+
+function localizeStaticItem(item: NavItem, locale: ReturnType<typeof useLocale>): NavItem {
+  return 'items' in item && item.items
+    ? { ...item, title: translate(item.title, locale), items: item.items.map((child) => ({ ...child, title: translate(child.title, locale) })) }
+    : { ...item, title: translate(item.title, locale) }
 }

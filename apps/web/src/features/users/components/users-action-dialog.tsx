@@ -26,6 +26,7 @@ import { PasswordInput } from '@/components/password-input'
 import { SelectDropdown } from '@/components/select-dropdown'
 import { roles } from '../data/data'
 import { type User } from '../data/schema'
+import { LocalizedText } from '@/components/localized-text'
 
 const formSchema = z
   .object({
@@ -145,11 +146,10 @@ export function UsersActionDialog({
     >
       <DialogContent className='sm:max-w-lg'>
         <DialogHeader className='text-start'>
-          <DialogTitle>{isEdit ? 'Edit User' : 'Add New User'}</DialogTitle>
+          <DialogTitle>{isEdit ? <LocalizedText text={"Edit User"} /> : <LocalizedText text={"Add New User"} />}</DialogTitle>
           <DialogDescription>
-            {isEdit ? 'Update the user here. ' : 'Create new user here. '}
-            Click save when you&apos;re done.
-          </DialogDescription>
+            {isEdit ? <LocalizedText text={"Update the user here. "} /> : <LocalizedText text={"Create new user here. "} />}
+            <LocalizedText text={"\n            Click save when you&apos;re done.\n          "} /></DialogDescription>
         </DialogHeader>
         <div className='h-105 w-[calc(100%+0.75rem)] overflow-y-auto py-1 pe-3'>
           <Form {...form}>
@@ -164,8 +164,7 @@ export function UsersActionDialog({
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
                     <FormLabel className='col-span-2 text-end'>
-                      First Name
-                    </FormLabel>
+                      <LocalizedText text={"\n                      First Name\n                    "} /></FormLabel>
                     <FormControl>
                       <Input
                         placeholder='John'
@@ -184,8 +183,7 @@ export function UsersActionDialog({
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
                     <FormLabel className='col-span-2 text-end'>
-                      Last Name
-                    </FormLabel>
+                      <LocalizedText text={"\n                      Last Name\n                    "} /></FormLabel>
                     <FormControl>
                       <Input
                         placeholder='Doe'
@@ -204,8 +202,7 @@ export function UsersActionDialog({
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
                     <FormLabel className='col-span-2 text-end'>
-                      Username
-                    </FormLabel>
+                      <LocalizedText text={"\n                      Username\n                    "} /></FormLabel>
                     <FormControl>
                       <Input
                         placeholder='john_doe'
@@ -222,7 +219,7 @@ export function UsersActionDialog({
                 name='email'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
-                    <FormLabel className='col-span-2 text-end'>Email</FormLabel>
+                    <FormLabel className='col-span-2 text-end'><LocalizedText text={"Email"} /></FormLabel>
                     <FormControl>
                       <Input
                         placeholder='john.doe@gmail.com'
@@ -240,8 +237,7 @@ export function UsersActionDialog({
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
                     <FormLabel className='col-span-2 text-end'>
-                      Phone Number
-                    </FormLabel>
+                      <LocalizedText text={"\n                      Phone Number\n                    "} /></FormLabel>
                     <FormControl>
                       <Input
                         placeholder='+123456789'
@@ -258,7 +254,7 @@ export function UsersActionDialog({
                 name='role'
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
-                    <FormLabel className='col-span-2 text-end'>Role</FormLabel>
+                    <FormLabel className='col-span-2 text-end'><LocalizedText text={"Role"} /></FormLabel>
                     <SelectDropdown
                       defaultValue={field.value}
                       onValueChange={field.onChange}
@@ -279,8 +275,7 @@ export function UsersActionDialog({
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
                     <FormLabel className='col-span-2 text-end'>
-                      Password
-                    </FormLabel>
+                      <LocalizedText text={"\n                      Password\n                    "} /></FormLabel>
                     <FormControl>
                       <PasswordInput
                         placeholder='e.g., S3cur3P@ssw0rd'
@@ -298,8 +293,7 @@ export function UsersActionDialog({
                 render={({ field }) => (
                   <FormItem className='grid grid-cols-6 items-center space-y-0 gap-x-4 gap-y-1'>
                     <FormLabel className='col-span-2 text-end'>
-                      Confirm Password
-                    </FormLabel>
+                      <LocalizedText text={"\n                      Confirm Password\n                    "} /></FormLabel>
                     <FormControl>
                       <PasswordInput
                         disabled={!isPasswordTouched}
@@ -317,8 +311,7 @@ export function UsersActionDialog({
         </div>
         <DialogFooter>
           <Button type='submit' form='user-form'>
-            Save changes
-          </Button>
+            <LocalizedText text={"\n            Save changes\n          "} /></Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

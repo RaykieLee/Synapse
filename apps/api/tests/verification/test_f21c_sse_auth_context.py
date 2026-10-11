@@ -11,12 +11,17 @@ from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import pytest
+
 import uvicorn
 from alembic import command
 from alembic.config import Config
 from fastapi import Depends, Request
 from sqlalchemy import select
 
+pytestmark = [
+    pytest.mark.redis,
+    pytest.mark.integration,
+]
 
 def _free_port() -> int:
     with socket.socket() as sock:

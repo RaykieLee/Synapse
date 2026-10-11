@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { LocalizedText } from '@/components/localized-text'
 
 const formSchema = z.object({
   file: z
@@ -74,10 +75,9 @@ export function TasksImportDialog({
     >
       <DialogContent className='gap-2 sm:max-w-sm'>
         <DialogHeader className='text-start'>
-          <DialogTitle>Import Tasks</DialogTitle>
+          <DialogTitle><LocalizedText text={"Import Tasks"} /></DialogTitle>
           <DialogDescription>
-            Import tasks quickly from a CSV file.
-          </DialogDescription>
+            <LocalizedText text={"\n            Import tasks quickly from a CSV file.\n          "} /></DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form id='task-import-form' onSubmit={form.handleSubmit(onSubmit)}>
@@ -86,7 +86,7 @@ export function TasksImportDialog({
               name='file'
               render={() => (
                 <FormItem className='my-2'>
-                  <FormLabel>File</FormLabel>
+                  <FormLabel><LocalizedText text={"File"} /></FormLabel>
                   <FormControl>
                     <Input
                       type='file'
@@ -103,11 +103,10 @@ export function TasksImportDialog({
         </Form>
         <DialogFooter className='gap-2'>
           <DialogClose asChild>
-            <Button variant='outline'>Close</Button>
+            <Button variant='outline'><LocalizedText text={"Close"} /></Button>
           </DialogClose>
           <Button type='submit' form='task-import-form'>
-            Import
-          </Button>
+            <LocalizedText text={"\n            Import\n          "} /></Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

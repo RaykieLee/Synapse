@@ -6,10 +6,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import select
 
+pytestmark = [
+    pytest.mark.windows_symlink,
+]
 
 def test_f18b3_attachment_reconcile_is_read_only_and_tenant_scoped(tmp_path, monkeypatch):
     db_path = tmp_path / "f18b3.sqlite"

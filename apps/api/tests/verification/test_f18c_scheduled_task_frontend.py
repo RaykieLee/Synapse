@@ -9,9 +9,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+
 from alembic import command
 from alembic.config import Config
 
+pytestmark = [
+    pytest.mark.browser,
+    pytest.mark.integration,
+]
 
 ROOT = Path(__file__).resolve().parents[4]
 

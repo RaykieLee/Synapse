@@ -18,6 +18,7 @@ import {
 import { labels } from '../data/data'
 import { taskSchema } from '../data/schema'
 import { useTasks } from './tasks-provider'
+import { LocalizedText } from '@/components/localized-text'
 
 type DataTableRowActionsProps<TData> = {
   row: Row<TData>
@@ -38,7 +39,7 @@ export function DataTableRowActions<TData>({
           className='flex h-8 w-8 p-0 data-[state=open]:bg-muted'
         >
           <DotsHorizontalIcon className='h-4 w-4' />
-          <span className='sr-only'>Open menu</span>
+          <span className='sr-only'><LocalizedText text={"Open menu"} /></span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-40'>
@@ -48,13 +49,12 @@ export function DataTableRowActions<TData>({
             setOpen('update')
           }}
         >
-          Edit
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled>Make a copy</DropdownMenuItem>
-        <DropdownMenuItem disabled>Favorite</DropdownMenuItem>
+          <LocalizedText text={"\n          Edit\n        "} /></DropdownMenuItem>
+        <DropdownMenuItem disabled><LocalizedText text={"Make a copy"} /></DropdownMenuItem>
+        <DropdownMenuItem disabled><LocalizedText text={"Favorite"} /></DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Labels</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger><LocalizedText text={"Labels"} /></DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             <DropdownMenuRadioGroup value={task.label}>
               {labels.map((label) => (
@@ -72,8 +72,7 @@ export function DataTableRowActions<TData>({
             setOpen('delete')
           }}
         >
-          Delete
-          <DropdownMenuShortcut>
+          <LocalizedText text={"\n          Delete\n          "} /><DropdownMenuShortcut>
             <Trash2 size={16} />
           </DropdownMenuShortcut>
         </DropdownMenuItem>

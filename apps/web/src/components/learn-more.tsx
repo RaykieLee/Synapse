@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { LocalizedText } from '@/components/localized-text'
 
 type LearnMoreProps = React.ComponentProps<typeof Root> & {
   contentProps?: React.ComponentProps<typeof Content>
@@ -27,7 +28,7 @@ export function LearnMore({
         className={cn('size-5 rounded-full', triggerProps?.className)}
       >
         <Button variant='outline' size='icon'>
-          <span className='sr-only'>Learn more</span>
+          <span className='sr-only'><LocalizedText text={"Learn more"} /></span>
           <CircleQuestionMark className='size-4 [&>circle]:hidden' />
         </Button>
       </PopoverTrigger>

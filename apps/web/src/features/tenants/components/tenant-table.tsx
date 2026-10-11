@@ -1,24 +1,48 @@
-import { type SetStateAction } from 'react'
+import { useState } from 'react'
+import { CheckIcon, PlusCircledIcon } from '@radix-ui/react-icons'
 import { Link } from '@tanstack/react-router'
 import {
   Archive,
   ArrowUpRight,
   Eye,
+  Filter,
   MoreHorizontal,
   Pause,
   Play,
+  X,
+  ChevronFirst,
+  ChevronLast,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
 } from 'lucide-react'
-import type { Tenant, TenantStatus } from '@/api/tenants'
+import type { Tenant, TenantStatus, TenantValidity } from '@/api/tenants'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Command,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -26,6 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 import {
   Table,
   TableBody,
@@ -36,6 +61,8 @@ import {
 } from '@/components/ui/table'
 import { formatDateTime, tenantText } from '../types'
 import { EmptyState, TableSkeleton } from './shared'
+import { LocalizedText } from '@/components/localized-text'
+import { useLocaleText } from '@/lib/i18n'
 
 const statusStyles: Record<TenantStatus, string> = {
   active:
@@ -54,43 +81,341 @@ export function StatusBadge({ status }: { status: TenantStatus }) {
   )
 }
 
+function TenantFacetFilter<T extends string>({
+  title,
+  value,
+  options,
+  onChange,
+}: {
+  title: string
+  value: T | ''
+  options: { value: T; label: string }[]
+  onChange: (value: T | '') => void
+}) {
+  const selected = options.find((option) => option.value === value)
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          className='h-8 border-dashed'
+        >
+          <PlusCircledIcon className='size-4' />
+          {title}
+          {selected ? (
+            <>
+              <Separator orientation='vertical' className='mx-1 h-4' />
+              <Badge
+                variant='secondary'
+                className='rounded-sm px-1 font-normal'
+              >
+                {selected.label}
+              </Badge>
+            </>
+          ) : null}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className='w-48 p-0' align='start'>
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() =>
+                    onChange(value === option.value ? '' : option.value)
+                  }
+                >
+                  <span
+                    className={cn(
+                      'flex size-4 items-center justify-center rounded-sm border border-primary',
+                      value === option.value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'opacity-50 [&_svg]:invisible'
+                    )}
+                  >
+                    <CheckIcon className='size-4' />
+                  </span>
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            {selected ? (
+              <>
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem
+                    className='justify-center'
+                    onSelect={() => onChange('')}
+                  >
+                    <LocalizedText text={"\n                    清除筛选\n                  "} /></CommandItem>
+                </CommandGroup>
+              </>
+            ) : null}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 export function TenantToolbar({
   query,
   onQueryChange,
   status,
   onStatusChange,
+  validity,
+  onValidityChange,
+  createdFrom,
+  createdTo,
+  slug,
+  updatedFrom,
+  expiresBefore,
+  onAdvancedChange,
+  onReset,
+  isAdmin,
 }: {
   query: string
-  onQueryChange: (value: SetStateAction<string>) => void
+  onQueryChange: (value: string) => void
   status: TenantStatus | ''
-  onStatusChange: (value: SetStateAction<TenantStatus | ''>) => void
+  onStatusChange: (value: TenantStatus | '') => void
+  validity: TenantValidity | ''
+  onValidityChange: (value: TenantValidity | '') => void
+  createdFrom: string
+  createdTo: string
+  slug: string
+  updatedFrom: string
+  expiresBefore: string
+  onAdvancedChange: (values: AdvancedTenantFilters) => void
+  onReset: () => void
+  isAdmin: boolean
 }) {
+  const t = useLocaleText()
+  const [dateOpen, setDateOpen] = useState(false)
+  const [draft, setDraft] = useState<AdvancedTenantFilters>({
+    slug,
+    createdFrom,
+    createdTo,
+    updatedFrom,
+    expiresBefore,
+  })
+  const advancedCount = [
+    slug,
+    createdFrom || createdTo,
+    updatedFrom,
+    expiresBefore,
+  ].filter(Boolean).length
+  const hasFilters = Boolean(query || status || validity || advancedCount)
+
   return (
-    <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
+    <div
+      role='toolbar'
+      aria-label={t('租户筛选')}
+      className='flex flex-wrap items-center gap-2'
+    >
       <Input
         value={query}
-        placeholder='搜索租户名称'
-        className='h-10 w-full bg-background/80 sm:max-w-72'
+        aria-label='搜索租户'
+        placeholder='搜索名称、标识或 ID'
+        className='h-8 w-full sm:w-64'
         onChange={(event) => onQueryChange(event.target.value)}
       />
-      <Select
-        value={status || 'all'}
-        onValueChange={(value) =>
-          onStatusChange(value === 'all' ? '' : (value as TenantStatus))
-        }
+      {isAdmin ? (
+        <TenantFacetFilter
+          title='状态'
+          value={status}
+          onChange={onStatusChange}
+          options={[
+            { value: 'active', label: '启用' },
+            { value: 'suspended', label: '已停用' },
+            { value: 'archived', label: '已归档' },
+          ]}
+        />
+      ) : null}
+      <TenantFacetFilter
+        title='有效期'
+        value={validity}
+        onChange={onValidityChange}
+        options={[
+          { value: 'current', label: '当前有效' },
+          { value: 'not_started', label: '未开始' },
+          { value: 'expired', label: '已过期' },
+          { value: 'unlimited', label: '长期有效' },
+        ]}
+      />
+      <Popover
+        open={dateOpen}
+        onOpenChange={(open) => {
+          if (open)
+            setDraft({
+              slug,
+              createdFrom,
+              createdTo,
+              updatedFrom,
+              expiresBefore,
+            })
+          setDateOpen(open)
+        }}
       >
-        <SelectTrigger className='h-10 w-full bg-background/80 sm:w-36'>
-          <SelectValue placeholder='全部状态' />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value='all'>全部状态</SelectItem>
-          <SelectItem value='active'>启用</SelectItem>
-          <SelectItem value='suspended'>已停用</SelectItem>
-          <SelectItem value='archived'>已归档</SelectItem>
-        </SelectContent>
-      </Select>
+        <PopoverTrigger asChild>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            className='h-8 border-dashed'
+          >
+            <Filter className='size-4' />
+            <LocalizedText text={"\n            更多筛选"} />{advancedCount ? ` · ${advancedCount}` : <LocalizedText text={""} />}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align='start'
+          className='w-80 max-w-[calc(100vw-2rem)] p-4'
+        >
+          <div className='space-y-3'>
+            <label className='block space-y-1 text-sm'>
+              <span className='font-medium'><LocalizedText text={"租户标识"} /></span>
+              <Input
+                value={draft.slug}
+                placeholder='精确匹配，例如 acme'
+                onChange={(event) =>
+                  setDraft({ ...draft, slug: event.target.value })
+                }
+              />
+            </label>
+            <div className='space-y-1'>
+              <span className='text-sm font-medium'><LocalizedText text={"创建时间"} /></span>
+              <div className='grid grid-cols-2 gap-2'>
+                <Input
+                  type='date'
+                  aria-label='创建时间起始'
+                  value={draft.createdFrom}
+                  max={draft.createdTo || undefined}
+                  onChange={(event) =>
+                    setDraft({ ...draft, createdFrom: event.target.value })
+                  }
+                />
+                <Input
+                  type='date'
+                  aria-label='创建时间结束'
+                  value={draft.createdTo}
+                  min={draft.createdFrom || undefined}
+                  onChange={(event) =>
+                    setDraft({ ...draft, createdTo: event.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className='flex flex-wrap gap-2'>
+              {[7, 30].map((days) => (
+                <Button
+                  key={days}
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  onClick={() => {
+                    const today = new Date()
+                    const from = new Date(
+                      today.getFullYear(),
+                      today.getMonth(),
+                      today.getDate() - days + 1
+                    )
+                    setDraft({
+                      ...draft,
+                      createdFrom: formatLocalDate(from),
+                      createdTo: formatLocalDate(today),
+                    })
+                  }}
+                >
+                  <LocalizedText text={"\n                  最近 "} />{days} <LocalizedText text={" 天\n                "} /></Button>
+              ))}
+            </div>
+            <label className='block space-y-1 text-sm'>
+              <span className='font-medium'><LocalizedText text={"最近更新不早于"} /></span>
+              <Input
+                type='date'
+                value={draft.updatedFrom}
+                onChange={(event) =>
+                  setDraft({ ...draft, updatedFrom: event.target.value })
+                }
+              />
+            </label>
+            <label className='block space-y-1 text-sm'>
+              <span className='font-medium'><LocalizedText text={"到期时间不晚于"} /></span>
+              <Input
+                type='date'
+                value={draft.expiresBefore}
+                onChange={(event) =>
+                  setDraft({ ...draft, expiresBefore: event.target.value })
+                }
+              />
+            </label>
+            <div className='flex justify-between border-t pt-3'>
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                onClick={() => {
+                  const empty = {
+                    slug: '',
+                    createdFrom: '',
+                    createdTo: '',
+                    updatedFrom: '',
+                    expiresBefore: '',
+                  }
+                  setDraft(empty)
+                  onAdvancedChange(empty)
+                  setDateOpen(false)
+                }}
+              >
+                <LocalizedText text={"\n                清空\n              "} /></Button>
+              <Button
+                type='button'
+                size='sm'
+                disabled={Boolean(
+                  draft.createdFrom &&
+                  draft.createdTo &&
+                  draft.createdFrom > draft.createdTo
+                )}
+                onClick={() => {
+                  onAdvancedChange({ ...draft, slug: draft.slug.trim() })
+                  setDateOpen(false)
+                }}
+              >
+                <LocalizedText text={"\n                应用筛选\n              "} /></Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+      {hasFilters ? (
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          className='h-8'
+          onClick={onReset}
+        >
+          <X className='size-4' /> <LocalizedText text={" 重置\n        "} /></Button>
+      ) : null}
     </div>
   )
+}
+
+type AdvancedTenantFilters = {
+  slug: string
+  createdFrom: string
+  createdTo: string
+  updatedFrom: string
+  expiresBefore: string
+}
+
+function formatLocalDate(value: Date): string {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 export function TenantTable({
@@ -99,39 +424,96 @@ export function TenantTable({
   loading,
   onStatusChange,
   onArchive,
+  selectedIds,
+  onSelectionChange,
+  visibleColumns,
 }: {
   tenants: Tenant[]
   isAdmin: boolean
   loading: boolean
   onStatusChange: (tenant: Tenant) => void
   onArchive: (tenant: Tenant) => void
+  selectedIds: Set<string>
+  onSelectionChange: (ids: Set<string>) => void
+  visibleColumns: Set<TenantColumn>
 }) {
-  const columnCount = isAdmin ? 5 : 4
+  const columns = tenantColumns.filter(
+    (column) => column.key !== 'role' || !isAdmin
+  )
+  const columnCount =
+    3 + columns.filter((column) => visibleColumns.has(column.key)).length
+  const allSelected =
+    tenants.length > 0 &&
+    tenants.every((tenant) => selectedIds.has(tenant.tenant_id))
+  const someSelected = tenants.some((tenant) =>
+    selectedIds.has(tenant.tenant_id)
+  )
+  const toggleAll = (checked: boolean) => {
+    const next = new Set(selectedIds)
+    for (const tenant of tenants) {
+      if (checked) next.add(tenant.tenant_id)
+      else next.delete(tenant.tenant_id)
+    }
+    onSelectionChange(next)
+  }
 
   return (
-    <div className='overflow-hidden border-t'>
+    <div className='overflow-x-auto'>
       <Table>
         <TableHeader>
           <TableRow className='bg-muted/35 hover:bg-muted/35'>
-            <TableHead className='h-11 ps-4'>租户</TableHead>
-            <TableHead>标识</TableHead>
-            <TableHead>状态</TableHead>
-            <TableHead className='hidden lg:table-cell'>有效期</TableHead>
-            {!isAdmin ? <TableHead>我的角色</TableHead> : null}
-            <TableHead className='hidden xl:table-cell'>创建时间</TableHead>
-            <TableHead className='w-20 pe-4 text-end'>操作</TableHead>
+            <TableHead className='w-10 ps-4'>
+              <Checkbox
+                aria-label='选择当前页全部租户'
+                checked={
+                  allSelected ? true : someSelected ? 'indeterminate' : false
+                }
+                onCheckedChange={(value) => toggleAll(value === true)}
+              />
+            </TableHead>
+            <TableHead className='h-11 ps-4'><LocalizedText text={"租户"} /></TableHead>
+            {visibleColumns.has('slug') ? <TableHead><LocalizedText text={"标识"} /></TableHead> : null}
+            {visibleColumns.has('status') ? <TableHead><LocalizedText text={"状态"} /></TableHead> : null}
+            {visibleColumns.has('validity') ? (
+              <TableHead><LocalizedText text={"有效期"} /></TableHead>
+            ) : null}
+            {!isAdmin && visibleColumns.has('role') ? (
+              <TableHead><LocalizedText text={"我的角色"} /></TableHead>
+            ) : null}
+            {visibleColumns.has('created') ? (
+              <TableHead><LocalizedText text={"创建时间"} /></TableHead>
+            ) : null}
+            <TableHead className='w-20 pe-4 text-end'><LocalizedText text={"操作"} /></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
               <TableCell colSpan={columnCount} className='p-0'>
-                <TableSkeleton columns={5} />
+                <TableSkeleton columns={columnCount} />
               </TableCell>
             </TableRow>
           ) : tenants.length ? (
             tenants.map((tenant) => (
-              <TableRow key={tenant.tenant_id} className='group'>
+              <TableRow
+                key={tenant.tenant_id}
+                className='group'
+                data-state={
+                  selectedIds.has(tenant.tenant_id) ? 'selected' : undefined
+                }
+              >
+                <TableCell className='ps-4'>
+                  <Checkbox
+                    aria-label={`选择租户 ${tenant.name}`}
+                    checked={selectedIds.has(tenant.tenant_id)}
+                    onCheckedChange={(value) => {
+                      const next = new Set(selectedIds)
+                      if (value === true) next.add(tenant.tenant_id)
+                      else next.delete(tenant.tenant_id)
+                      onSelectionChange(next)
+                    }}
+                  />
+                </TableCell>
                 <TableCell className='max-w-72 ps-4'>
                   <div className='space-y-0.5'>
                     <Link
@@ -141,28 +523,33 @@ export function TenantTable({
                     >
                       {tenant.name}
                     </Link>
-                    <p className='text-xs text-muted-foreground'>
-                      {tenant.tenant_id}
-                    </p>
                   </div>
                 </TableCell>
-                <TableCell className='font-mono text-xs text-muted-foreground'>
-                  {tenant.slug}
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={tenant.status} />
-                </TableCell>
-                <TableCell className='hidden max-w-56 text-xs text-muted-foreground lg:table-cell'>
-                  {formatDateRangeCell(tenant)}
-                </TableCell>
-                {!isAdmin ? (
+                {visibleColumns.has('slug') ? (
+                  <TableCell className='font-mono text-xs text-muted-foreground'>
+                    {tenant.slug}
+                  </TableCell>
+                ) : null}
+                {visibleColumns.has('status') ? (
+                  <TableCell>
+                    <StatusBadge status={tenant.status} />
+                  </TableCell>
+                ) : null}
+                {visibleColumns.has('validity') ? (
+                  <TableCell className='max-w-56 text-xs text-muted-foreground'>
+                    {formatDateRangeCell(tenant)}
+                  </TableCell>
+                ) : null}
+                {!isAdmin && visibleColumns.has('role') ? (
                   <TableCell>
                     {tenantText[tenant.tenant_role ?? 'member']}
                   </TableCell>
                 ) : null}
-                <TableCell className='hidden text-xs text-muted-foreground xl:table-cell'>
-                  {formatDateTime(tenant.created_at)}
-                </TableCell>
+                {visibleColumns.has('created') ? (
+                  <TableCell className='text-xs text-muted-foreground'>
+                    {formatDateTime(tenant.created_at)}
+                  </TableCell>
+                ) : null}
                 <TableCell className='pe-4'>
                   <div className='flex items-center justify-end gap-1'>
                     <Button
@@ -197,8 +584,7 @@ export function TenantTable({
                               to='/tenants/$tenantId'
                               params={{ tenantId: tenant.tenant_id }}
                             >
-                              <Eye className='size-4' /> 查看详情
-                            </Link>
+                              <Eye className='size-4' /> <LocalizedText text={" 查看详情\n                            "} /></Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => onStatusChange(tenant)}
@@ -208,24 +594,20 @@ export function TenantTable({
                             ) : (
                               <Play className='size-4' />
                             )}
-                            {tenant.status === 'active'
-                              ? '停用租户'
-                              : '重新启用'}
+                            {tenant.status === 'active' ? <LocalizedText text={"停用租户"} /> : <LocalizedText text={"重新启用"} />}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant='destructive'
                             onClick={() => onArchive(tenant)}
                           >
-                            <Archive className='size-4' /> 归档租户
-                          </DropdownMenuItem>
+                            <Archive className='size-4' /> <LocalizedText text={" 归档租户\n                          "} /></DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : null}
                     {isAdmin && tenant.status === 'archived' ? (
                       <span className='text-xs text-muted-foreground'>
-                        已终态
-                      </span>
+                        <LocalizedText text={"\n                        已终态\n                      "} /></span>
                     ) : null}
                   </div>
                 </TableCell>
@@ -262,40 +644,147 @@ export function TablePager({
   page,
   pages,
   total,
-  onPrevious,
-  onNext,
+  pageSize,
+  selectedCount = 0,
+  onPageChange,
+  onPageSizeChange,
+  onClearSelection,
 }: {
   page: number
   pages: number
   total: number
-  onPrevious: () => void
-  onNext: () => void
+  pageSize: number
+  selectedCount?: number
+  onPageChange: (page: number) => void
+  onPageSizeChange?: (size: number) => void
+  onClearSelection?: () => void
 }) {
   return (
-    <div className='flex flex-col gap-3 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between'>
-      <p className='text-muted-foreground'>共 {total} 个租户</p>
-      <div className='flex items-center gap-2'>
-        <Button
-          variant='outline'
-          size='sm'
-          disabled={page <= 1}
-          onClick={onPrevious}
-        >
-          上一页
-        </Button>
-        <span className='min-w-16 text-center font-medium'>
-          {page} / {pages}
-        </span>
-        <Button
-          variant='outline'
-          size='sm'
-          disabled={page >= pages}
-          onClick={onNext}
-        >
-          下一页
-        </Button>
+    <div className='flex flex-col gap-3 border-t px-4 py-3 text-sm lg:flex-row lg:items-center lg:justify-between'>
+      <div className='flex items-center gap-2 text-muted-foreground'>
+        <span>
+          <LocalizedText text={"\n          已选择 "} />{selectedCount} <LocalizedText text={" 项，共 "} />{total} <LocalizedText text={" 项\n        "} /></span>
+        {selectedCount > 0 && onClearSelection ? (
+          <Button variant='ghost' size='sm' onClick={onClearSelection}>
+            <LocalizedText text={"\n            取消选择\n          "} /></Button>
+        ) : null}
+      </div>
+      <div className='flex flex-wrap items-center gap-4'>
+        {onPageSizeChange ? (
+          <div className='flex items-center gap-2'>
+            <span><LocalizedText text={"每页行数"} /></span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => onPageSizeChange?.(Number(value))}
+            >
+              <SelectTrigger className='h-8 w-18' aria-label='每页行数'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent side='top'>
+                {[10, 20, 30, 50].map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+        <span className='min-w-24 text-center'>
+          <LocalizedText text={"\n          第 "} />{page} <LocalizedText text={" 页，共 "} />{pages} <LocalizedText text={" 页\n        "} /></span>
+        <div className='flex items-center gap-1'>
+          <Button
+            variant='outline'
+            size='icon'
+            className='size-8'
+            aria-label='跳到第一页'
+            disabled={page <= 1}
+            onClick={() => onPageChange(1)}
+          >
+            <ChevronFirst className='size-4' />
+          </Button>
+          <Button
+            variant='outline'
+            size='icon'
+            className='size-8'
+            aria-label='上一页'
+            disabled={page <= 1}
+            onClick={() => onPageChange(page - 1)}
+          >
+            <ChevronLeft className='size-4' />
+          </Button>
+          <Button
+            variant='outline'
+            size='icon'
+            className='size-8'
+            aria-label='下一页'
+            disabled={page >= pages}
+            onClick={() => onPageChange(page + 1)}
+          >
+            <ChevronRight className='size-4' />
+          </Button>
+          <Button
+            variant='outline'
+            size='icon'
+            className='size-8'
+            aria-label='跳到最后一页'
+            disabled={page >= pages}
+            onClick={() => onPageChange(pages)}
+          >
+            <ChevronLast className='size-4' />
+          </Button>
+        </div>
       </div>
     </div>
+  )
+}
+
+export const tenantColumns = [
+  { key: 'slug', label: '标识' },
+  { key: 'status', label: '状态' },
+  { key: 'validity', label: '有效期' },
+  { key: 'role', label: '我的角色' },
+  { key: 'created', label: '创建时间' },
+] as const
+export type TenantColumn = (typeof tenantColumns)[number]['key']
+
+export function TenantColumnOptions({
+  visible,
+  onChange,
+  isAdmin,
+}: {
+  visible: Set<TenantColumn>
+  onChange: (columns: Set<TenantColumn>) => void
+  isAdmin: boolean
+}) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button variant='outline' size='sm' className='h-8'>
+          <SlidersHorizontal className='size-4' />
+          <LocalizedText text={"\n          显示列\n        "} /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end'>
+        <DropdownMenuLabel><LocalizedText text={"显示列"} /></DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {tenantColumns
+          .filter((column) => !isAdmin || column.key !== 'role')
+          .map((column) => (
+            <DropdownMenuCheckboxItem
+              key={column.key}
+              checked={visible.has(column.key)}
+              onCheckedChange={(checked) => {
+                const next = new Set(visible)
+                if (checked) next.add(column.key)
+                else next.delete(column.key)
+                onChange(next)
+              }}
+            >
+              {column.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

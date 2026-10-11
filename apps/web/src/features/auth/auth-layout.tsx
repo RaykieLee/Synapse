@@ -1,4 +1,5 @@
 import { Logo } from '@/assets/logo'
+import { LocalizedText } from '@/components/localized-text'
 
 type AuthLayoutProps = {
   children: React.ReactNode
@@ -10,7 +11,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
       <div className='mx-auto flex w-full flex-col justify-center space-y-2 py-8 sm:p-8'>
         <div className='mb-4 flex items-center justify-center'>
           <Logo className='me-2' />
-          <h1 className='text-xl font-medium'>Synapse</h1>
+          <h1 className='text-xl font-medium'><LocalizedText text={"Synapse"} /></h1>
         </div>
         {children}
       </div>

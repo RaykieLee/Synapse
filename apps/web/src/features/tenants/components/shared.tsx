@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { LocalizedText } from '@/components/localized-text'
 
 export const panelClass =
   'rounded-xl border bg-card text-card-foreground shadow-sm'
@@ -62,9 +63,9 @@ export function EmptyState({
         className
       )}
     >
-      <p className='text-sm font-medium'>{title}</p>
+      <p className='text-sm font-medium'><LocalizedText text={title} /></p>
       {description ? (
-        <p className='text-xs text-muted-foreground'>{description}</p>
+        <p className='text-xs text-muted-foreground'><LocalizedText text={description} /></p>
       ) : null}
     </div>
   )

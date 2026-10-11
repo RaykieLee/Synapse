@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { LocalizedText } from '@/components/localized-text'
 
 type TeamSwitcherProps = {
   teams: {
@@ -52,12 +53,11 @@ export function TeamSwitcher({ teams }: TeamSwitcherProps) {
           <DropdownMenuContent
             className='w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg'
             align='start'
-            side={isMobile ? 'bottom' : 'right'}
+            side={isMobile ? "bottom" : "right"}
             sideOffset={4}
           >
             <DropdownMenuLabel className='text-xs text-muted-foreground'>
-              Teams
-            </DropdownMenuLabel>
+              <LocalizedText text={"\n              Teams\n            "} /></DropdownMenuLabel>
             {teams.map((team, index) => (
               <DropdownMenuItem
                 key={team.name}
@@ -68,7 +68,7 @@ export function TeamSwitcher({ teams }: TeamSwitcherProps) {
                   <team.logo className='size-4 shrink-0' />
                 </div>
                 {team.name}
-                <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
+                <DropdownMenuShortcut><LocalizedText text={"⌘"} />{index + 1}</DropdownMenuShortcut>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
@@ -76,7 +76,7 @@ export function TeamSwitcher({ teams }: TeamSwitcherProps) {
               <div className='flex size-6 items-center justify-center rounded-md border bg-background'>
                 <Plus className='size-4' />
               </div>
-              <div className='font-medium text-muted-foreground'>Add team</div>
+              <div className='font-medium text-muted-foreground'><LocalizedText text={"Add team"} /></div>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

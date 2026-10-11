@@ -1,9 +1,13 @@
 import { useState } from 'react'
+import { LocalizedNativeSelect } from '@/components/localized-native-select'
+import { Input } from '@/components/ui/input'
+import { formatMessage } from '@/lib/i18n'
 import { Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
+import { LocalizedText } from '@/components/localized-text'
 
 type Department = {
   department_id: string
@@ -73,9 +77,9 @@ export function TenantDepartmentsPage() {
     onError: (cause) => setError(errorText(cause)),
   })
 
-  if (tenant.isLoading) return <main className="p-6">正在加载租户…</main>
-  if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}>返回租户</Link><ErrorBox message={errorText(tenant.error)} /></main>
-  if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}>返回租户</Link><ErrorBox message="仅租户所有者或管理员可以管理部门。" /></main>
+  if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
+  if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message={errorText(tenant.error)} /></main>
+  if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message="仅租户所有者或管理员可以管理部门。" /></main>
 
   const departments = tree.data?.items ?? []
   const flat = flatten(departments)
@@ -88,13 +92,13 @@ export function TenantDepartmentsPage() {
   }
 
   return <main className="space-y-5 p-6">
-    <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}>← 返回 {tenant.data?.name}</Link>
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold">租户部门</h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground">管理当前租户的部门层级、排序和状态。部门不会自动关联租户成员。</p></div><button className={primary} onClick={() => { setError(''); setDraft(emptyDraft()) }}>创建部门</button></header>
+    <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"← 返回 "} />{tenant.data?.name}</Link>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户部门"} /></h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的部门层级、排序和状态。部门不会自动关联租户成员。"} /></p></div><button className={primary} onClick={() => { setError(''); setDraft(emptyDraft()) }}><LocalizedText text={"创建部门"} /></button></header>
     {error && <ErrorBox message={error} />}
     {draft && <DepartmentEditor draft={draft} departments={flat} pending={save.isPending} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => save.mutate(draft)} />}
     <section className={`${panel} space-y-4`}>
-      <div><h2 className="font-semibold">部门树</h2><p className="text-sm text-muted-foreground">上移或下移调整同级顺序；编辑部门可移动到其他有效父级。停用部门会保留在树中。</p></div>
-      {tree.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground">正在加载部门…</p> : tree.isError ? <ErrorBox message={errorText(tree.error)} /> : departments.length ? <div className="space-y-2">{departments.map((department, index) => <DepartmentTreeNode key={department.department_id} department={department} siblings={departments} index={index} depth={0} pending={reorder.isPending || toggle.isPending || remove.isPending} onEdit={(value) => { setError(''); setDraft(toDraft(value)) }} onMove={moveSibling} onToggle={(value) => toggle.mutate({ departmentId: value.department_id, status: value.status === '0' ? '1' : '0' })} onDelete={(value) => { if (window.confirm(`删除部门“${value.dept_name}”？有子部门时服务端会拒绝删除。`)) remove.mutate(value.department_id) }} />)}</div> : <p className="py-8 text-center text-sm text-muted-foreground">暂无部门</p>}
+      <div><h2 className="font-semibold"><LocalizedText text={"部门树"} /></h2><p className="text-sm text-muted-foreground"><LocalizedText text={"上移或下移调整同级顺序；编辑部门可移动到其他有效父级。停用部门会保留在树中。"} /></p></div>
+      {tree.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载部门…"} /></p> : tree.isError ? <ErrorBox message={errorText(tree.error)} /> : departments.length ? <div className="space-y-2">{departments.map((department, index) => <DepartmentTreeNode key={department.department_id} department={department} siblings={departments} index={index} depth={0} pending={reorder.isPending || toggle.isPending || remove.isPending} onEdit={(value) => { setError(''); setDraft(toDraft(value)) }} onMove={moveSibling} onToggle={(value) => toggle.mutate({ departmentId: value.department_id, status: value.status === '0' ? '1' : '0' })} onDelete={(value) => { if (window.confirm(formatMessage('删除部门“{name}”？有子部门时服务端会拒绝删除。', { name: value.dept_name }))) remove.mutate(value.department_id) }} />)}</div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无部门"} /></p>}
     </section>
   </main>
 }
@@ -112,9 +116,9 @@ function DepartmentTreeNode({ department, siblings, index, depth, pending, onEdi
 }) {
   return <div>
     <div className="flex flex-wrap items-center gap-2 rounded-md border p-3" style={{ marginLeft: `${depth * 1.25}rem` }}>
-      <span className="min-w-32 font-medium">{department.dept_name}</span><span className="text-xs text-muted-foreground">{department.status === '0' ? '启用' : '停用'} · 顺序 {department.order_num}</span>
-      {department.leader && <span className="text-xs text-muted-foreground">负责人：{department.leader}</span>}
-      <div className="ml-auto flex flex-wrap gap-2"><button className="underline disabled:opacity-50" disabled={pending || index === 0} onClick={() => onMove(siblings, index, -1)}>上移</button><button className="underline disabled:opacity-50" disabled={pending || index === siblings.length - 1} onClick={() => onMove(siblings, index, 1)}>下移</button><button className="underline" onClick={() => onEdit(department)}>编辑</button><button className="underline disabled:opacity-50" disabled={pending} onClick={() => onToggle(department)}>{department.status === '0' ? '停用' : '启用'}</button><button className="text-destructive underline disabled:opacity-50" disabled={pending} onClick={() => onDelete(department)}>删除</button></div>
+      <span className="min-w-32 font-medium">{department.dept_name}</span><span className="text-xs text-muted-foreground">{department.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />} <LocalizedText text={" · 顺序 "} />{department.order_num}</span>
+      {department.leader && <span className="text-xs text-muted-foreground"><LocalizedText text={"负责人："} />{department.leader}</span>}
+      <div className="ml-auto flex flex-wrap gap-2"><button className="underline disabled:opacity-50" disabled={pending || index === 0} onClick={() => onMove(siblings, index, -1)}><LocalizedText text={"上移"} /></button><button className="underline disabled:opacity-50" disabled={pending || index === siblings.length - 1} onClick={() => onMove(siblings, index, 1)}><LocalizedText text={"下移"} /></button><button className="underline" onClick={() => onEdit(department)}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={pending} onClick={() => onToggle(department)}>{department.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={pending} onClick={() => onDelete(department)}><LocalizedText text={"删除"} /></button></div>
     </div>
     {department.children.map((child, childIndex) => <DepartmentTreeNode key={child.department_id} department={child} siblings={department.children} index={childIndex} depth={depth + 1} pending={pending} onEdit={onEdit} onMove={onMove} onToggle={onToggle} onDelete={onDelete} />)}
   </div>
@@ -136,17 +140,17 @@ function DepartmentEditor({ draft, departments, pending, onChange, onCancel, onS
   }
   const parents = departments.filter((department) => department.status === '0' && department.department_id !== draft.department_id && !descendants.has(department.department_id))
   return <form className={`${panel} space-y-4`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
-    <h2 className="font-semibold">{draft.department_id ? '编辑部门' : '创建部门'}</h2>
+    <h2 className="font-semibold">{draft.department_id ? <LocalizedText text={"编辑部门"} /> : <LocalizedText text={"创建部门"} />}</h2>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <label className="space-y-1 text-sm"><span>部门名称</span><input autoFocus required maxLength={30} className={input} value={draft.dept_name} onChange={(event) => set('dept_name', event.target.value)} /></label>
-      <label className="space-y-1 text-sm"><span>上级部门</span><select className={input} value={draft.parent_id ?? ''} onChange={(event) => set('parent_id', event.target.value || null)}><option value="">顶级部门</option>{parents.map((department) => <option key={department.department_id} value={department.department_id}>{department.dept_name}</option>)}</select></label>
-      <label className="space-y-1 text-sm"><span>排序</span><input type="number" min={0} className={input} value={draft.order_num} onChange={(event) => set('order_num', Number(event.target.value))} /></label>
-      <label className="space-y-1 text-sm"><span>负责人</span><input maxLength={20} className={input} value={draft.leader} onChange={(event) => set('leader', event.target.value)} /></label>
-      <label className="space-y-1 text-sm"><span>联系电话</span><input maxLength={11} className={input} value={draft.phone} onChange={(event) => set('phone', event.target.value)} /></label>
-      <label className="space-y-1 text-sm"><span>邮箱</span><input type="email" maxLength={50} className={input} value={draft.email} onChange={(event) => set('email', event.target.value)} /></label>
-      <label className="space-y-1 text-sm"><span>状态</span><select className={input} value={draft.status} onChange={(event) => set('status', event.target.value as '0' | '1')}><option value="0">启用</option><option value="1">停用</option></select></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"部门名称"} /></span><Input autoFocus required maxLength={30} className={input} value={draft.dept_name} onChange={(event) => set('dept_name', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"上级部门"} /></span><LocalizedNativeSelect className={input} value={draft.parent_id ?? ''} onChange={(event) => set('parent_id', event.target.value || null)}><option value=""><LocalizedText text={"顶级部门"} /></option>{parents.map((department) => <option key={department.department_id} value={department.department_id}>{department.dept_name}</option>)}</LocalizedNativeSelect></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"排序"} /></span><Input type="number" min={0} className={input} value={draft.order_num} onChange={(event) => set('order_num', Number(event.target.value))} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"负责人"} /></span><Input maxLength={20} className={input} value={draft.leader} onChange={(event) => set('leader', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"联系电话"} /></span><Input maxLength={11} className={input} value={draft.phone} onChange={(event) => set('phone', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"邮箱"} /></span><Input type="email" maxLength={50} className={input} value={draft.email} onChange={(event) => set('email', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={input} value={draft.status} onChange={(event) => set('status', event.target.value as '0' | '1')}><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label>
     </div>
-    <div className="flex gap-2"><button className={primary} disabled={pending || !draft.dept_name.trim()}>{pending ? '保存中…' : '保存部门'}</button><button type="button" className={button} onClick={onCancel}>取消</button></div>
+    <div className="flex gap-2"><button className={primary} disabled={pending || !draft.dept_name.trim()}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存部门"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
   </form>
 }
 

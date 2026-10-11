@@ -3,6 +3,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { TasksImportDialog } from './tasks-import-dialog'
 import { TasksMutateDrawer } from './tasks-mutate-drawer'
 import { useTasks } from './tasks-provider'
+import { LocalizedText } from '@/components/localized-text'
 
 export function TasksDialogs() {
   const { open, setOpen, currentRow, setCurrentRow } = useTasks()
@@ -58,10 +59,9 @@ export function TasksDialogs() {
             title={`Delete this task: ${currentRow.id} ?`}
             desc={
               <>
-                You are about to delete a task with the ID{' '}
-                <strong>{currentRow.id}</strong>. <br />
-                This action cannot be undone.
-              </>
+                <LocalizedText text={"\n                You are about to delete a task with the ID"} />{' '}
+                <strong>{currentRow.id}</strong><LocalizedText text={". "} /><br />
+                <LocalizedText text={"\n                This action cannot be undone.\n              "} /></>
             }
             confirmText='Delete'
           />

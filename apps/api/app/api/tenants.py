@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -54,7 +56,14 @@ def list_tenants(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     name: str | None = Query(default=None, max_length=120),
+    q: str | None = Query(default=None, max_length=120),
     status: str | None = Query(default=None, pattern="^(active|suspended|archived)$"),
+    validity: str | None = Query(default=None, pattern="^(current|not_started|expired|unlimited)$"),
+    slug: str | None = Query(default=None, max_length=64),
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+    updated_from: datetime | None = None,
+    expires_before: datetime | None = None,
     user: User = Depends(get_current_user),
     service: TenantService = Depends(get_tenant_service),
 ):
@@ -63,7 +72,14 @@ def list_tenants(
         page=page,
         page_size=page_size,
         name=name,
+        q=q,
         status=status,
+        validity=validity,
+        slug=slug,
+        created_from=created_from,
+        created_to=created_to,
+        updated_from=updated_from,
+        expires_before=expires_before,
     )
 
 
@@ -73,6 +89,13 @@ def platform_list_tenants(
     page_size: int = Query(20, ge=1, le=100),
     status: str | None = Query(default=None, pattern="^(active|suspended|archived)$"),
     name: str | None = Query(default=None, max_length=120),
+    q: str | None = Query(default=None, max_length=120),
+    validity: str | None = Query(default=None, pattern="^(current|not_started|expired|unlimited)$"),
+    slug: str | None = Query(default=None, max_length=64),
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+    updated_from: datetime | None = None,
+    expires_before: datetime | None = None,
     admin: User = Depends(require_platform_admin),
     service: TenantService = Depends(get_tenant_service),
 ):
@@ -82,6 +105,13 @@ def platform_list_tenants(
         page_size=page_size,
         name=name,
         status=status,
+        q=q,
+        validity=validity,
+        slug=slug,
+        created_from=created_from,
+        created_to=created_to,
+        updated_from=updated_from,
+        expires_before=expires_before,
     )
 
 

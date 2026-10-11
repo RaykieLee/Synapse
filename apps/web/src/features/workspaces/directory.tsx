@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { Check, ChevronsUpDown, Plus, Layers3 } from 'lucide-react'
@@ -42,6 +43,8 @@ import {
   type TenantSummary,
   type Workspace,
 } from './types'
+import { LocalizedText } from '@/components/localized-text'
+import { useLocaleText } from '@/lib/i18n'
 
 const workspacePath = (id: string) => `/w/${id}`
 const recentKey = (userId: string) => `synapse:recent-workspace:${userId}`
@@ -139,6 +142,7 @@ function activeWorkspaceId(pathname: string) {
 }
 
 export function TeamSwitcher() {
+  const t = useLocaleText()
   const { isMobile } = useSidebar()
   const actor = useAuthStore((state) => state.auth.user)
   const { actorId, tenants, tenantById, workspaces, workspaceQuery } =
@@ -204,7 +208,7 @@ export function TeamSwitcher() {
             <PopoverTrigger asChild>
               <SidebarMenuButton
                 size='lg'
-                aria-label='选择工作区'
+                aria-label={t('选择工作区')}
                 className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
               >
                 <div className='flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground'>
@@ -225,15 +229,13 @@ export function TeamSwitcher() {
             <PopoverContent
               className='w-[min(22rem,calc(100vw-2rem))] p-0'
               align='start'
-              side={isMobile ? 'bottom' : 'right'}
+              side={isMobile ? "bottom" : "right"}
             >
               <Command>
                 <CommandInput placeholder='搜索空间或租户…' />
                 <CommandList>
                   <CommandEmpty>
-                    {workspaceQuery.isLoading
-                      ? '正在加载空间…'
-                      : '没有匹配的可访问空间'}
+                    {workspaceQuery.isLoading ? <LocalizedText text={"正在加载空间…"} /> : <LocalizedText text={"没有匹配的可访问空间"} />}
                   </CommandEmpty>
                   {groups.map(({ tenant, items }) => (
                     <CommandGroup key={tenant.tenant_id} heading={tenant.name}>
@@ -248,9 +250,7 @@ export function TeamSwitcher() {
                             {workspace.name}
                           </span>
                           <span className='text-xs text-muted-foreground'>
-                            {workspace.status === 'archived'
-                              ? '已归档'
-                              : roleLabel[workspace.workspace_role]}
+                            {workspace.status === 'archived' ? <LocalizedText text={"已归档"} /> : roleLabel[workspace.workspace_role]}
                           </span>
                           {workspace.workspace_id ===
                             selected?.workspace_id && (
@@ -274,8 +274,7 @@ export function TeamSwitcher() {
                             setCreateOpen(true)
                           }}
                         >
-                          <Plus className='size-4' /> 创建空间
-                        </CommandItem>
+                          <Plus className='size-4' /> <LocalizedText text={" 创建空间\n                        "} /></CommandItem>
                       </CommandGroup>
                     </>
                   )}
@@ -345,10 +344,9 @@ function CreateWorkspaceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>创建 Workspace</DialogTitle>
+          <DialogTitle><LocalizedText text={"创建 Workspace"} /></DialogTitle>
           <DialogDescription>
-            创建者会成为空间所有者。其他租户成员需要逐个加入空间。
-          </DialogDescription>
+            <LocalizedText text={"\n            创建者会成为空间所有者。其他租户成员需要逐个加入空间。\n          "} /></DialogDescription>
         </DialogHeader>
         <form
           className='space-y-4'
@@ -359,8 +357,8 @@ function CreateWorkspaceDialog({
           }}
         >
           <div className='space-y-2'>
-            <Label htmlFor='workspace-tenant'>所属租户</Label>
-            <select
+            <Label htmlFor='workspace-tenant'><LocalizedText text={"所属租户"} /></Label>
+            <LocalizedNativeSelect
               id='workspace-tenant'
               className='h-9 w-full rounded-md border bg-background px-3 text-sm'
               value={selectedTenantId}
@@ -371,10 +369,10 @@ function CreateWorkspaceDialog({
                   {tenant.name}
                 </option>
               ))}
-            </select>
+            </LocalizedNativeSelect>
           </div>
           <div className='space-y-2'>
-            <Label htmlFor='workspace-name'>名称</Label>
+            <Label htmlFor='workspace-name'><LocalizedText text={"名称"} /></Label>
             <Input
               id='workspace-name'
               value={name}
@@ -384,7 +382,7 @@ function CreateWorkspaceDialog({
             />
           </div>
           <div className='space-y-2'>
-            <Label htmlFor='workspace-slug'>标识</Label>
+            <Label htmlFor='workspace-slug'><LocalizedText text={"标识"} /></Label>
             <Input
               id='workspace-slug'
               value={slug}
@@ -395,8 +393,7 @@ function CreateWorkspaceDialog({
               placeholder='research-team'
             />
             <p className='text-xs text-muted-foreground'>
-              小写字母、数字和连字符。
-            </p>
+              <LocalizedText text={"\n              小写字母、数字和连字符。\n            "} /></p>
           </div>
           {error && (
             <p role='alert' className='text-sm text-destructive'>
@@ -409,8 +406,7 @@ function CreateWorkspaceDialog({
               variant='outline'
               onClick={() => onOpenChange(false)}
             >
-              取消
-            </Button>
+              <LocalizedText text={"\n              取消\n            "} /></Button>
             <Button
               type='submit'
               disabled={
@@ -420,7 +416,7 @@ function CreateWorkspaceDialog({
                 create.isPending
               }
             >
-              {create.isPending ? '创建中…' : '创建空间'}
+              {create.isPending ? <LocalizedText text={"创建中…"} /> : <LocalizedText text={"创建空间"} />}
             </Button>
           </DialogFooter>
         </form>

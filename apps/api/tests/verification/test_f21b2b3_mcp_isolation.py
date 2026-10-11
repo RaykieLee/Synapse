@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timezone
 
 import pytest
+
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
@@ -14,6 +15,9 @@ from app.integrations.agentscope_session_scope import WorkspaceSessionStorage, b
 from app.integrations.agentscope_workspace_scope import ScopedWorkspace
 from app.tenancy.context import WorkspaceContext
 
+pytestmark = [
+    pytest.mark.redis,
+]
 
 def context(tenant: int, workspace: int, actor: int) -> WorkspaceContext:
     return WorkspaceContext(actor, tenant, workspace, "member", "member", frozenset(), 1)

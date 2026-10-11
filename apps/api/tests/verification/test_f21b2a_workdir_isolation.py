@@ -8,6 +8,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+
 from fastapi import HTTPException
 
 from agentscope.app.workspace_manager import LocalWorkspaceManager
@@ -16,6 +17,9 @@ from app.integrations.agentscope_session_scope import bind_agentscope_context, r
 from app.integrations.agentscope_workspace_scope import ConfinedLocalBackend, ScopedLocalWorkspaceManager
 from app.tenancy.context import WorkspaceContext
 
+pytestmark = [
+    pytest.mark.windows_symlink,
+]
 
 def ctx(tenant: int, workspace: int, actor: int) -> WorkspaceContext:
     return WorkspaceContext(actor, tenant, workspace, "member", "member", frozenset({"resource:read", "resource:create", "resource:update"}), 1)

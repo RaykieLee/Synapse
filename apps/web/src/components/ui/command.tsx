@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 import { SearchIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { translate, useLocale } from '@/lib/i18n'
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,7 @@ function CommandInput({
   className,
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
+  const locale = useLocale()
   return (
     <div
       data-slot='command-input-wrapper'
@@ -74,6 +76,7 @@ function CommandInput({
           className
         )}
         {...props}
+        placeholder={props.placeholder ? translate(props.placeholder, locale) : props.placeholder}
       />
     </div>
   )

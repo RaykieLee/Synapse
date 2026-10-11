@@ -10,11 +10,15 @@ from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import pytest
+
 import uvicorn
 from alembic import command
 from alembic.config import Config
 from fastapi import Depends, Request
 
+pytestmark = [
+    pytest.mark.redis,
+]
 
 def _free_port() -> int:
     with socket.socket() as sock:

@@ -19,6 +19,7 @@ import { DataTableBulkActions as BulkActionsToolbar } from '@/components/data-ta
 import { priorities, statuses } from '../data/data'
 import { type Task } from '../data/schema'
 import { TasksMultiDeleteDialog } from './tasks-multi-delete-dialog'
+import { LocalizedText } from '@/components/localized-text'
 
 type DataTableBulkActionsProps<TData> = {
   table: Table<TData>
@@ -84,12 +85,12 @@ export function DataTableBulkActions<TData>({
                   title='Update status'
                 >
                   <CircleArrowUp />
-                  <span className='sr-only'>Update status</span>
+                  <span className='sr-only'><LocalizedText text={"Update status"} /></span>
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Update status</p>
+              <p><LocalizedText text={"Update status"} /></p>
             </TooltipContent>
           </Tooltip>
           <DropdownMenuContent sideOffset={14}>
@@ -120,12 +121,12 @@ export function DataTableBulkActions<TData>({
                   title='Update priority'
                 >
                   <ArrowUpDown />
-                  <span className='sr-only'>Update priority</span>
+                  <span className='sr-only'><LocalizedText text={"Update priority"} /></span>
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Update priority</p>
+              <p><LocalizedText text={"Update priority"} /></p>
             </TooltipContent>
           </Tooltip>
           <DropdownMenuContent sideOffset={14}>
@@ -155,11 +156,11 @@ export function DataTableBulkActions<TData>({
               title='Export tasks'
             >
               <Download />
-              <span className='sr-only'>Export tasks</span>
+              <span className='sr-only'><LocalizedText text={"Export tasks"} /></span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Export tasks</p>
+            <p><LocalizedText text={"Export tasks"} /></p>
           </TooltipContent>
         </Tooltip>
 
@@ -174,11 +175,11 @@ export function DataTableBulkActions<TData>({
               title='Delete selected tasks'
             >
               <Trash2 />
-              <span className='sr-only'>Delete selected tasks</span>
+              <span className='sr-only'><LocalizedText text={"Delete selected tasks"} /></span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Delete selected tasks</p>
+            <p><LocalizedText text={"Delete selected tasks"} /></p>
           </TooltipContent>
         </Tooltip>
       </BulkActionsToolbar>

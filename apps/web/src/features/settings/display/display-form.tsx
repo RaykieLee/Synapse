@@ -13,6 +13,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { LocalizedText } from '@/components/localized-text'
 
 const items = [
   {
@@ -72,10 +73,9 @@ export function DisplayForm() {
           render={() => (
             <FormItem>
               <div className='mb-4'>
-                <FormLabel className='text-base'>Sidebar</FormLabel>
+                <FormLabel className='text-base'><LocalizedText text={"Sidebar"} /></FormLabel>
                 <FormDescription>
-                  Select the items you want to display in the sidebar.
-                </FormDescription>
+                  <LocalizedText text={"\n                  Select the items you want to display in the sidebar.\n                "} /></FormDescription>
               </div>
               {items.map((item) => (
                 <FormField
@@ -114,7 +114,7 @@ export function DisplayForm() {
             </FormItem>
           )}
         />
-        <Button type='submit'>Update display</Button>
+        <Button type='submit'><LocalizedText text={"Update display"} /></Button>
       </form>
     </Form>
   )

@@ -9,6 +9,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { translate, useLocale } from '@/lib/i18n'
+
 
 type ConfirmDialogProps = {
   open: boolean
@@ -28,6 +30,7 @@ type ConfirmDialogProps = {
 )
 
 export function ConfirmDialog(props: ConfirmDialogProps) {
+  const locale = useLocale()
   const {
     title,
     desc,
@@ -46,24 +49,24 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
     <AlertDialog {...actions}>
       <AlertDialogContent className={cn(className && className)}>
         <AlertDialogHeader className='text-start'>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogTitle>{typeof title === 'string' ? translate(title, locale) : title}</AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div>{desc}</div>
+            <div>{typeof desc === 'string' ? translate(desc, locale) : desc}</div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         {children}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>
-            {cancelBtnText ?? 'Cancel'}
+            {cancelBtnText ? translate(cancelBtnText, locale) : translate('Cancel', locale)}
           </AlertDialogCancel>
           <Button
-            type={form ? 'submit' : 'button'}
+            type={form ? "submit" : "button"}
             form={form}
             onClick={handleConfirm}
-            variant={destructive ? 'destructive' : 'default'}
+            variant={destructive ? "destructive" : "default"}
             disabled={disabled || isLoading}
           >
-            {confirmText ?? 'Continue'}
+            {typeof confirmText === 'string' ? translate(confirmText, locale) : confirmText ?? translate('Continue', locale)}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

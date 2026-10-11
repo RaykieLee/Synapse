@@ -11,6 +11,7 @@ import zipfile
 from datetime import datetime, timezone
 
 import pytest
+
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
@@ -20,6 +21,10 @@ from app.integrations.agentscope_session_scope import (
 )
 from app.tenancy.context import WorkspaceContext
 
+pytestmark = [
+    pytest.mark.redis,
+    pytest.mark.windows_symlink,
+]
 
 def _ctx(tenant: int, workspace: int, actor: int) -> WorkspaceContext:
     return WorkspaceContext(actor, tenant, workspace, "member", "member", frozenset(), 1)

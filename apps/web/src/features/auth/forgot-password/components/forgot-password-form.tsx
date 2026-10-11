@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { LocalizedText } from '@/components/localized-text'
 
 const formSchema = z.object({
   email: z.email({
@@ -62,7 +63,7 @@ export function ForgotPasswordForm({
           name='email'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel><LocalizedText text={"Email"} /></FormLabel>
               <FormControl>
                 <Input placeholder='name@example.com' {...field} />
               </FormControl>
@@ -71,8 +72,7 @@ export function ForgotPasswordForm({
           )}
         />
         <Button className='mt-2' disabled={isLoading}>
-          Continue
-          {isLoading ? <Loader2 className='animate-spin' /> : <ArrowRight />}
+          <LocalizedText text={"\n          Continue\n          "} />{isLoading ? <Loader2 className='animate-spin' /> : <ArrowRight />}
         </Button>
       </form>
     </Form>

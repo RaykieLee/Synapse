@@ -21,7 +21,6 @@ from app.services.errors import (
     ConflictError,
     DomainValidationError,
     ForbiddenError,
-    GoneError,
     NotFoundError,
 )
 from app.services.results import ActorContext
@@ -49,10 +48,6 @@ class InvitationNotFound(NotFoundError):
 
 class InvitationNotPending(ConflictError):
     code = "INVITATION_NOT_PENDING"
-
-
-class InvitationExpired(GoneError):
-    code = "INVITATION_EXPIRED"
 
 
 class InvitationRequiresExistingAccount(ConflictError):
@@ -124,6 +119,14 @@ class InvitationRegistrationResult:
     user: RegisteredUserResult
     membership: TenantMembershipResult
     token_version: int
+
+
+@dataclass(frozen=True)
+class InvitationExpiredResult:
+    """A committed terminal state transition that maps to HTTP 410."""
+
+    code: str = "INVITATION_EXPIRED"
+    detail: str = "Invitation has expired"
 
 
 def _now() -> datetime:
@@ -267,14 +270,17 @@ class TenantInvitationService:
         invitation.revoked_at = _now()
         self.db.flush()
 
-    def register_and_accept(self, body: InvitationRegister) -> InvitationRegistrationResult:
+    def register_and_accept(
+        self, body: InvitationRegister
+    ) -> InvitationRegistrationResult | InvitationExpiredResult:
         """Register only the recipient named by a live unbound email invitation."""
 
         now = _now()
         invitation = self._invitation_by_token(body.token)
         if invitation.status != "pending":
             raise InvitationNotPending("Invitation is not pending")
-        self._reject_expired(invitation, now)
+        if self._mark_expired(invitation, now):
+            return InvitationExpiredResult()
 
         if not invitation.email or invitation.target_user_id is not None:
             raise InvitationRequiresExistingAccount(
@@ -366,12 +372,13 @@ class TenantInvitationService:
         self,
         body: InvitationAccept,
         actor: User,
-    ) -> TenantMembershipResult:
+    ) -> TenantMembershipResult | InvitationExpiredResult:
         now = _now()
         invitation = self._invitation_by_token(body.token)
         if invitation.status != "pending":
             raise InvitationNotPending("Invitation is not pending")
-        self._reject_expired(invitation, now)
+        if self._mark_expired(invitation, now):
+            return InvitationExpiredResult()
 
         tenant = self.db.get(Tenant, invitation.tenant_id)
         if tenant is None:
@@ -462,11 +469,12 @@ class TenantInvitationService:
             raise InvitationNotFound("Invitation not found")
         return invitation
 
-    def _reject_expired(self, invitation: TenantInvitation, now: datetime) -> None:
+    def _mark_expired(self, invitation: TenantInvitation, now: datetime) -> bool:
         if _aware(invitation.expires_at) <= now:
             invitation.status = "expired"
             self.db.flush()
-            raise InvitationExpired("Invitation has expired")
+            return True
+        return False
 
     def _claim_invitation(
         self,

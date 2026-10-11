@@ -1,7 +1,9 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { translate, useLocale } from '@/lib/i18n'
 
 function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
+  const locale = useLocale()
   return (
     <input
       type={type}
@@ -13,6 +15,8 @@ function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
         className
       )}
       {...props}
+      placeholder={props.placeholder ? translate(props.placeholder, locale) : props.placeholder}
+      aria-label={props['aria-label'] ? translate(props['aria-label'], locale) : undefined}
     />
   )
 }

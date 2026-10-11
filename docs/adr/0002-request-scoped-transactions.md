@@ -27,6 +27,7 @@ finally:
 - 请求路径上的任何异常统一 rollback。
 - service 只调用 `flush()` 获取生成 ID、触发约束检查或刷新对象，不调用 `commit()`。
 - router 不管理事务；已迁移域不得出现显式 commit/rollback。
+- 需要提交终态变更、同时向客户端返回错误状态的业务结果，service 以显式结果值返回；router 将该结果映射为正常 HTTP 响应。不要先写入再抛异常，否则请求级依赖会按约定回滚该变更。
 
 ## 后果
 

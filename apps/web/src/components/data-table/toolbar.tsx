@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTableFacetedFilter } from './faceted-filter'
 import { DataTableViewOptions } from './view-options'
+import { LocalizedText } from '@/components/localized-text'
 
 type DataTableToolbarProps<TData> = {
   table: Table<TData>
@@ -74,8 +75,7 @@ export function DataTableToolbar<TData>({
             }}
             className='h-8 px-2 lg:px-3'
           >
-            Reset
-            <Cross2Icon className='ms-2 h-4 w-4' />
+            <LocalizedText text={"\n            Reset\n            "} /><Cross2Icon className='ms-2 h-4 w-4' />
           </Button>
         )}
       </div>

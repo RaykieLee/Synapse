@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -216,6 +216,13 @@ class TenantService:
         page_size: int,
         name: str | None,
         status: str | None,
+        q: str | None = None,
+        validity: str | None = None,
+        slug: str | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        updated_from: datetime | None = None,
+        expires_before: datetime | None = None,
     ) -> PageResult[TenantWithWorkspacesResult]:
         query = (
             select(Tenant, TenantMember.tenant_role)
@@ -226,8 +233,11 @@ class TenantService:
                 Tenant.status == "active",
             )
         )
-        if name:
-            query = query.where(Tenant.name.ilike(f"%{name}%"))
+        query = self._filter_tenants(
+            query, name=name, q=q, validity=validity, slug=slug,
+            created_from=created_from, created_to=created_to,
+            updated_from=updated_from, expires_before=expires_before,
+        )
         # Ordinary member listings never expose inactive tenants, even when an
         # inactive status is explicitly requested as a filter.
         if status and status != "active":
@@ -250,22 +260,83 @@ class TenantService:
         page_size: int,
         name: str | None,
         status: str | None,
+        q: str | None = None,
+        validity: str | None = None,
+        slug: str | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        updated_from: datetime | None = None,
+        expires_before: datetime | None = None,
     ) -> PageResult[TenantResult]:
         query = select(Tenant)
-        count_query = select(func.count()).select_from(Tenant)
         if status:
             query = query.where(Tenant.status == status)
-            count_query = count_query.where(Tenant.status == status)
-        if name:
-            query = query.where(Tenant.name.ilike(f"%{name}%"))
-            count_query = count_query.where(Tenant.name.ilike(f"%{name}%"))
+        query = self._filter_tenants(
+            query, name=name, q=q, validity=validity, slug=slug,
+            created_from=created_from, created_to=created_to,
+            updated_from=updated_from, expires_before=expires_before,
+        )
 
-        total = self.db.scalar(count_query) or 0
+        total = self.db.scalar(select(func.count()).select_from(query.subquery())) or 0
         rows = self.db.scalars(
             query.order_by(Tenant.tenant_id).offset((page - 1) * page_size).limit(page_size)
         ).all()
         items = tuple(self._tenant_result(tenant) for tenant in rows)
         return PageResult(items=items, total=total, page=page, page_size=page_size)
+
+    @staticmethod
+    def _filter_tenants(
+        query,
+        *,
+        name: str | None,
+        q: str | None,
+        validity: str | None,
+        slug: str | None,
+        created_from: datetime | None,
+        created_to: datetime | None,
+        updated_from: datetime | None,
+        expires_before: datetime | None,
+    ):
+        if any(value is not None and (value.tzinfo is None or value.utcoffset() is None)
+               for value in (created_from, created_to, updated_from, expires_before)):
+            raise DomainValidationError("Date boundaries must include a timezone")
+        if created_from and created_to and created_from >= created_to:
+            raise DomainValidationError("Creation date range must have a later end")
+        if name:
+            query = query.where(Tenant.name.ilike(f"%{name}%"))
+        if slug and slug.strip():
+            query = query.where(Tenant.slug == slug.strip())
+        if q and (term := q.strip()):
+            escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            matches = [
+                Tenant.name.ilike(pattern, escape="\\"),
+                Tenant.slug.ilike(pattern, escape="\\"),
+            ]
+            if term.isascii() and term.isdecimal():
+                matches.append(Tenant.tenant_id == int(term))
+            query = query.where(or_(*matches))
+        now = _now()
+        if validity == "current":
+            query = query.where(and_(
+                or_(Tenant.valid_from.is_(None), Tenant.valid_from <= now),
+                or_(Tenant.valid_until.is_(None), Tenant.valid_until > now),
+            ))
+        elif validity == "not_started":
+            query = query.where(Tenant.valid_from > now)
+        elif validity == "expired":
+            query = query.where(Tenant.valid_until <= now)
+        elif validity == "unlimited":
+            query = query.where(Tenant.valid_from.is_(None), Tenant.valid_until.is_(None))
+        if created_from:
+            query = query.where(Tenant.created_at >= created_from)
+        if created_to:
+            query = query.where(Tenant.created_at < created_to)
+        if updated_from:
+            query = query.where(Tenant.updated_at >= updated_from)
+        if expires_before:
+            query = query.where(Tenant.valid_until.is_not(None), Tenant.valid_until < expires_before)
+        return query
 
     def get_tenant(self, tenant_id: int, actor: ActorContext) -> TenantResult:
         tenant = self._tenant(tenant_id)

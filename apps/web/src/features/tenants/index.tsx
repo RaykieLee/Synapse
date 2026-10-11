@@ -1,10 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { formatMessage } from '@/lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, getRouteApi, useParams } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import {
+  createTenantInvitation,
+  listTenantInvitations,
+  revokeTenantInvitation,
+  type CreatedTenantInvitation,
+  type TenantInvitationCreatePayload,
+} from '@/api/tenant-invitations'
+import {
   createTenant,
-  createTenantMember,
   getTenant,
   listPlatformTenants,
   listTenantMembers,
@@ -15,14 +22,8 @@ import {
   type Tenant,
   type TenantPatchPayload,
   type TenantStatus,
+  type TenantValidity,
 } from '@/api/tenants'
-import {
-  createTenantInvitation,
-  listTenantInvitations,
-  revokeTenantInvitation,
-  type CreatedTenantInvitation,
-  type TenantInvitationCreatePayload,
-} from '@/api/tenant-invitations'
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiProblem, api } from '@/lib/api'
 import {
@@ -46,7 +47,7 @@ import {
 import { CreateTenantDialog } from './components/create-tenant-dialog'
 import { InvitationPanel } from './components/invitation-panel'
 import { MemberCustomRoleCell } from './components/member-custom-role'
-import { AddMemberDialog, MemberTable } from './components/member-table'
+import { MemberTable } from './components/member-table'
 import { ErrorBox, PageHeader, panelClass } from './components/shared'
 import {
   EditTenantNameDialog,
@@ -58,27 +59,72 @@ import {
   TablePager,
   TenantTable,
   TenantToolbar,
+  TenantColumnOptions,
+  tenantColumns,
+  type TenantColumn,
 } from './components/tenant-table'
-import {
-  tenantText,
-  type TenantRoleRecord,
-} from './types'
+import { tenantText, type TenantRoleRecord } from './types'
+import { LocalizedText } from '@/components/localized-text'
+
+const tenantsRoute = getRouteApi('/_authenticated/tenants/')
+
+function dateBoundary(value: string, nextDay = false): string {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day + Number(nextDay)).toISOString()
+}
 
 export function Tenants() {
   const actor = useAuthStore((s) => s.auth.user)
   const admin = actor?.platform_role === 'platform_admin'
-  const [query, setQuery] = useState('')
-  const [status, setStatus] = useState<TenantStatus | ''>('')
-  const [page, setPage] = useState(1)
+  const search = tenantsRoute.useSearch()
+  const navigate = tenantsRoute.useNavigate()
+  const page = search.page ?? 1
+  const pageSize = search.pageSize ?? 20
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [visibleColumns, setVisibleColumns] = useState<Set<TenantColumn>>(
+    () => new Set(tenantColumns.map((column) => column.key))
+  )
+  const query = search.q ?? ''
+  const status = admin ? (search.status ?? '') : ''
+  const validity = search.validity ?? ''
+  const slug = search.slug ?? ''
+  const createdFrom = search.createdFrom ?? ''
+  const createdTo = search.createdTo ?? ''
+  const updatedFrom = search.updatedFrom ?? ''
+  const expiresBefore = search.expiresBefore ?? ''
+  const [searchInput, setSearchInput] = useState(query)
+  useEffect(() => setSearchInput(query), [query])
+  useEffect(() => {
+    if (searchInput.trim() === query) return
+    const timer = window.setTimeout(() => {
+      void navigate({
+        search: (previous) => ({
+          ...previous,
+          q: searchInput.trim() || undefined,
+          page: 1,
+        }),
+        replace: true,
+      })
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchInput, query, navigate])
   const [createOpen, setCreateOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<Tenant | null>(null)
   const [error, setError] = useState('')
   const client = useQueryClient()
   const request = {
     page,
-    pageSize: 20,
-    name: query.trim() || undefined,
+    pageSize,
+    q: query || undefined,
     status: status || undefined,
+    validity: validity || undefined,
+    slug: slug || undefined,
+    createdFrom: createdFrom ? dateBoundary(createdFrom) : undefined,
+    createdTo: createdTo ? dateBoundary(createdTo, true) : undefined,
+    updatedFrom: updatedFrom ? dateBoundary(updatedFrom) : undefined,
+    expiresBefore: expiresBefore
+      ? dateBoundary(expiresBefore, true)
+      : undefined,
   }
   const key = [
     'synapse',
@@ -88,9 +134,15 @@ export function Tenants() {
     'tenants',
     admin ? 'platform' : 'member',
     page,
-    query.trim(),
+    pageSize,
+    query,
     status,
-    request,
+    validity,
+    slug,
+    createdFrom,
+    createdTo,
+    updatedFrom,
+    expiresBefore,
   ]
   const tenants = useQuery({
     queryKey: key,
@@ -120,22 +172,35 @@ export function Tenants() {
       setError('')
       setCreateOpen(false)
       await refresh()
-      setPage(1)
+      void navigate({ search: (previous) => ({ ...previous, page: 1 }) })
     },
     onError: (cause) => setError(errorText(cause)),
   })
 
   const total = tenants.data?.total ?? 0
-  const pages = Math.max(1, Math.ceil(total / 20))
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  useEffect(
+    () => setSelectedIds(new Set()),
+    [
+      page,
+      pageSize,
+      query,
+      status,
+      validity,
+      slug,
+      createdFrom,
+      createdTo,
+      updatedFrom,
+      expiresBefore,
+    ]
+  )
 
   return (
     <main className='space-y-5 p-6'>
       <PageHeader
         title='租户管理'
         description={
-          admin
-            ? '平台租户目录用于管理租户状态，不代表您拥有租户内业务或成员访问权限。'
-            : '查看您所属的启用租户。'
+          admin ? "平台租户目录用于管理租户状态，不代表您拥有租户内业务或成员访问权限。" : "查看您所属的启用租户。"
         }
         actions={
           admin ? (
@@ -145,8 +210,7 @@ export function Tenants() {
                 setCreateOpen(true)
               }}
             >
-              <Plus className='size-4' /> 创建租户
-            </Button>
+              <Plus className='size-4' /> <LocalizedText text={" 创建租户\n            "} /></Button>
           ) : null
         }
       />
@@ -159,42 +223,102 @@ export function Tenants() {
         />
       ) : null}
       {error ? <ErrorBox message={error} /> : null}
-      <section className={panelClass}>
-        <div className='p-4 pb-3'>
+      <section className='space-y-4'>
+        <div className='flex flex-wrap items-start justify-between gap-2'>
           <TenantToolbar
-            query={query}
-            onQueryChange={(value) => {
-              setQuery(value)
-              setPage(1)
-            }}
+            query={searchInput}
+            onQueryChange={setSearchInput}
             status={status}
-            onStatusChange={(value) => {
-              setStatus(value)
-              setPage(1)
+            onStatusChange={(value: TenantStatus | '') =>
+              void navigate({
+                search: (previous) => ({
+                  ...previous,
+                  status: value || undefined,
+                  page: 1,
+                }),
+              })
+            }
+            validity={validity}
+            onValidityChange={(value: TenantValidity | '') =>
+              void navigate({
+                search: (previous) => ({
+                  ...previous,
+                  validity: value || undefined,
+                  page: 1,
+                }),
+              })
+            }
+            createdFrom={createdFrom}
+            createdTo={createdTo}
+            slug={slug}
+            updatedFrom={updatedFrom}
+            expiresBefore={expiresBefore}
+            onAdvancedChange={(values) =>
+              void navigate({
+                search: (previous) => ({
+                  ...previous,
+                  slug: values.slug || undefined,
+                  createdFrom: values.createdFrom || undefined,
+                  createdTo: values.createdTo || undefined,
+                  updatedFrom: values.updatedFrom || undefined,
+                  expiresBefore: values.expiresBefore || undefined,
+                  page: 1,
+                }),
+              })
+            }
+            onReset={() => {
+              setSearchInput('')
+              void navigate({ search: () => ({ page: 1 }), replace: true })
             }}
+            isAdmin={admin}
+          />
+          <TenantColumnOptions
+            visible={visibleColumns}
+            onChange={setVisibleColumns}
+            isAdmin={admin}
           />
         </div>
-        <TenantTable
-          tenants={tenants.data?.items ?? []}
-          isAdmin={admin}
-          loading={tenants.isLoading}
-          onStatusChange={(tenant) =>
-            mutation.mutate({
-              id: tenant.tenant_id,
-              body: {
-                status: tenant.status === 'active' ? 'suspended' : 'active',
-              },
-            })
-          }
-          onArchive={setArchiveTarget}
-        />
-        <TablePager
-          page={page}
-          pages={pages}
-          total={total}
-          onPrevious={() => setPage((current) => Math.max(1, current - 1))}
-          onNext={() => setPage((current) => Math.min(pages, current + 1))}
-        />
+        <div className='overflow-hidden rounded-md border'>
+          <TenantTable
+            tenants={tenants.data?.items ?? []}
+            isAdmin={admin}
+            loading={tenants.isLoading}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            visibleColumns={visibleColumns}
+            onStatusChange={(tenant) =>
+              mutation.mutate({
+                id: tenant.tenant_id,
+                body: {
+                  status: tenant.status === 'active' ? 'suspended' : 'active',
+                },
+              })
+            }
+            onArchive={setArchiveTarget}
+          />
+          <TablePager
+            page={page}
+            pages={pages}
+            total={total}
+            pageSize={pageSize}
+            selectedCount={selectedIds.size}
+            onClearSelection={() => setSelectedIds(new Set())}
+            onPageChange={(nextPage) =>
+              void navigate({
+                search: (previous) => ({ ...previous, page: nextPage }),
+              })
+            }
+            onPageSizeChange={(size) =>
+              void navigate({
+                search: (previous) => ({
+                  ...previous,
+                  pageSize: size as 10 | 20 | 30 | 50,
+                  page: 1,
+                }),
+              })
+            }
+          />
+        </div>
       </section>
       <AlertDialog
         open={Boolean(archiveTarget)}
@@ -202,16 +326,14 @@ export function Tenants() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>归档租户</AlertDialogTitle>
+            <AlertDialogTitle><LocalizedText text={"归档租户"} /></AlertDialogTitle>
             <AlertDialogDescription>
-              确定归档租户“{archiveTarget?.name}
-              ”吗？归档后租户进入终态，无法重新启用。
-            </AlertDialogDescription>
+              <LocalizedText text={"\n              确定归档租户“"} />{archiveTarget?.name}
+              <LocalizedText text={"\n              ”吗？归档后租户进入终态，无法重新启用。\n            "} /></AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setArchiveTarget(null)}>
-              取消
-            </AlertDialogCancel>
+              <LocalizedText text={"\n              取消\n            "} /></AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (archiveTarget)
@@ -222,8 +344,7 @@ export function Tenants() {
                 setArchiveTarget(null)
               }}
             >
-              确认归档
-            </AlertDialogAction>
+              <LocalizedText text={"\n              确认归档\n            "} /></AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -326,12 +447,6 @@ export function TenantDetail() {
     onSuccess: refresh,
     onError: (cause) => setError(errorText(cause)),
   })
-  const add = useMutation({
-    mutationFn: (body: Parameters<typeof createTenantMember>[1]) =>
-      createTenantMember(tenantId, body),
-    onSuccess: refresh,
-    onError: (cause) => setError(errorText(cause)),
-  })
   const createInvite = useMutation({
     mutationFn: (body: TenantInvitationCreatePayload) =>
       createTenantInvitation(tenantId, body),
@@ -353,15 +468,14 @@ export function TenantDetail() {
   })
   if (tenant.isLoading) {
     return (
-      <main className='p-6 text-sm text-muted-foreground'>正在加载租户…</main>
+      <main className='p-6 text-sm text-muted-foreground'><LocalizedText text={"正在加载租户…"} /></main>
     )
   }
   if (tenant.isError) {
     return (
       <main className='space-y-4 p-6'>
         <Link to='/tenants' className='text-sm underline'>
-          返回租户列表
-        </Link>
+          <LocalizedText text={"\n          返回租户列表\n        "} /></Link>
         <ErrorBox message={errorText(tenant.error)} />
       </main>
     )
@@ -383,8 +497,7 @@ export function TenantDetail() {
           to='/tenants'
           className='text-sm text-muted-foreground hover:text-foreground'
         >
-          ← 返回租户列表
-        </Link>
+          <LocalizedText text={"\n          ← 返回租户列表\n        "} /></Link>
         <div className='flex flex-wrap items-center gap-2'>
           {canManage || platformAdmin ? (
             <EditTenantNameDialog
@@ -403,7 +516,7 @@ export function TenantDetail() {
               tenant={item}
               onChange={(status) => patchTenant.mutate({ status })}
               onArchive={() => {
-                if (window.confirm(`确定归档租户“${item.name}”吗？`)) {
+                if (window.confirm(formatMessage('确定归档租户“{name}”吗？', { name: item.name }))) {
                   patchTenant.mutate({ status: 'archived' })
                 }
               }}
@@ -413,7 +526,7 @@ export function TenantDetail() {
       </div>
       <PageHeader
         title={item.name}
-        description={`租户 ID ${item.tenant_id} · ${tenantText[item.status]}${
+        description={`${tenantText[item.status]}${
           item.tenant_role
             ? ` · 我的角色：${tenantText[item.tenant_role]}`
             : platformAdmin
@@ -438,6 +551,18 @@ export function TenantDetail() {
           ) : null
         }
       />
+      <details className='text-xs text-muted-foreground'>
+        <summary className='w-fit cursor-pointer'><LocalizedText text={"技术信息"} /></summary>
+        <div className='mt-2 flex flex-wrap items-center gap-2'>
+          <code>租户 ID {item.tenant_id}</code>
+          <button
+            type='button'
+            className='underline'
+            onClick={() => navigator.clipboard.writeText(item.tenant_id)}
+          >
+            <LocalizedText text={"\n            复制 ID\n          "} /></button>
+        </div>
+      </details>
       <section className='grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]'>
         <TenantSummaryCard
           tenant={item}
@@ -452,8 +577,8 @@ export function TenantDetail() {
         {canManage && item.status === 'active' ? (
           <Card>
             <CardHeader className='pb-3'>
-              <CardTitle className='text-base'>快捷配置</CardTitle>
-              <CardDescription>租户级配置入口</CardDescription>
+              <CardTitle className='text-base'><LocalizedText text={"快捷配置"} /></CardTitle>
+              <CardDescription><LocalizedText text={"租户级配置入口"} /></CardDescription>
             </CardHeader>
             <CardContent className='grid gap-1 text-sm'>
               {managementLinks.map((link) => (
@@ -463,7 +588,7 @@ export function TenantDetail() {
                   className='flex items-center justify-between rounded-md px-3 py-2 transition-colors hover:bg-muted'
                 >
                   {link.label}
-                  <span aria-hidden='true'>→</span>
+                  <span aria-hidden='true'><LocalizedText text={"→"} /></span>
                 </a>
               ))}
             </CardContent>
@@ -475,19 +600,10 @@ export function TenantDetail() {
         <section className={panelClass}>
           <div className='flex flex-wrap items-center justify-between gap-3 p-5 pb-4'>
             <div>
-              <h2 className='text-lg font-semibold'>租户成员</h2>
+              <h2 className='text-lg font-semibold'><LocalizedText text={"租户成员"} /></h2>
               <p className='mt-1 text-sm text-muted-foreground'>
-                添加已有全局账号。邀请通过链接接受，不会自动加入任何 Workspace。
-              </p>
+                <LocalizedText text={"\n                通过邮箱邀请已有账号加入。接受邀请后不会自动加入任何 Workspace。\n              "} /></p>
             </div>
-            {canManage ? (
-              <AddMemberDialog
-                pending={add.isPending}
-                onAdd={(userId, role) =>
-                  add.mutate({ user_id: userId, tenant_role: role })
-                }
-              />
-            ) : null}
           </div>
           <MemberTable
             members={members.data?.items ?? []}
@@ -535,21 +651,17 @@ export function TenantDetail() {
             page={memberPage}
             pages={Math.max(1, Math.ceil((members.data?.total ?? 0) / 20))}
             total={members.data?.total ?? 0}
-            onPrevious={() =>
-              setMemberPage((current) => Math.max(1, current - 1))
-            }
-            onNext={() => setMemberPage((current) => current + 1)}
+            pageSize={20}
+            onPageChange={setMemberPage}
           />
         </section>
       ) : null}
       {canManage && item.status === 'active' ? (
         <section className={panelClass}>
           <div className='p-5 pb-4'>
-            <h2 className='text-lg font-semibold'>邀请链接</h2>
+            <h2 className='text-lg font-semibold'><LocalizedText text={"邀请链接"} /></h2>
             <p className='mt-1 text-sm text-muted-foreground'>
-              收件人使用已有 Synapse
-              账号登录后接受邀请。租户管理员只能邀请为成员。
-            </p>
+              <LocalizedText text={"\n              收件人使用已有 Synapse\n              账号登录后接受邀请。租户管理员只能邀请为成员。\n            "} /></p>
           </div>
           <div className='px-5 pb-5'>
             <InvitationPanel

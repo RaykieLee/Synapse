@@ -12,6 +12,7 @@ import {
 import { DataTableBulkActions as BulkActionsToolbar } from '@/components/data-table'
 import { type User } from '../data/schema'
 import { UsersMultiDeleteDialog } from './users-multi-delete-dialog'
+import { LocalizedText } from '@/components/localized-text'
 
 type DataTableBulkActionsProps<TData> = {
   table: Table<TData>
@@ -63,11 +64,11 @@ export function DataTableBulkActions<TData>({
               title='Invite selected users'
             >
               <Mail />
-              <span className='sr-only'>Invite selected users</span>
+              <span className='sr-only'><LocalizedText text={"Invite selected users"} /></span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Invite selected users</p>
+            <p><LocalizedText text={"Invite selected users"} /></p>
           </TooltipContent>
         </Tooltip>
 
@@ -82,11 +83,11 @@ export function DataTableBulkActions<TData>({
               title='Activate selected users'
             >
               <UserCheck />
-              <span className='sr-only'>Activate selected users</span>
+              <span className='sr-only'><LocalizedText text={"Activate selected users"} /></span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Activate selected users</p>
+            <p><LocalizedText text={"Activate selected users"} /></p>
           </TooltipContent>
         </Tooltip>
 
@@ -101,11 +102,11 @@ export function DataTableBulkActions<TData>({
               title='Deactivate selected users'
             >
               <UserX />
-              <span className='sr-only'>Deactivate selected users</span>
+              <span className='sr-only'><LocalizedText text={"Deactivate selected users"} /></span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Deactivate selected users</p>
+            <p><LocalizedText text={"Deactivate selected users"} /></p>
           </TooltipContent>
         </Tooltip>
 
@@ -120,11 +121,11 @@ export function DataTableBulkActions<TData>({
               title='Delete selected users'
             >
               <Trash2 />
-              <span className='sr-only'>Delete selected users</span>
+              <span className='sr-only'><LocalizedText text={"Delete selected users"} /></span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Delete selected users</p>
+            <p><LocalizedText text={"Delete selected users"} /></p>
           </TooltipContent>
         </Tooltip>
       </BulkActionsToolbar>

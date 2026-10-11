@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import dashboardDark from './assets/dashboard-dark.png'
 import dashboardLight from './assets/dashboard-light.png'
 import { UserAuthForm } from './components/user-auth-form'
+import { LocalizedText } from '@/components/localized-text'
 
 export function SignIn2() {
   return (
@@ -12,42 +13,37 @@ export function SignIn2() {
         <div className='mx-auto flex w-full flex-col justify-center space-y-2 py-8 sm:w-120 sm:p-8'>
           <div className='mb-4 flex items-center justify-center'>
             <Logo className='me-2' />
-            <h1 className='text-xl font-medium'>Synapse</h1>
+            <h1 className='text-xl font-medium'><LocalizedText text={"Synapse"} /></h1>
           </div>
         </div>
         <div className='mx-auto flex w-full max-w-sm flex-col justify-center space-y-2'>
           <div className='flex flex-col space-y-2 text-start'>
-            <h2 className='text-lg font-semibold tracking-tight'>Sign in</h2>
+            <h2 className='text-lg font-semibold tracking-tight'><LocalizedText text={"Sign in"} /></h2>
             <p className='text-sm text-muted-foreground'>
-              Enter your email and password below to log into{' '}
-              <br className='max-sm:hidden' /> your account. Don't have an
-              account?{' '}
+              <LocalizedText text={"\n              Enter your email and password below to log into"} />{' '}
+              <br className='max-sm:hidden' /> <LocalizedText text={" your account. Don't have an\n              account?"} />{' '}
               <Link
                 to='/sign-up'
                 className='text-nowrap underline underline-offset-4 hover:text-primary'
               >
-                Sign Up
-              </Link>
+                <LocalizedText text={"\n                Sign Up\n              "} /></Link>
             </p>
           </div>
           <UserAuthForm />
           <p className='px-8 text-center text-sm text-muted-foreground'>
-            By clicking sign in, you agree to our{' '}
+            <LocalizedText text={"\n            By clicking sign in, you agree to our"} />{' '}
             <a
               href='/terms'
               className='underline underline-offset-4 hover:text-primary'
             >
-              Terms of Service
-            </a>{' '}
-            and{' '}
+              <LocalizedText text={"\n              Terms of Service\n            "} /></a>{' '}
+            <LocalizedText text={"\n            and"} />{' '}
             <a
               href='/privacy'
               className='underline underline-offset-4 hover:text-primary'
             >
-              Privacy Policy
-            </a>
-            .
-          </p>
+              <LocalizedText text={"\n              Privacy Policy\n            "} /></a>
+            <LocalizedText text={"\n            .\n          "} /></p>
         </div>
       </div>
 

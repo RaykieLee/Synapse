@@ -12,7 +12,7 @@
 
 ## API 测试分层
 
-在 `apps/api` 中默认只运行本地 SQLite/API 套件，不要求 Redis、浏览器或系统符号链接权限：
+在 `apps/api` 中默认只运行本地 SQLite/API 套件，不要求 Redis、浏览器或系统符号链接权限。外部环境要求通过测试文件中的 pytest marker 显式声明；改动测试文件名不会改变套件分层：
 
 ```powershell
 .venv\Scripts\python.exe -m pytest -q

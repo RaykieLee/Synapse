@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
+import { LocalizedText } from '@/components/localized-text'
 
 const formSchema = z
   .object({
@@ -75,7 +76,7 @@ export function SignUpForm({
           name='email'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel><LocalizedText text={"Email"} /></FormLabel>
               <FormControl>
                 <Input placeholder='name@example.com' {...field} />
               </FormControl>
@@ -88,7 +89,7 @@ export function SignUpForm({
           name='password'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <FormLabel><LocalizedText text={"Password"} /></FormLabel>
               <FormControl>
                 <PasswordInput placeholder='********' {...field} />
               </FormControl>
@@ -101,7 +102,7 @@ export function SignUpForm({
           name='confirmPassword'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Confirm Password</FormLabel>
+              <FormLabel><LocalizedText text={"Confirm Password"} /></FormLabel>
               <FormControl>
                 <PasswordInput placeholder='********' {...field} />
               </FormControl>
@@ -111,8 +112,7 @@ export function SignUpForm({
         />
         <Button className='mt-2' disabled={isLoading}>
           {isLoading ? <Loader2 className='animate-spin' /> : <UserPlus />}
-          Create Account
-        </Button>
+          <LocalizedText text={"\n          Create Account\n        "} /></Button>
 
         <div className='relative my-2'>
           <div className='absolute inset-0 flex items-center'>
@@ -120,8 +120,7 @@ export function SignUpForm({
           </div>
           <div className='relative flex justify-center text-xs uppercase'>
             <span className='bg-background px-2 text-muted-foreground'>
-              Or continue with
-            </span>
+              <LocalizedText text={"\n              Or continue with\n            "} /></span>
           </div>
         </div>
 
@@ -132,16 +131,14 @@ export function SignUpForm({
             type='button'
             disabled={isLoading}
           >
-            <IconGithub className='h-4 w-4' /> GitHub
-          </Button>
+            <IconGithub className='h-4 w-4' /> <LocalizedText text={" GitHub\n          "} /></Button>
           <Button
             variant='outline'
             className='w-full'
             type='button'
             disabled={isLoading}
           >
-            <IconFacebook className='h-4 w-4' /> Facebook
-          </Button>
+            <IconFacebook className='h-4 w-4' /> <LocalizedText text={" Facebook\n          "} /></Button>
         </div>
       </form>
     </Form>

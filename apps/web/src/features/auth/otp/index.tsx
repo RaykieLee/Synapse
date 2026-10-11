@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/card'
 import { AuthLayout } from '../auth-layout'
 import { OtpForm } from './components/otp-form'
+import { LocalizedText } from '@/components/localized-text'
 
 export function Otp() {
   return (
@@ -16,27 +17,22 @@ export function Otp() {
       <Card className='max-w-md gap-4'>
         <CardHeader>
           <CardTitle className='text-base tracking-tight'>
-            Two-factor Authentication
-          </CardTitle>
+            <LocalizedText text={"\n            Two-factor Authentication\n          "} /></CardTitle>
           <CardDescription>
-            Please enter the authentication code. <br /> We have sent the
-            authentication code to your email.
-          </CardDescription>
+            <LocalizedText text={"\n            Please enter the authentication code. "} /><br /> <LocalizedText text={" We have sent the\n            authentication code to your email.\n          "} /></CardDescription>
         </CardHeader>
         <CardContent>
           <OtpForm />
         </CardContent>
         <CardFooter>
           <p className='px-8 text-center text-sm text-muted-foreground'>
-            Haven't received it?{' '}
+            <LocalizedText text={"\n            Haven't received it?"} />{' '}
             <Link
               to='/sign-in'
               className='underline underline-offset-4 hover:text-primary'
             >
-              Resend a new code.
-            </Link>
-            .
-          </p>
+              <LocalizedText text={"\n              Resend a new code.\n            "} /></Link>
+            <LocalizedText text={"\n            .\n          "} /></p>
         </CardFooter>
       </Card>
     </AuthLayout>

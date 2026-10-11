@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { LocalizedText } from '@/components/localized-text'
 
 type TaskMultiDeleteDialogProps<TData> = {
   open: boolean
@@ -60,8 +61,8 @@ export function TasksMultiDeleteDialog<TData>({
             className='me-1 inline-block stroke-destructive'
             size={18}
           />{' '}
-          Delete {selectedRows.length}{' '}
-          {selectedRows.length > 1 ? 'tasks' : 'task'}
+          <LocalizedText text={"\n          Delete "} />{selectedRows.length}{' '}
+          {selectedRows.length > 1 ? <LocalizedText text={"tasks"} /> : <LocalizedText text={"task"} />}
         </span>
       }
       desc={
@@ -74,12 +75,11 @@ export function TasksMultiDeleteDialog<TData>({
           className='space-y-4'
         >
           <p className='mb-2'>
-            Are you sure you want to delete the selected tasks? <br />
-            This action cannot be undone.
-          </p>
+            <LocalizedText text={"\n            Are you sure you want to delete the selected tasks? "} /><br />
+            <LocalizedText text={"\n            This action cannot be undone.\n          "} /></p>
 
           <Label className='my-4 flex flex-col items-start gap-1.5'>
-            <span className=''>Confirm by typing "{CONFIRM_WORD}":</span>
+            <span className=''><LocalizedText text={"Confirm by typing \""} />{CONFIRM_WORD}<LocalizedText text={"\":"} /></span>
             <Input
               value={value}
               onChange={(e) => setValue(e.target.value)}
@@ -89,10 +89,9 @@ export function TasksMultiDeleteDialog<TData>({
           </Label>
 
           <Alert variant='destructive'>
-            <AlertTitle>Warning!</AlertTitle>
+            <AlertTitle><LocalizedText text={"Warning!"} /></AlertTitle>
             <AlertDescription>
-              Please be careful, this operation can not be rolled back.
-            </AlertDescription>
+              <LocalizedText text={"\n              Please be careful, this operation can not be rolled back.\n            "} /></AlertDescription>
           </Alert>
         </form>
       }
