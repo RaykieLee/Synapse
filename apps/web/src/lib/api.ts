@@ -2,6 +2,23 @@ import { useAuthStore } from '@/stores/auth-store'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api/v1').replace(/\/$/, '')
 
+export type ApiProblemFieldError = { field: string; code?: string; message?: string }
+
+function problemFieldErrors(value: unknown): ApiProblemFieldError[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const errors = value.flatMap((item): ApiProblemFieldError[] => {
+    if (!item || typeof item !== 'object') return []
+    const entry = item as Record<string, unknown>
+    if (typeof entry.field !== 'string') return []
+    return [{
+      field: entry.field,
+      ...(typeof entry.code === 'string' ? { code: entry.code } : {}),
+      ...(typeof entry.message === 'string' ? { message: entry.message } : {}),
+    }]
+  })
+  return errors.length ? errors : undefined
+}
+
 export type AuthUser = {
   user_id: string
   user_name: string
@@ -17,10 +34,12 @@ export type AuthUser = {
 export class ApiProblem extends Error {
   status: number
   code?: string
-  constructor(status: number, code?: string, detail?: string) {
+  errors?: ApiProblemFieldError[]
+  constructor(status: number, code?: string, detail?: string, errors?: ApiProblemFieldError[]) {
     super(detail || `Request failed (${status})`)
     this.status = status
     this.code = code
+    this.errors = errors
   }
 }
 
@@ -38,12 +57,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (response.status === 401) useAuthStore.getState().auth.reset()
   if (!response.ok) {
-    let problem: { code?: string; detail?: string | { code?: string; message?: string }; title?: string } = {}
+    let problem: { code?: string; detail?: string | { code?: string; message?: string }; title?: string; errors?: unknown } = {}
     try { problem = await response.json() } catch { /* non-JSON error */ }
     const detail = typeof problem.detail === 'string'
       ? problem.detail
       : problem.detail?.message || problem.detail?.code
-    throw new ApiProblem(response.status, problem.code || (typeof problem.detail === 'object' ? problem.detail?.code : undefined), detail || problem.title)
+    throw new ApiProblem(response.status, problem.code || (typeof problem.detail === 'object' ? problem.detail?.code : undefined), detail || problem.title, problemFieldErrors(problem.errors))
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
@@ -61,12 +80,12 @@ export async function apiBlob(path: string, init: RequestInit = {}): Promise<Blo
   }
   if (response.status === 401) useAuthStore.getState().auth.reset()
   if (!response.ok) {
-    let problem: { code?: string; detail?: string | { code?: string; message?: string }; title?: string } = {}
+    let problem: { code?: string; detail?: string | { code?: string; message?: string }; title?: string; errors?: unknown } = {}
     try { problem = await response.json() } catch { /* non-JSON error */ }
     const detail = typeof problem.detail === 'string'
       ? problem.detail
       : problem.detail?.message || problem.detail?.code
-    throw new ApiProblem(response.status, problem.code || (typeof problem.detail === 'object' ? problem.detail?.code : undefined), detail || problem.title)
+    throw new ApiProblem(response.status, problem.code || (typeof problem.detail === 'object' ? problem.detail?.code : undefined), detail || problem.title, problemFieldErrors(problem.errors))
   }
   return response.blob()
 }

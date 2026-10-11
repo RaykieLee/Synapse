@@ -2,6 +2,8 @@
 
 用户要求逐项实现 docs/integration-plan.md，包含租户和 Workspace，并对每项功能安排独立子智能体验证。
 
+长期任务接续提示词见 docs/long-term-migration-task-prompt.md；实际范围与状态仍以 integration-plan、tenancy-contract 和 development-status 为准。
+
 - 子智能体必须使用 gpt-6-luna，思考强度 medium；单次只承担一个功能或一个独立验证，规模不超过用户管理迁移。
 - 每个功能点增加独立 UX 子智能体，先审视信息架构、交互状态、权限提示、错误/部分成功、移动端和可访问性，再确定前端界面与后端契约；UX 方案记录在相应任务说明或验收材料中。实施与独立验收仍由不同子智能体承担。
 - 主智能体维护 docs/development-status.md、安排任务与接续。开发者不自行扩大任务范围或替代独立验收。

@@ -4,7 +4,7 @@ import type { Member } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import type { TenantRoleRecord } from '../types'
 import { LocalizedText } from '@/components/localized-text'
-import { useLocaleText } from '@/lib/i18n'
+import { useLocale, useLocaleText } from '@/lib/i18n'
 
 function errorText(error: unknown) {
   if (error instanceof ApiProblem)
@@ -33,6 +33,7 @@ export function MemberCustomRoleCell({
   canManage: boolean
   onError: (message: string) => void
 }) {
+  const locale = useLocale()
   const t = useLocaleText()
   const client = useQueryClient()
   const canAssign =
@@ -94,10 +95,16 @@ export function MemberCustomRoleCell({
     onError: (cause) => onError(errorText(cause)),
   })
 
-  if (!canAssign)
-    return <span className='text-xs text-muted-foreground'><LocalizedText text={"—"} /></span>
-  if (canManage && !canAssign) {
-    return <span className='text-xs text-muted-foreground'><LocalizedText text={"需成员角色"} /></span>
+  if (!canAssign) {
+    const reason =
+      member.status !== 'active'
+        ? locale === 'en'
+          ? 'Inactive members cannot be assigned a custom role.'
+          : '成员非 active 状态，无法分配自定义角色。'
+        : locale === 'en'
+          ? 'Tenant owner and admin identities are protected and cannot be assigned a custom role.'
+          : '租户 owner 和 admin 身份受保护，不能分配自定义角色。'
+    return <span className='text-xs text-muted-foreground'>{reason}</span>
   }
   if (assignment.isLoading || (canManage && rolesLoading)) {
     return <span className='text-xs text-muted-foreground'><LocalizedText text={"加载中…"} /></span>
@@ -119,7 +126,7 @@ export function MemberCustomRoleCell({
   if (!canManage) {
     return (
       <span className='text-xs'>
-        {assignment.data?.role?.role_name ?? '未分配'}
+        {assignment.data?.role?.role_name ?? t('未分配')}
       </span>
     )
   }
@@ -152,7 +159,8 @@ export function MemberCustomRoleCell({
           disabled={assign.isPending || revoke.isPending}
           onClick={() => revoke.mutate()}
         >
-          <LocalizedText text={"\n          撤销\n        "} /></button>
+          <LocalizedText text={'撤销'} />
+        </button>
       ) : null}
       {assign.isPending || revoke.isPending ? (
         <span className='text-xs text-muted-foreground'><LocalizedText text={"保存中…"} /></span>

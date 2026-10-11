@@ -631,6 +631,7 @@ export function TenantDetail() {
     'tenant',
     'roles',
     'active-assignment-options',
+    tenant.data?.membership_version ?? 0,
   ]
   const activeRoles = useQuery({
     queryKey: rolesKey,

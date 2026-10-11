@@ -1,13 +1,16 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
-import { formatMessage } from '@/lib/i18n'
-import { Link, useParams } from '@tanstack/react-router'
+import { getRouteApi, Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { useLocale } from '@/lib/i18n'
+
+const rolesRoute = getRouteApi('/_authenticated/tenants/$tenantId/roles')
 
 type TenantRole = {
   role_id: string
@@ -40,10 +43,10 @@ type MenuTree = { items: Menu[] }
 type RoleMenuSet = { tenant_id: string; role_id: string; menu_ids: string[] }
 
 const permissions = [
-  { key: 'tenant:read', label: '查看租户信息' },
-  { key: 'tenant:update', label: '修改租户设置' },
-  { key: 'tenant:archive', label: '归档租户' },
-  { key: 'tenant_member:manage', label: '管理租户成员' },
+  { key: 'tenant:read', label: '查看租户信息', labelEn: 'View tenant information' },
+  { key: 'tenant:update', label: '修改租户设置', labelEn: 'Update tenant settings' },
+  { key: 'tenant:archive', label: '归档租户', labelEn: 'Archive tenant' },
+  { key: 'tenant_member:manage', label: '管理租户成员', labelEn: 'Manage tenant members' },
 ] as const
 const panel = 'rounded-lg border bg-card p-5 shadow-sm'
 const input = 'h-10 rounded-md border bg-background px-3 text-sm'
@@ -53,19 +56,24 @@ const primary = 'rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground
 export function TenantRolesPage() {
   const actor = useAuthStore((state) => state.auth.user)
   const { tenantId } = useParams({ from: '/_authenticated/tenants/$tenantId/roles' })
+  const searchParams = rolesRoute.useSearch()
+  const navigate = rolesRoute.useNavigate()
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
-  const [page, setPage] = useState(1)
+  const isEnglish = useLocale() === 'en'
+  const search = searchParams.q ?? ''
+  const status = searchParams.status ?? ''
+  const page = searchParams.page ?? 1
   const [draft, setDraft] = useState<RoleDraft | null>(null)
   const [menuRole, setMenuRole] = useState<TenantRole | null>(null)
+  const [confirmRoleAction, setConfirmRoleAction] = useState<{ role: TenantRole; action: 'disable' | 'delete' } | null>(null)
   const [error, setError] = useState('')
 
   const tenantKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant']
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
   const normalizedSearch = search.trim()
-  const roleKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'roles', page, 20, normalizedSearch, status]
+  const membershipVersion = tenant.data?.membership_version ?? 0
+  const roleKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'roles', membershipVersion, page, 20, normalizedSearch, status]
   const roles = useQuery({
     queryKey: roleKey,
     enabled: canManage,
@@ -77,6 +85,7 @@ export function TenantRolesPage() {
     },
   })
   const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: tenantKey })
     await queryClient.invalidateQueries({ queryKey: ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'roles'] })
   }
   const save = useMutation({
@@ -91,20 +100,43 @@ export function TenantRolesPage() {
   })
   const remove = useMutation({
     mutationFn: (roleId: string) => api<void>(`/tenants/${tenantId}/roles/${roleId}`, { method: 'DELETE' }),
-    onSuccess: async () => { setError(''); await refresh() },
+    onSuccess: async (_result, roleId) => {
+      if (confirmRoleAction?.action === 'delete' && confirmRoleAction.role.role_id === roleId) setConfirmRoleAction(null)
+      setError('')
+      await refresh()
+    },
     onError: (cause) => setError(errorText(cause)),
   })
   const toggle = useMutation({
     mutationFn: ({ roleId, next }: { roleId: string; next: TenantRole['status'] }) => api<TenantRole>(`/tenants/${tenantId}/roles/${roleId}`, { method: 'PATCH', body: JSON.stringify({ status: next }) }),
-    onSuccess: async () => { setError(''); await refresh() },
+    onSuccess: async (updatedRole) => {
+      if (confirmRoleAction?.action === 'disable' && confirmRoleAction.role.role_id === updatedRole.role_id) setConfirmRoleAction(null)
+      setError('')
+      await refresh()
+    },
     onError: (cause) => setError(errorText(cause)),
   })
+  const setRoleFilters = useCallback((next: { q?: string; status?: '' | TenantRole['status']; page?: number }) => {
+    void navigate({
+      search: (previous) => ({
+        ...previous,
+        q: next.q ?? previous.q ?? '',
+        status: next.status === '' ? undefined : next.status ?? previous.status,
+        page: next.page ?? previous.page ?? 1,
+      }),
+      replace: true,
+    })
+  }, [navigate])
+  const clearFilters = () => setRoleFilters({ q: '', status: '', page: 1 })
+  const totalPages = Math.max(1, Math.ceil((roles.data?.total ?? 0) / 20))
+  useEffect(() => {
+    if (roles.data && page > totalPages) setRoleFilters({ page: totalPages })
+  }, [page, roles.data, setRoleFilters, totalPages])
 
   if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
   if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message={errorText(tenant.error)} /></main>
   if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message="仅租户所有者或管理员可以管理租户角色。" /></main>
 
-  const totalPages = Math.max(1, Math.ceil((roles.data?.total ?? 0) / 20))
   return <main className="space-y-5 p-6">
     <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"← 返回 "} />{tenant.data?.name}</Link>
     <header className="flex flex-wrap items-start justify-between gap-3">
@@ -120,22 +152,37 @@ export function TenantRolesPage() {
       onSave={() => save.mutate(draft)}
     />}
     {menuRole && <RoleMenuEditor
-      key={`${tenantId}:${menuRole.role_id}`}
+      key={`${tenantId}:${membershipVersion}:${menuRole.role_id}`}
       tenantId={tenantId}
       actorId={actor?.user_id ?? 'anonymous'}
+      membershipVersion={membershipVersion}
       role={menuRole}
       onCancel={() => setMenuRole(null)}
       onError={setError}
       onSaved={async () => { setMenuRole(null); setError(''); await refresh() }}
     />}
     <section className={`${panel} space-y-4`}>
-      <div className="flex flex-wrap gap-3">
-        <Input className={`${input} min-w-56 flex-1`} value={search} placeholder="搜索角色名称或标识" onChange={(event) => { setSearch(event.target.value); setPage(1) }} />
-        <LocalizedNativeSelect aria-label="角色状态筛选" className={input} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }}><option value=""><LocalizedText text={"全部状态"} /></option><option value="active"><LocalizedText text={"启用"} /></option><option value="disabled"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect>
+      <div className="flex flex-wrap items-center gap-3">
+        <Input className={`${input} min-w-56 flex-1`} maxLength={100} value={search} placeholder={isEnglish ? 'Search role name or key' : '搜索角色名称或标识'} onChange={(event) => setRoleFilters({ q: event.target.value, page: 1 })} />
+        <LocalizedNativeSelect aria-label={isEnglish ? 'Filter roles by status' : '角色状态筛选'} className={input} value={status} onChange={(event) => setRoleFilters({ status: event.target.value as '' | TenantRole['status'], page: 1 })}><option value="">{isEnglish ? 'All statuses' : '全部状态'}</option><option value="active">{isEnglish ? 'Active' : '启用'}</option><option value="disabled">{isEnglish ? 'Disabled' : '停用'}</option></LocalizedNativeSelect>
+        {(search || status) && <button type="button" className="text-sm underline" onClick={clearFilters}><LocalizedText text={"清除筛选"} /></button>}
       </div>
-      {roles.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载角色…"} /></p> : roles.isError ? <ErrorBox message={errorText(roles.error)} /> : roles.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"角色"} /></th><th className="p-3"><LocalizedText text={"权限标识"} /></th><th className="p-3"><LocalizedText text={"授权集合"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{roles.data.items.map((role) => <tr className="border-b align-top last:border-0" key={`${role.tenant_id}:${role.role_id}`}><td className="p-3"><span className="font-medium">{role.role_name}</span><span className="block text-xs text-muted-foreground"><LocalizedText text={"顺序 "} />{role.role_sort} <LocalizedText text={" · 租户 "} />{role.tenant_id}</span></td><td className="p-3"><code>{role.role_key}</code></td><td className="max-w-xs p-3 text-muted-foreground">{role.permissions.length ? role.permissions.map(permissionLabel).join('、') : <LocalizedText text={"无授权"} />}</td><td className="p-3">{role.status === 'active' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td><td className="space-x-3 whitespace-nowrap p-3"><button className="underline" onClick={() => { setError(''); setDraft(toDraft(role)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={role.status !== 'active'} onClick={() => { setError(''); setMenuRole(role) }}><LocalizedText text={"菜单授权"} /></button><button className="underline" disabled={toggle.isPending} onClick={() => toggle.mutate({ roleId: role.role_id, next: role.status === 'active' ? 'disabled' : 'active' })}>{role.status === 'active' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline" disabled={remove.isPending} onClick={() => { if (window.confirm(formatMessage('软删除角色“{name}”？', { name: role.role_name }))) remove.mutate(role.role_id) }}><LocalizedText text={"删除"} /></button></td></tr>)}</tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无租户角色"} /></p>}
-      <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground"><LocalizedText text={"共 "} />{roles.data?.total ?? 0} <LocalizedText text={" 个角色"} /></span><div className="flex items-center gap-2"><button className={button} disabled={page <= 1} onClick={() => setPage(page - 1)}><LocalizedText text={"上一页"} /></button><span>{page} <LocalizedText text={" / "} />{totalPages}</span><button className={button} disabled={page >= totalPages} onClick={() => setPage(page + 1)}><LocalizedText text={"下一页"} /></button></div></div>
+      {roles.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载角色…"} /></p> : roles.isError ? <ErrorBox message={errorText(roles.error)} /> : roles.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"角色"} /></th><th className="p-3"><LocalizedText text={"权限标识"} /></th><th className="p-3"><LocalizedText text={"授权集合"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{roles.data.items.map((role) => <tr className="border-b align-top last:border-0" key={`${role.tenant_id}:${role.role_id}`}><td className="p-3"><span className="font-medium">{role.role_name}</span><span className="block text-xs text-muted-foreground"><LocalizedText text={"顺序 "} />{role.role_sort} <LocalizedText text={" · 租户 "} />{role.tenant_id}</span></td><td className="p-3"><code>{role.role_key}</code></td><td className="max-w-xs p-3 text-muted-foreground">{role.permissions.length ? role.permissions.map((permission) => permissionLabel(permission, isEnglish)).join(isEnglish ? ', ' : '、') : <LocalizedText text={"无授权"} />}</td><td className="p-3">{role.status === 'active' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td><td className="space-x-3 whitespace-nowrap p-3"><button className="underline" onClick={() => { setError(''); setDraft(toDraft(role)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={role.status !== 'active'} onClick={() => { setError(''); setMenuRole(role) }}><LocalizedText text={"菜单授权"} /></button><button className="underline" disabled={toggle.isPending || remove.isPending} onClick={() => role.status === 'active' ? setConfirmRoleAction({ role, action: 'disable' }) : toggle.mutate({ roleId: role.role_id, next: 'active' })}>{role.status === 'active' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline" disabled={remove.isPending || toggle.isPending} onClick={() => setConfirmRoleAction({ role, action: 'delete' })}><LocalizedText text={"删除"} /></button></td></tr>)}</tbody></table></div> : <div className="space-y-2 py-8 text-center text-sm text-muted-foreground"><p><LocalizedText text={search || status ? "没有符合筛选条件的角色。" : "暂无租户角色"} /></p>{(search || status) && <button type="button" className="underline" onClick={clearFilters}><LocalizedText text={"清除筛选"} /></button>}</div>}
+      <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground"><LocalizedText text={"共 "} />{roles.data?.total ?? 0} <LocalizedText text={" 个角色"} /></span><div className="flex items-center gap-2"><button className={button} disabled={page <= 1} onClick={() => setRoleFilters({ page: page - 1 })}><LocalizedText text={"上一页"} /></button><span>{page} <LocalizedText text={" / "} />{totalPages}</span><button className={button} disabled={page >= totalPages} onClick={() => setRoleFilters({ page: page + 1 })}><LocalizedText text={"下一页"} /></button></div></div>
     </section>
+    <AlertDialog open={Boolean(confirmRoleAction)} onOpenChange={(open) => { if (!open && !remove.isPending && !toggle.isPending) setConfirmRoleAction(null) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{confirmRoleAction?.action === 'delete' ? <LocalizedText text={"软删除角色"} /> : <LocalizedText text={"停用角色"} />}{confirmRoleAction && `：${confirmRoleAction.role.role_name}`}</AlertDialogTitle>
+          <AlertDialogDescription>{confirmRoleAction?.action === 'delete' ? <LocalizedText text={"软删除后，该角色将不可再分配；分配给现有成员的该角色权限会立即失效。确定继续吗？"} /> : <LocalizedText text={"停用后，分配给现有成员的该角色权限会立即失效。确定继续吗？"} />}</AlertDialogDescription>
+        </AlertDialogHeader>
+        {error && <ErrorBox message={error} />}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={remove.isPending || toggle.isPending}><LocalizedText text={"取消"} /></AlertDialogCancel>
+          <AlertDialogAction disabled={!confirmRoleAction || remove.isPending || toggle.isPending} onClick={(event) => { event.preventDefault(); if (!confirmRoleAction) return; setError(''); if (confirmRoleAction.action === 'delete') remove.mutate(confirmRoleAction.role.role_id); else toggle.mutate({ roleId: confirmRoleAction.role.role_id, next: 'disabled' }) }}>{remove.isPending || toggle.isPending ? <LocalizedText text={"处理中…"} /> : confirmRoleAction?.action === 'delete' ? <LocalizedText text={"确认软删除"} /> : <LocalizedText text={"确认停用"} />}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </main>
 }
 
@@ -153,6 +200,7 @@ function RoleEditor({ draft, pending, onChange, onCancel, onSave }: {
   onCancel: () => void
   onSave: () => void
 }) {
+  const isEnglish = useLocale() === 'en'
   const set = <K extends keyof RoleDraft>(key: K, value: RoleDraft[K]) => onChange({ ...draft, [key]: value })
   function togglePermission(permission: string) {
     const selected = new Set(draft.permissions)
@@ -163,28 +211,33 @@ function RoleEditor({ draft, pending, onChange, onCancel, onSave }: {
   return <form className={`${panel} space-y-4`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
     <h2 className="font-semibold">{draft.role_id ? <LocalizedText text={"编辑角色"} /> : <LocalizedText text={"创建角色"} />}</h2>
     <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-sm"><span><LocalizedText text={"角色名称"} /></span><Input autoFocus required maxLength={30} className={`${input} w-full`} value={draft.role_name} onChange={(event) => set('role_name', event.target.value)} /></label><label className="space-y-1 text-sm"><span><LocalizedText text={"角色标识"} /></span><Input required maxLength={64} pattern="[a-z][a-z0-9_]{0,63}" className={`${input} w-full`} value={draft.role_key} onChange={(event) => set('role_key', event.target.value)} /><span className="block text-xs text-muted-foreground"><LocalizedText text={"小写字母开头，仅含小写字母、数字和下划线"} /></span></label><label className="space-y-1 text-sm"><span><LocalizedText text={"排序"} /></span><Input type="number" min={0} className={`${input} w-full`} value={draft.role_sort} onChange={(event) => set('role_sort', Number(event.target.value))} /></label><label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={`${input} w-full`} value={draft.status} onChange={(event) => set('status', event.target.value as RolePayload['status'])}><option value="active"><LocalizedText text={"启用"} /></option><option value="disabled"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label></div>
-    <fieldset><legend className="mb-2 text-sm font-medium"><LocalizedText text={"租户授权集合"} /></legend><div className="grid gap-2 sm:grid-cols-2">{permissions.map((permission) => <label key={permission.key} className="flex items-center gap-2 rounded-md border p-3 text-sm"><Input type="checkbox" checked={draft.permissions.includes(permission.key)} onChange={() => togglePermission(permission.key)} /><span>{permission.label}</span><code className="ml-auto text-xs text-muted-foreground">{permission.key}</code></label>)}</div></fieldset>
+    <fieldset><legend className="mb-2 text-sm font-medium"><LocalizedText text={"租户授权集合"} /></legend><div className="grid gap-2 sm:grid-cols-2">{permissions.map((permission) => <label key={permission.key} className="flex items-center gap-2 rounded-md border p-3 text-sm"><Input type="checkbox" checked={draft.permissions.includes(permission.key)} onChange={() => togglePermission(permission.key)} /><span>{isEnglish ? permission.labelEn : permission.label}</span><code className="ml-auto text-xs text-muted-foreground">{permission.key}</code></label>)}</div></fieldset>
     <label className="block space-y-1 text-sm"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={3} className="w-full rounded-md border bg-background p-3" value={draft.remark ?? ''} onChange={(event) => set('remark', event.target.value)} /></label>
     <div className="flex gap-2"><button className={primary} disabled={pending || !draft.role_name.trim() || !draft.role_key.trim()}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存角色"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
   </form>
 }
 
-function permissionLabel(key: string) {
-  return permissions.find((permission) => permission.key === key)?.label ?? key
+function permissionLabel(key: string, isEnglish: boolean) {
+  const permission = permissions.find((item) => item.key === key)
+  return permission ? (isEnglish ? permission.labelEn : permission.label) : key
 }
 
-function RoleMenuEditor({ tenantId, actorId, role, onCancel, onError, onSaved }: {
+function RoleMenuEditor({ tenantId, actorId, membershipVersion, role, onCancel, onError, onSaved }: {
   tenantId: string
   actorId: string
+  membershipVersion: number
   role: TenantRole
   onCancel: () => void
   onError: (message: string) => void
   onSaved: () => Promise<void>
 }) {
   const client = useQueryClient()
+  const isEnglish = useLocale() === 'en'
   const [selected, setSelected] = useState<string[] | null>(null)
-  const menuTreeKey = ['synapse', actorId, tenantId, 'tenant', 'menus', 'tree'] as const
-  const roleMenusKey = ['synapse', actorId, tenantId, 'tenant', 'roles', role.role_id, 'menus'] as const
+  const [confirmPrune, setConfirmPrune] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const menuTreeKey = ['synapse', actorId, tenantId, 'tenant', 'menus', membershipVersion, 'tree'] as const
+  const roleMenusKey = ['synapse', actorId, tenantId, 'tenant', 'roles', membershipVersion, role.role_id, 'menus'] as const
   const menuTree = useQuery({ queryKey: menuTreeKey, queryFn: () => api<MenuTree>(`/tenants/${tenantId}/menus/tree?include_disabled=true`) })
   const roleMenus = useQuery({ queryKey: roleMenusKey, queryFn: () => api<RoleMenuSet>(`/tenants/${tenantId}/roles/${role.role_id}/menus`) })
   const allMenus = flattenTenantMenus(menuTree.data?.items ?? [])
@@ -196,44 +249,77 @@ function RoleMenuEditor({ tenantId, actorId, role, onCancel, onError, onSaved }:
       body: JSON.stringify({ menu_ids: [...menuIds].sort((left, right) => Number(left) - Number(right)) }),
     }),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: roleMenusKey })
+      setConfirmPrune(false)
+      setSaveError('')
       await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'personal', 'tenant'] })
+      await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'tenant', 'menus'] })
+      await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'tenant', 'roles'] })
       onError('')
       await onSaved()
     },
-    onError: (cause) => onError(errorText(cause)),
+    onError: (cause) => {
+      const message = errorText(cause)
+      setSaveError(message)
+      onError(message)
+    },
   })
   const menuById = new Map(allMenus.map((menu) => [menu.menu_id, menu]))
   const historical = (roleMenus.data?.menu_ids ?? []).filter((menuId) => menuById.get(menuId)?.status !== '0')
+  const saveMenuGrants = () => {
+    setSaveError('')
+    onError('')
+    if (historical.length > 0) setConfirmPrune(true)
+    else save.mutate(selectedIds)
+  }
   const toggleMenu = (menuId: string, checked: boolean) => {
     setSelected(checked ? [...new Set([...selectedIds, menuId])] : selectedIds.filter((id) => id !== menuId))
   }
-  return <section className={`${panel} space-y-4`}>
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">{role.role_name} <LocalizedText text={" · 菜单授权"} /></h2><p className="mt-1 text-sm text-muted-foreground"><LocalizedText text={"仅当前租户启用菜单可勾选。停用或已删除的历史授权仅供查看；保存时会从授权集合中移除。"} /></p></div><button type="button" className={button} onClick={onCancel}><LocalizedText text={"关闭"} /></button></header>
+  return <>
+    <section className={`${panel} space-y-4`}>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">{role.role_name} <LocalizedText text={" · 菜单授权"} /></h2><p className="mt-1 text-sm text-muted-foreground">{isEnglish ? 'Only enabled menus in this tenant can be selected. Disabled or deleted historical grants are view-only and will be removed when saved.' : '仅当前租户启用菜单可勾选。停用或已删除的历史授权仅供查看；保存时会从授权集合中移除。'}</p></div><button type="button" className={button} onClick={onCancel}><LocalizedText text={"关闭"} /></button></header>
     {menuTree.isLoading || roleMenus.isLoading ? <p className="py-5 text-sm text-muted-foreground"><LocalizedText text={"正在加载菜单授权…"} /></p> : menuTree.isError ? <ErrorBox message={errorText(menuTree.error)} /> : roleMenus.isError ? <ErrorBox message={errorText(roleMenus.error)} /> : <>
-      {historical.length > 0 && <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3"><h3 className="text-sm font-medium"><LocalizedText text={"不可重新勾选的历史授权"} /></h3><ul className="space-y-1 text-sm text-muted-foreground">{historical.map((menuId) => {
+      {historical.length > 0 && <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3"><h3 className="text-sm font-medium">{isEnglish ? 'Historical grants that cannot be selected again' : '不可重新勾选的历史授权'}</h3><ul className="space-y-1 text-sm text-muted-foreground">{historical.map((menuId) => {
         const menu = menuById.get(menuId)
-        return <li key={menuId}>{menu ? `${menu.menu_name}（已停用，ID ${menuId}）` : `已删除菜单（ID ${menuId}）`}</li>
+        return <li key={menuId}>{menu ? (isEnglish ? `${menu.menu_name} (disabled, ID ${menuId})` : `${menu.menu_name}（已停用，ID ${menuId}）`) : isEnglish ? `Deleted menu (ID ${menuId})` : `已删除菜单（ID ${menuId}）`}</li>
       })}</ul></div>}
-      {menuTree.data?.items.length ? <div className="max-h-[55vh] space-y-2 overflow-auto rounded-md border p-3">{menuTree.data.items.map((menu) => <MenuGrantNode key={menu.menu_id} menu={menu} depth={0} selected={selectedIds} onToggle={toggleMenu} />)}</div> : <p className="rounded-md border p-5 text-center text-sm text-muted-foreground"><LocalizedText text={"当前租户没有可配置菜单"} /></p>}
-      <div className="flex flex-wrap items-center gap-3"><button type="button" className={primary} disabled={!menuTree.data || !roleMenus.data || save.isPending} onClick={() => save.mutate(selectedIds)}>{save.isPending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存授权"} />}</button><span className="text-sm text-muted-foreground"><LocalizedText text={"已选 "} />{selectedIds.length} <LocalizedText text={" 个启用菜单"} /></span></div>
+      {menuTree.data?.items.length ? <div className="max-h-[55vh] space-y-2 overflow-auto rounded-md border p-3">{menuTree.data.items.map((menu) => <MenuGrantNode key={menu.menu_id} menu={menu} depth={0} selected={selectedIds} onToggle={toggleMenu} isEnglish={isEnglish} />)}</div> : <p className="rounded-md border p-5 text-center text-sm text-muted-foreground"><LocalizedText text={"当前租户没有可配置菜单"} /></p>}
+      <div className="flex flex-wrap items-center gap-3"><button type="button" className={primary} disabled={!menuTree.data || !roleMenus.data || save.isPending} onClick={saveMenuGrants}>{save.isPending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存授权"} />}</button><span className="text-sm text-muted-foreground"><LocalizedText text={"已选 "} />{selectedIds.length} <LocalizedText text={" 个启用菜单"} /></span></div>
     </>}
-  </section>
+    </section>
+    <AlertDialog open={confirmPrune} onOpenChange={(open) => { if (!save.isPending) setConfirmPrune(open) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{isEnglish ? 'Confirm removal of historical menu grants' : '确认移除历史菜单授权'}</AlertDialogTitle>
+          <AlertDialogDescription>{isEnglish ? 'Saving will remove the following grants for disabled or deleted menus from this role. They will not be restored automatically.' : '保存后，以下已停用或已删除菜单的历史授权将从该角色授权集合中移除，之后不会自动恢复。'}</AlertDialogDescription>
+        </AlertDialogHeader>
+        {saveError && <ErrorBox message={saveError} />}
+        <ul className="max-h-40 space-y-1 overflow-auto rounded-md border p-3 text-sm">{historical.map((menuId) => {
+          const menu = menuById.get(menuId)
+          return <li key={menuId}>{menu ? (isEnglish ? `${menu.menu_name} (disabled)` : `${menu.menu_name}（已停用）`) : isEnglish ? `Deleted menu (ID ${menuId})` : `已删除菜单（ID ${menuId}）`}</li>
+        })}</ul>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={save.isPending}><LocalizedText text={"返回检查"} /></AlertDialogCancel>
+          <AlertDialogAction disabled={save.isPending} onClick={(event) => { event.preventDefault(); setSaveError(''); onError(''); save.mutate(selectedIds) }}>{save.isPending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"确认移除并保存"} />}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
 }
 
-function MenuGrantNode({ menu, depth, selected, onToggle }: {
+function MenuGrantNode({ menu, depth, selected, onToggle, isEnglish }: {
   menu: Menu
   depth: number
   selected: string[]
   onToggle: (menuId: string, checked: boolean) => void
+  isEnglish: boolean
 }) {
   const enabled = menu.status === '0'
   return <div>
     <label className={`flex items-center gap-2 rounded-md border p-2 text-sm ${enabled ? '' : 'text-muted-foreground opacity-70'}`} style={{ marginLeft: `${depth * 1.25}rem` }}>
       <Input type="checkbox" disabled={!enabled} checked={enabled && selected.includes(menu.menu_id)} onChange={(event) => onToggle(menu.menu_id, event.target.checked)} />
-      <span>{menu.menu_name}</span><span className="text-xs text-muted-foreground">{menu.menu_type === 'M' ? <LocalizedText text={"目录"} /> : menu.menu_type === 'C' ? <LocalizedText text={"页面"} /> : <LocalizedText text={"操作"} />}{enabled ? <LocalizedText text={""} /> : <LocalizedText text={" · 已停用"} />}</span>{menu.path && <code className="ml-auto text-xs text-muted-foreground">{menu.path}</code>}
+      <span>{menu.menu_name}</span><span className="text-xs text-muted-foreground">{menu.menu_type === 'M' ? (isEnglish ? 'Directory' : '目录') : menu.menu_type === 'C' ? (isEnglish ? 'Page' : '页面') : (isEnglish ? 'Action' : '操作')}{enabled ? '' : isEnglish ? ' · Disabled' : ' · 已停用'}</span>{menu.path && <code className="ml-auto text-xs text-muted-foreground">{menu.path}</code>}
     </label>
-    {menu.children.map((child) => <MenuGrantNode key={child.menu_id} menu={child} depth={depth + 1} selected={selected} onToggle={onToggle} />)}
+    {menu.children.map((child) => <MenuGrantNode key={child.menu_id} menu={child} depth={depth + 1} selected={selected} onToggle={onToggle} isEnglish={isEnglish} />)}
   </div>
 }
 

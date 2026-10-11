@@ -184,24 +184,30 @@ def list_roles(
     context: TenantContext = Depends(require_tenant_permission("tenant_member:manage")),
     db: Session = Depends(get_db),
 ):
-    statement = tenant_scope(
-        select(TenantRole).where(TenantRole.del_flag.is_(False)), TenantRole, context,
-    )
+    filters = [TenantRole.del_flag.is_(False)]
     if search and search.strip():
-        term = f"%{search.strip()}%"
-        statement = statement.where(TenantRole.role_name.ilike(term) | TenantRole.role_key.ilike(term))
+        escaped_search = (
+            search.strip()
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        term = f"%{escaped_search}%"
+        filters.append(
+            TenantRole.role_name.ilike(term, escape="\\")
+            | TenantRole.role_key.ilike(term, escape="\\")
+        )
     if status:
-        statement = statement.where(TenantRole.status == status)
+        filters.append(TenantRole.status == status)
+
+    statement = tenant_scope(
+        select(TenantRole).where(*filters), TenantRole, context,
+    )
     count_statement = tenant_scope(
-        select(func.count(TenantRole.role_id)).where(TenantRole.del_flag.is_(False)),
+        select(func.count(TenantRole.role_id)).where(*filters),
         TenantRole,
         context,
     )
-    if search and search.strip():
-        term = f"%{search.strip()}%"
-        count_statement = count_statement.where(TenantRole.role_name.ilike(term) | TenantRole.role_key.ilike(term))
-    if status:
-        count_statement = count_statement.where(TenantRole.status == status)
     total = db.scalar(count_statement) or 0
     roles = db.scalars(statement.order_by(TenantRole.role_sort, TenantRole.role_id)
                        .offset((page - 1) * page_size).limit(page_size)).all()

@@ -66,13 +66,19 @@ class UserService:
     ) -> PageResult[UserResult]:
         query = select(User).where(User.del_flag.is_(False))
         if search and search.strip():
-            term = f"%{search.strip()}%"
+            escaped = (
+                search.strip()
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
+            term = f"%{escaped}%"
             query = query.where(
                 or_(
-                    User.user_name.ilike(term),
-                    User.nick_name.ilike(term),
-                    User.email.ilike(term),
-                    User.phonenumber.ilike(term),
+                    User.user_name.ilike(term, escape="\\"),
+                    User.nick_name.ilike(term, escape="\\"),
+                    User.email.ilike(term, escape="\\"),
+                    User.phonenumber.ilike(term, escape="\\"),
                 )
             )
         total = self.db.scalar(select(func.count()).select_from(query.subquery())) or 0
