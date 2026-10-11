@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRouterState } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Bell,
   Building2,
@@ -9,6 +9,7 @@ import {
   FolderTree,
   Home,
   LayoutDashboard,
+  Layers3,
   Monitor,
   Palette,
   Settings,
@@ -26,7 +27,12 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
 import {
@@ -251,7 +257,7 @@ export function AppSidebar() {
         title: translate(group.title, locale),
         items: group.items.filter(
           (item) =>
-            item.title !== 'Users' ||
+            item.title !== '全局用户' ||
             authUser?.platform_role === 'platform_admin'
         ).map((item) => localizeStaticItem(item, locale)),
       }))
@@ -265,6 +271,31 @@ export function AppSidebar() {
         {navGroups.map((props) => (
           <NavGroup key={props.title} {...props} />
         ))}
+        {!inWorkspaceRoute &&
+          (directory.tenantQuery.isError ||
+            directory.workspaceQuery.isError ||
+            (directory.tenantQuery.isSuccess &&
+              directory.workspaceQuery.isSuccess &&
+              directory.workspaces.length === 0)) && (
+            <SidebarGroup>
+              <SidebarGroupLabel>{translate('工作空间', locale)}</SidebarGroupLabel>
+              <div className='px-2 pb-2 text-xs leading-relaxed text-muted-foreground'>
+                {directory.tenantQuery.isError || directory.workspaceQuery.isError
+                  ? translate('无法加载租户或工作空间目录。', locale)
+                  : translate('当前账号还没有可访问的工作空间。可以先查看租户成员资格，或通过上方选择器创建有权限的空间。', locale)}
+              </div>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link to='/tenants'>
+                      <Layers3 />
+                      <span>{translate('前往租户管理', locale)}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          )}
       </SidebarContent>
       <SidebarFooter>
         <NavUser

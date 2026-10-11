@@ -559,7 +559,15 @@ class WorkspaceSessionStorage:
 
     async def get_session(self, user_id: str, agent_id: str, session_id: str) -> Any:
         scoped = self._scoped_id(session_id)
-        return await self._storage.get_session(user_id, agent_id, scoped) if scoped else None
+        if scoped is None:
+            return None
+        record = await self._storage.get_session(user_id, agent_id, scoped)
+        # Some upstream storage backends look up sessions by ID and owner only.
+        # The requested agent must match the stored binding before callers read
+        # messages, lock status, or any other session-derived data.
+        if record is None or record.id != scoped or record.agent_id != agent_id:
+            return None
+        return record
 
     async def list_sessions(self, user_id: str, agent_id: str) -> list[Any]:
         prefix = self._prefix()

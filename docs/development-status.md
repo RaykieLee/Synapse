@@ -8,6 +8,10 @@
 
 ## 功能任务
 
+> 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已提交（`51a6c61`）；构建/类型检查不代表这些增量已独立验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本次增量状态为**代码已写，待独立验收**。国际化为**代码已写，待完整覆盖与独立验收**。F24b 的 agent/session 绑定校验修复**代码已写，待独立验收**；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
+
+> 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停与正式导航方案已记入上述差距清单；F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)。这三项的代码已写且当前 TypeScript 编译通过，均**待独立验收**；设计与编译结论不能替代功能验收。
+
 | ID | 单一任务 | 状态 | 开发/设计智能体 | 独立验证与证据 |
 | --- | --- | --- | --- | --- |
 | F01 | shadcn-admin 前端基础与品牌 | 基础通过 | web_foundation | verification/F01-web-foundation.md：构建、品牌、桌面/移动浏览器渲染通过；仍含待替换模板业务 |
@@ -25,6 +29,7 @@
 | F07 | 作用域权限与资源隔离基础 | 通过 | verify_tenant_backend | verification/F07-resource-scopes.md：1 passed；多租户/空间/私有scope、撤权、归档及权限边界独立复验 |
 | F08 | 真实登录与个人中心前端 | 通过 | web_auth | verification/F08-web-auth.md；默认代理连接真实API，构建和13项浏览器流程通过 |
 | F09 | 租户管理前端 | 通过 | tenant_frontend | verification/F09-tenant-frontend.md；真实API浏览器覆盖平台管理、成员权限和跨页筛选 |
+| F09b | 租户列表批量启用/停用 | UX 已设计，代码已写，静态检查通过，待独立验收 | tenant_batch_ux；tenant_batch_impl | 复用单租户 PATCH；逐项结果、部分失败和权限需真实 API/浏览器复验 |
 | F10 | Workspace 管理与左上角切换 | 通过 | workspace_backend | verification/F10-workspace-frontend.md；构建及真实API浏览器流程通过，含跨租户回退与撤权后缓存清理 |
 | F11 | 全局用户管理后端迁移 | 通过 | agent_embedding_design | verification/F11-user-management-api.md；1 passed，权限、CRUD、JWT撤销、bcrypt兼容与软删独立复验 |
 | F11a | 全局用户管理前端迁移 | 通过 | workspace_backend | verification/F11a-user-management-frontend.md：build、真实API浏览器CRUD及权限通过；旧Clerk演示Faker清理另列F43 |
@@ -58,7 +63,7 @@
 | F19a | 系统任务执行记录后端 | 通过 | verify_tenant_backend | verification/F19a-scheduled-task-runs.md：1 passed，0015迁移、租户API权限/脱敏与复合FK通过 |
 | F19b | 系统任务执行记录前端 | 通过 | verify_tenant_backend | verification/F19b-task-runs-frontend.md：build、真实API浏览器分页筛选/脱敏/权限通过 |
 | F19c1 | 系统任务手工触发API | 待独立验收 | workspace_backend | owner/admin手工trigger与run持久化已实现；待独立验证 |
-| F19c2 | 系统任务手工触发前端 | 待开始 | — | — |
+| F19c2 | 系统任务手工触发前端 | 代码已写，静态检查通过，待独立验收 | manual_task_ux；manual_task_impl | ux/F19c2-manual-task-trigger.md；同步无幂等接口的超时重试风险待产品决策 |
 | F20b | AgentScope 应用内嵌与生命周期 | 通过 | agent_embedding_design | verification/F20b-agentscope-embed.md：真实依赖、Redis、同端口JWT与父子lifespan独立验收通过；F21隔离另列 |
 | F20a | AgentScope 内嵌技术契约 | 静态核验完成 | agent_embedding_design | verification/F20a-embedding-contract.md；运行兼容与隔离仍待F20/F21 |
 | F21a | AgentScope 租户/Workspace身份网关 | 通过 | agent_embedding_design | verification/F21a-agentscope-gateway.md：真实Redis/同进程下105入口鉴权、撤权/归档与SSE/WS短路通过 |
@@ -75,7 +80,7 @@
 | F21c | AgentScope SSE流鉴权上下文 | 通过（模型推理待验） | agent_embedding_design | verification/F21c-sse-auth-context.md：真实Redis SSE事件、上下文、断连与越权拒绝1 passed；无provider推理 |
 | F24a | 会话管理前端融合 | 通过 | agent_embedding_design | verification/F24a-session-management-frontend.md：build、真实API/Redis浏览器CRUD、跨空间和只读状态通过 |
 | F24c | 会话状态agent_id一致性 | 通过 | verify_tenant_backend | verification/F24c-session-status-agent-binding.md：真实Redis网关错配/跨scope 404且不探测run-lock |
-| F24b | 基础聊天消息前端融合 | 验收未通过，待修复 | agent_embedding_design | verification/F24b-chat-messages-frontend.md：真实API浏览器核心流程通过；前端构建失败，且跨Workspace的agent_id查询可返回当前会话消息 |
+| F24b | 基础聊天消息前端融合 | 隔离修复代码已写、静态检查待核，待独立复验 | agent_embedding_design | verification/F24b-chat-messages-frontend.md：原验收发现跨 Workspace 的 agent_id 查询泄漏；适配器 `get_session` 已加入 agent 绑定校验，不能以代码审查代替真实请求复验 |
 | F25a | SSE文本增量展示 | 验收未通过，待修复 | agent_embedding_design | verification/F25a-sse-text-frontend.md：真实SSE浏览器流程通过；前端构建被未定义controller阻断，真实模型推理待验 |
 | F25b1 | 聊天生成中断 | 待独立验收 | agent_embedding_design | 当前scope会话interrupt与状态刷新完成；待独立浏览器验证 |
 | F25b2 | 工具执行事件展示 | 待独立验收 | agent_embedding_design | SSE/历史工具时间线、脱敏摘要与结果折叠完成；待独立浏览器验证 |
@@ -98,7 +103,7 @@
 | F40 | 人脸账号绑定与登录 | 待开始 | — | — |
 | F41 | 本地启动与持久化部署配置 | 待开始 | — | — |
 | F42 | 初始化数据与旧数据迁移工具 | 待开始 | — | — |
-| F43 | 范围清理与来源许可证记录 | 待开始 | — | — |
+| F43 | 范围清理与来源许可证记录 | 正式导航和根首页已改，旧演示路由及许可证范围待处理、待独立验收 | formal_nav_impl | 租户/用户/个人设置与 Workspace 动态菜单保留；演示路由仍需逐项审查 |
 | F44 | 首页真实业务概览替换模板指标 | 待开始 | — | — |
 
 ## 最终独立验收任务（每行独立委派）

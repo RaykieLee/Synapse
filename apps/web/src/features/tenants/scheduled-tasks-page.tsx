@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
-import { formatMessage } from '@/lib/i18n'
+import { formatMessage, getLocale, useLocale } from '@/lib/i18n'
 import { Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
 type Task = {
   task_id: string; tenant_id: string; task_name: string; description: string | null; execution_target: string
@@ -39,10 +40,20 @@ const unitLabels: Record<TaskDraft['interval_unit'], string> = { seconds: '秒',
 export function TenantScheduledTasksPage() {
   const actor = useAuthStore((state) => state.auth.user)
   const { tenantId } = useParams({ from: '/_authenticated/tenants/$tenantId/scheduled-tasks' })
-  const client = useQueryClient()
   const actorId = actor?.user_id ?? 'anonymous'
+  const contextKey = `${actorId}:${tenantId}`
+  const requestContext = useRef({ key: contextKey, generation: 0 })
+  if (requestContext.current.key !== contextKey) {
+    requestContext.current = { key: contextKey, generation: requestContext.current.generation + 1 }
+  }
+  const client = useQueryClient()
+  const isEnglish = useLocale() === 'en'
   const [draft, setDraft] = useState<TaskDraft | null>(null)
   const [historyTask, setHistoryTask] = useState<Task | null>(null)
+  const [runConfirmation, setRunConfirmation] = useState<Task | null>(null)
+  const [manualRun, setManualRun] = useState<{ tenantId: string; task: Task; run: TaskRun } | null>(null)
+  const [manualRunError, setManualRunError] = useState('')
+  const [manualRunPendingId, setManualRunPendingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [targetFilter, setTargetFilter] = useState('')
@@ -53,6 +64,10 @@ export function TenantScheduledTasksPage() {
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
   const active = tenant.data?.status === 'active'
+  useEffect(() => {
+    setDraft(null); setHistoryTask(null); setRunConfirmation(null); setManualRun(null)
+    setManualRunError(''); setManualRunPendingId(null)
+  }, [actorId, tenantId])
   const params = new URLSearchParams({ page: String(page), page_size: '20' })
   if (search.trim()) params.set('task_name', search.trim())
   if (targetFilter) params.set('execution_target', targetFilter)
@@ -104,6 +119,29 @@ export function TenantScheduledTasksPage() {
     onSuccess: async () => { setError(''); await invalidate() },
     onError: (cause) => setError(errorText(cause)),
   })
+  const confirmManualRun = async () => {
+    if (!runConfirmation || manualRunPendingId) return
+    const task = runConfirmation
+    const requestTenantId = tenantId
+    const requestActorId = actorId
+    const requestGeneration = requestContext.current.generation
+    setManualRunPendingId(task.task_id); setManualRunError(''); setManualRun(null); setRunConfirmation(null)
+    try {
+      const run = await api<TaskRun>(`/tenants/${requestTenantId}/scheduled-tasks/${task.task_id}/runs`, { method: 'POST' })
+      if (requestGeneration !== requestContext.current.generation || requestContext.current.key !== `${requestActorId}:${requestTenantId}`) return
+      setManualRun({ tenantId: requestTenantId, task, run })
+      setHistoryTask(task)
+      setManualRunPendingId(null)
+      await client.invalidateQueries({ queryKey: ['synapse', actorId, requestTenantId, 'tenant', 'scheduled-tasks'] })
+    } catch (cause) {
+      if (requestGeneration !== requestContext.current.generation || requestContext.current.key !== `${requestActorId}:${requestTenantId}`) return
+      setManualRunError(manualRunErrorText(cause))
+      setManualRunPendingId(null)
+      if (cause instanceof ApiProblem && cause.status === 409 && cause.code === 'TASK_UNAVAILABLE') {
+        await client.invalidateQueries({ queryKey: listKey })
+      }
+    }
+  }
 
   if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
   if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message={errorText(tenant.error)} /></main>
@@ -134,21 +172,40 @@ export function TenantScheduledTasksPage() {
           <td className="p-3"><code>{task.execution_target}</code>{target && <span className="mt-1 block text-xs text-muted-foreground">{target.name}</span>}</td>
           <td className="p-3">{task.schedule_type === 'cron' ? <><span className="font-mono">{task.cron_expression}</span><span className="block text-xs text-muted-foreground"><LocalizedText text={"Cron"} /></span></> : <>{task.interval_value} {unitLabels[task.interval_unit ?? 'minutes']}<span className="block text-xs text-muted-foreground"><LocalizedText text={"间隔"} /></span></>}</td>
           <td className="p-3">{task.timezone}</td><td className="p-3">{task.enabled ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td>
-          <td className="space-x-3 whitespace-nowrap p-3"><button className="underline" onClick={() => setHistoryTask(task)}><LocalizedText text={"执行记录"} /></button><button className="underline" disabled={!active || pending} onClick={() => { setError(''); setDraft(toDraft(task)) }}><LocalizedText text={"编辑"} /></button><button className="underline" disabled={!active || pending} onClick={() => toggle.mutate(task)}>{task.enabled ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline" disabled={!active || pending} onClick={() => { if (window.confirm(formatMessage('软删除任务“{name}”？', { name: task.task_name }))) remove.mutate(task.task_id) }}><LocalizedText text={"删除"} /></button></td>
+          <td className="space-x-3 whitespace-nowrap p-3"><button className="underline" onClick={() => setHistoryTask(task)}><LocalizedText text={"执行记录"} /></button><button className="underline" disabled={!active || !task.enabled || pending || Boolean(manualRunPendingId)} onClick={() => { setManualRunError(''); setRunConfirmation(task) }}><LocalizedText text={"立即运行"} /></button><button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => { setError(''); setDraft(toDraft(task)) }}><LocalizedText text={"编辑"} /></button><button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => toggle.mutate(task)}>{task.enabled ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => { if (window.confirm(formatMessage('软删除任务“{name}”？', { name: task.task_name }))) remove.mutate(task.task_id) }}><LocalizedText text={"删除"} /></button></td>
         </tr>
       })}</tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无任务定义"} /></p>}
       <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground"><LocalizedText text={"共 "} />{tasks.data?.total ?? 0} <LocalizedText text={" 项"} /></span><div className="flex gap-2"><button className={button} disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><LocalizedText text={"上一页"} /></button><span className="px-2 py-2 text-sm"><LocalizedText text={"第 "} />{page} <LocalizedText text={" 页"} /></span><button className={button} disabled={page * 20 >= (tasks.data?.total ?? 0)} onClick={() => setPage((value) => value + 1)}><LocalizedText text={"下一页"} /></button></div></div>
     </section>
-    {historyTask && <TaskRunsPanel key={`${tenantId}:${historyTask.task_id}`} tenantId={tenantId} actorId={actorId} task={historyTask} onClose={() => setHistoryTask(null)} />}
+    {historyTask && <TaskRunsPanel key={`${tenantId}:${historyTask.task_id}`} tenantId={tenantId} actorId={actorId} task={historyTask} initialSelectedRunId={manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''} onClose={() => setHistoryTask(null)} />}
+    {manualRun?.tenantId === tenantId && <p role="status" aria-live="polite" className="rounded-md border p-3 text-sm">{manualRun.run.status === 'succeeded' ? (isEnglish ? 'Manual run succeeded. The execution record is open.' : '手工运行成功，已打开执行记录。') : manualRun.run.status === 'failed' ? <>{isEnglish ? 'Manual run failed. The execution record is open. Error code: ' : '手工运行失败，已打开执行记录。错误码：'}{manualRun.run.error_code ?? '—'}</> : (isEnglish ? 'The run record was created; the task is still running.' : '已创建运行记录，任务仍在运行中。')}</p>}
+    {manualRunPendingId && <p role="status" aria-live="polite" className="rounded-md border p-3 text-sm">{isEnglish ? 'Task is running; waiting for the server to save its execution record…' : '正在运行任务，等待服务端写入执行记录…'}{` ${tasks.data?.items.find((task) => task.task_id === manualRunPendingId)?.task_name ?? ''}`}</p>}
+    {manualRunError && <ErrorBox message={manualRunError} />}
+    <AlertDialog open={Boolean(runConfirmation)} onOpenChange={(open) => { if (!open && !manualRunPendingId) setRunConfirmation(null) }}>
+      <AlertDialogContent className="max-h-[min(80vh,32rem)] overflow-y-auto">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{isEnglish ? 'Run task now' : '确认立即运行任务'}：{runConfirmation?.task_name}</AlertDialogTitle>
+          <AlertDialogDescription>{isEnglish ? 'This creates a new execution record immediately and does not change the schedule. Each confirmation starts a separate run. The page cannot cancel a run after it starts.' : '这会立即产生一条新的执行记录，不会修改任务计划。每次确认都会创建一次独立运行。任务开始后，无法通过此页面取消。'}</AlertDialogDescription>
+        </AlertDialogHeader>
+        {runConfirmation && <dl className="grid gap-2 text-sm sm:grid-cols-2"><DetailItem label="执行目标" value={runConfirmation.execution_target} /><DetailItem label="计划" value={runConfirmation.schedule_type === 'cron' ? `Cron · ${runConfirmation.cron_expression}` : `${runConfirmation.interval_value} ${unitLabels[runConfirmation.interval_unit ?? 'minutes']}`} /><DetailItem label="租户" value={tenant.data?.name ?? tenantId} /></dl>}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={Boolean(manualRunPendingId)}>{isEnglish ? 'Cancel' : '取消'}</AlertDialogCancel>
+          <AlertDialogAction disabled={!runConfirmation || Boolean(manualRunPendingId)} onClick={(event) => { event.preventDefault(); void confirmManualRun() }}>{isEnglish ? 'Run now' : '确认运行'}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </main>
 }
 
-function TaskRunsPanel({ tenantId, actorId, task, onClose }: { tenantId: string; actorId: string; task: Task; onClose: () => void }) {
+function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose }: { tenantId: string; actorId: string; task: Task; initialSelectedRunId?: string; onClose: () => void }) {
   const [status, setStatus] = useState('')
   const [startedFrom, setStartedFrom] = useState('')
   const [startedTo, setStartedTo] = useState('')
   const [page, setPage] = useState(1)
-  const [selectedRunId, setSelectedRunId] = useState('')
+  const [selectedRunId, setSelectedRunId] = useState(initialSelectedRunId ?? '')
+  useEffect(() => {
+    if (initialSelectedRunId) setSelectedRunId(initialSelectedRunId)
+  }, [initialSelectedRunId])
   const params = new URLSearchParams({ page: String(page), page_size: '20' })
   if (status) params.set('status', status)
   if (startedFrom) params.set('started_from', new Date(startedFrom).toISOString())
@@ -211,4 +268,20 @@ function ErrorBox({ message }: { message: string }) { return <div role="alert" c
 function errorText(error: unknown) {
   if (error instanceof ApiProblem) return `${error.message}${error.code ? `（${error.code}）` : ''}`
   return error instanceof Error ? error.message : '操作失败，请稍后重试。'
+}
+function manualRunErrorText(error: unknown) {
+  const english = getLocale() === 'en'
+  if (error instanceof ApiProblem) {
+    if (error.status === 409 && error.code === 'TASK_ALREADY_RUNNING') return english ? 'A scheduled run is already in progress. Check the run history again shortly.' : '该任务已有正在执行的计划运行，请稍后查看执行记录。'
+    if (error.status === 409 && error.code === 'TASK_UNAVAILABLE') return english ? 'This task cannot run now. It may be disabled or unavailable; refresh the task list.' : '任务当前不可运行，可能已停用或不可用；请刷新任务列表。'
+    if (error.status === 404) return english ? 'This task was not found or is no longer available. Refresh the list.' : '任务不存在或已不可用，请刷新列表。'
+    if (error.status === 403) return english ? 'You are not allowed to run this task in the current tenant.' : '你无权在当前租户运行此任务。'
+    if (error.status >= 500 || error.status === 408 || error.status === 504) return uncertainRunMessage(english)
+    if (error.status === 0) return english ? 'The server may have received the request. Check run history before deciding whether to retry, to avoid a duplicate run.' : '未能确认请求是否到达服务器。请先查看执行记录，再决定是否重试，避免重复运行。'
+  }
+  if (error instanceof TypeError) return uncertainRunMessage(english)
+  return errorText(error)
+}
+function uncertainRunMessage(english: boolean) {
+  return english ? 'The request outcome is uncertain. Check run history before deciding whether to retry, to avoid a duplicate run.' : '请求结果不确定。请先查看执行记录，再决定是否重试，避免重复运行。'
 }

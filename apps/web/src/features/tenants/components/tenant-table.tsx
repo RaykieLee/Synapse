@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CheckIcon, PlusCircledIcon } from '@radix-ui/react-icons'
 import { Link } from '@tanstack/react-router'
 import {
@@ -62,7 +62,7 @@ import {
 import { formatDateTime, tenantText } from '../types'
 import { EmptyState, TableSkeleton } from './shared'
 import { LocalizedText } from '@/components/localized-text'
-import { useLocaleText } from '@/lib/i18n'
+import { useLocale, useLocaleText } from '@/lib/i18n'
 
 const statusStyles: Record<TenantStatus, string> = {
   active:
@@ -86,20 +86,32 @@ function TenantFacetFilter<T extends string>({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   title: string
   value: T | ''
   options: { value: T; label: string }[]
   onChange: (value: T | '') => void
+  disabled?: boolean
 }) {
+  const [open, setOpen] = useState(false)
   const selected = options.find((option) => option.value === value)
+  useEffect(() => {
+    if (disabled) setOpen(false)
+  }, [disabled])
   return (
-    <Popover>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!disabled) setOpen(nextOpen)
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type='button'
           variant='outline'
           size='sm'
+          disabled={disabled}
           className='h-8 border-dashed'
         >
           <PlusCircledIcon className='size-4' />
@@ -124,6 +136,7 @@ function TenantFacetFilter<T extends string>({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
+                  disabled={disabled}
                   onSelect={() =>
                     onChange(value === option.value ? '' : option.value)
                   }
@@ -148,6 +161,7 @@ function TenantFacetFilter<T extends string>({
                 <CommandGroup>
                   <CommandItem
                     className='justify-center'
+                    disabled={disabled}
                     onSelect={() => onChange('')}
                   >
                     <LocalizedText text={"\n                    清除筛选\n                  "} /></CommandItem>
@@ -176,6 +190,7 @@ export function TenantToolbar({
   onAdvancedChange,
   onReset,
   isAdmin,
+  disabled = false,
 }: {
   query: string
   onQueryChange: (value: string) => void
@@ -191,6 +206,7 @@ export function TenantToolbar({
   onAdvancedChange: (values: AdvancedTenantFilters) => void
   onReset: () => void
   isAdmin: boolean
+  disabled?: boolean
 }) {
   const t = useLocaleText()
   const [dateOpen, setDateOpen] = useState(false)
@@ -209,6 +225,10 @@ export function TenantToolbar({
   ].filter(Boolean).length
   const hasFilters = Boolean(query || status || validity || advancedCount)
 
+  useEffect(() => {
+    if (disabled) setDateOpen(false)
+  }, [disabled])
+
   return (
     <div
       role='toolbar'
@@ -220,6 +240,7 @@ export function TenantToolbar({
         aria-label='搜索租户'
         placeholder='搜索名称、标识或 ID'
         className='h-8 w-full sm:w-64'
+        disabled={disabled}
         onChange={(event) => onQueryChange(event.target.value)}
       />
       {isAdmin ? (
@@ -227,6 +248,7 @@ export function TenantToolbar({
           title='状态'
           value={status}
           onChange={onStatusChange}
+          disabled={disabled}
           options={[
             { value: 'active', label: '启用' },
             { value: 'suspended', label: '已停用' },
@@ -238,6 +260,7 @@ export function TenantToolbar({
         title='有效期'
         value={validity}
         onChange={onValidityChange}
+        disabled={disabled}
         options={[
           { value: 'current', label: '当前有效' },
           { value: 'not_started', label: '未开始' },
@@ -248,6 +271,7 @@ export function TenantToolbar({
       <Popover
         open={dateOpen}
         onOpenChange={(open) => {
+          if (disabled) return
           if (open)
             setDraft({
               slug,
@@ -265,6 +289,7 @@ export function TenantToolbar({
             variant='outline'
             size='sm'
             className='h-8 border-dashed'
+            disabled={disabled}
           >
             <Filter className='size-4' />
             <LocalizedText text={"\n            更多筛选"} />{advancedCount ? ` · ${advancedCount}` : <LocalizedText text={""} />}
@@ -279,6 +304,7 @@ export function TenantToolbar({
               <span className='font-medium'><LocalizedText text={"租户标识"} /></span>
               <Input
                 value={draft.slug}
+                disabled={disabled}
                 placeholder='精确匹配，例如 acme'
                 onChange={(event) =>
                   setDraft({ ...draft, slug: event.target.value })
@@ -292,6 +318,7 @@ export function TenantToolbar({
                   type='date'
                   aria-label='创建时间起始'
                   value={draft.createdFrom}
+                  disabled={disabled}
                   max={draft.createdTo || undefined}
                   onChange={(event) =>
                     setDraft({ ...draft, createdFrom: event.target.value })
@@ -301,6 +328,7 @@ export function TenantToolbar({
                   type='date'
                   aria-label='创建时间结束'
                   value={draft.createdTo}
+                  disabled={disabled}
                   min={draft.createdFrom || undefined}
                   onChange={(event) =>
                     setDraft({ ...draft, createdTo: event.target.value })
@@ -315,6 +343,7 @@ export function TenantToolbar({
                   type='button'
                   variant='outline'
                   size='sm'
+                  disabled={disabled}
                   onClick={() => {
                     const today = new Date()
                     const from = new Date(
@@ -337,6 +366,7 @@ export function TenantToolbar({
               <Input
                 type='date'
                 value={draft.updatedFrom}
+                disabled={disabled}
                 onChange={(event) =>
                   setDraft({ ...draft, updatedFrom: event.target.value })
                 }
@@ -347,6 +377,7 @@ export function TenantToolbar({
               <Input
                 type='date'
                 value={draft.expiresBefore}
+                disabled={disabled}
                 onChange={(event) =>
                   setDraft({ ...draft, expiresBefore: event.target.value })
                 }
@@ -357,6 +388,7 @@ export function TenantToolbar({
                 type='button'
                 variant='ghost'
                 size='sm'
+                disabled={disabled}
                 onClick={() => {
                   const empty = {
                     slug: '',
@@ -375,9 +407,10 @@ export function TenantToolbar({
                 type='button'
                 size='sm'
                 disabled={Boolean(
-                  draft.createdFrom &&
-                  draft.createdTo &&
-                  draft.createdFrom > draft.createdTo
+                  disabled ||
+                  (draft.createdFrom &&
+                    draft.createdTo &&
+                    draft.createdFrom > draft.createdTo)
                 )}
                 onClick={() => {
                   onAdvancedChange({ ...draft, slug: draft.slug.trim() })
@@ -427,6 +460,7 @@ export function TenantTable({
   selectedIds,
   onSelectionChange,
   visibleColumns,
+  selectionDisabled = false,
 }: {
   tenants: Tenant[]
   isAdmin: boolean
@@ -436,21 +470,27 @@ export function TenantTable({
   selectedIds: Set<string>
   onSelectionChange: (ids: Set<string>) => void
   visibleColumns: Set<TenantColumn>
+  selectionDisabled?: boolean
 }) {
+  const locale = useLocale()
   const columns = tenantColumns.filter(
     (column) => column.key !== 'role' || !isAdmin
   )
   const columnCount =
-    3 + columns.filter((column) => visibleColumns.has(column.key)).length
+    (isAdmin ? 3 : 2) +
+    columns.filter((column) => visibleColumns.has(column.key)).length
+  const selectableTenants = tenants.filter(
+    (tenant) => tenant.status !== 'archived'
+  )
   const allSelected =
-    tenants.length > 0 &&
-    tenants.every((tenant) => selectedIds.has(tenant.tenant_id))
-  const someSelected = tenants.some((tenant) =>
+    selectableTenants.length > 0 &&
+    selectableTenants.every((tenant) => selectedIds.has(tenant.tenant_id))
+  const someSelected = selectableTenants.some((tenant) =>
     selectedIds.has(tenant.tenant_id)
   )
   const toggleAll = (checked: boolean) => {
     const next = new Set(selectedIds)
-    for (const tenant of tenants) {
+    for (const tenant of selectableTenants) {
       if (checked) next.add(tenant.tenant_id)
       else next.delete(tenant.tenant_id)
     }
@@ -462,15 +502,18 @@ export function TenantTable({
       <Table>
         <TableHeader>
           <TableRow className='bg-muted/35 hover:bg-muted/35'>
-            <TableHead className='w-10 ps-4'>
-              <Checkbox
-                aria-label='选择当前页全部租户'
-                checked={
-                  allSelected ? true : someSelected ? 'indeterminate' : false
-                }
-                onCheckedChange={(value) => toggleAll(value === true)}
-              />
-            </TableHead>
+            {isAdmin ? (
+              <TableHead className='w-10 ps-4'>
+                <Checkbox
+                  aria-label={locale === 'en' ? 'Select all selectable tenants on this page' : '选择当前页全部可操作租户'}
+                  checked={
+                    allSelected ? true : someSelected ? 'indeterminate' : false
+                  }
+                  disabled={selectionDisabled || selectableTenants.length === 0}
+                  onCheckedChange={(value) => toggleAll(value === true)}
+                />
+              </TableHead>
+            ) : null}
             <TableHead className='h-11 ps-4'><LocalizedText text={"租户"} /></TableHead>
             {visibleColumns.has('slug') ? <TableHead><LocalizedText text={"标识"} /></TableHead> : null}
             {visibleColumns.has('status') ? <TableHead><LocalizedText text={"状态"} /></TableHead> : null}
@@ -502,18 +545,21 @@ export function TenantTable({
                   selectedIds.has(tenant.tenant_id) ? 'selected' : undefined
                 }
               >
-                <TableCell className='ps-4'>
-                  <Checkbox
-                    aria-label={`选择租户 ${tenant.name}`}
-                    checked={selectedIds.has(tenant.tenant_id)}
-                    onCheckedChange={(value) => {
-                      const next = new Set(selectedIds)
-                      if (value === true) next.add(tenant.tenant_id)
-                      else next.delete(tenant.tenant_id)
-                      onSelectionChange(next)
-                    }}
-                  />
-                </TableCell>
+                {isAdmin ? (
+                  <TableCell className='ps-4'>
+                    <Checkbox
+                      aria-label={locale === 'en' ? `Select tenant ${tenant.name}` : `选择租户 ${tenant.name}`}
+                      checked={selectedIds.has(tenant.tenant_id)}
+                      disabled={selectionDisabled || tenant.status === 'archived'}
+                      onCheckedChange={(value) => {
+                        const next = new Set(selectedIds)
+                        if (value === true && tenant.status !== 'archived') next.add(tenant.tenant_id)
+                        else next.delete(tenant.tenant_id)
+                        onSelectionChange(next)
+                      }}
+                    />
+                  </TableCell>
+                ) : null}
                 <TableCell className='max-w-72 ps-4'>
                   <div className='space-y-0.5'>
                     <Link
@@ -587,6 +633,7 @@ export function TenantTable({
                               <Eye className='size-4' /> <LocalizedText text={" 查看详情\n                            "} /></Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            disabled={selectionDisabled}
                             onClick={() => onStatusChange(tenant)}
                           >
                             {tenant.status === 'active' ? (
@@ -599,6 +646,7 @@ export function TenantTable({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant='destructive'
+                            disabled={selectionDisabled}
                             onClick={() => onArchive(tenant)}
                           >
                             <Archive className='size-4' /> <LocalizedText text={" 归档租户\n                          "} /></DropdownMenuItem>
@@ -649,6 +697,7 @@ export function TablePager({
   onPageChange,
   onPageSizeChange,
   onClearSelection,
+  disabled = false,
 }: {
   page: number
   pages: number
@@ -658,6 +707,7 @@ export function TablePager({
   onPageChange: (page: number) => void
   onPageSizeChange?: (size: number) => void
   onClearSelection?: () => void
+  disabled?: boolean
 }) {
   return (
     <div className='flex flex-col gap-3 border-t px-4 py-3 text-sm lg:flex-row lg:items-center lg:justify-between'>
@@ -665,7 +715,7 @@ export function TablePager({
         <span>
           <LocalizedText text={"\n          已选择 "} />{selectedCount} <LocalizedText text={" 项，共 "} />{total} <LocalizedText text={" 项\n        "} /></span>
         {selectedCount > 0 && onClearSelection ? (
-          <Button variant='ghost' size='sm' onClick={onClearSelection}>
+          <Button variant='ghost' size='sm' disabled={disabled} onClick={onClearSelection}>
             <LocalizedText text={"\n            取消选择\n          "} /></Button>
         ) : null}
       </div>
@@ -675,9 +725,10 @@ export function TablePager({
             <span><LocalizedText text={"每页行数"} /></span>
             <Select
               value={String(pageSize)}
+              disabled={disabled}
               onValueChange={(value) => onPageSizeChange?.(Number(value))}
             >
-              <SelectTrigger className='h-8 w-18' aria-label='每页行数'>
+              <SelectTrigger className='h-8 w-18' aria-label='每页行数' disabled={disabled}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent side='top'>
@@ -698,7 +749,7 @@ export function TablePager({
             size='icon'
             className='size-8'
             aria-label='跳到第一页'
-            disabled={page <= 1}
+            disabled={disabled || page <= 1}
             onClick={() => onPageChange(1)}
           >
             <ChevronFirst className='size-4' />
@@ -708,7 +759,7 @@ export function TablePager({
             size='icon'
             className='size-8'
             aria-label='上一页'
-            disabled={page <= 1}
+            disabled={disabled || page <= 1}
             onClick={() => onPageChange(page - 1)}
           >
             <ChevronLeft className='size-4' />
@@ -718,7 +769,7 @@ export function TablePager({
             size='icon'
             className='size-8'
             aria-label='下一页'
-            disabled={page >= pages}
+            disabled={disabled || page >= pages}
             onClick={() => onPageChange(page + 1)}
           >
             <ChevronRight className='size-4' />
@@ -728,7 +779,7 @@ export function TablePager({
             size='icon'
             className='size-8'
             aria-label='跳到最后一页'
-            disabled={page >= pages}
+            disabled={disabled || page >= pages}
             onClick={() => onPageChange(pages)}
           >
             <ChevronLast className='size-4' />
@@ -752,15 +803,27 @@ export function TenantColumnOptions({
   visible,
   onChange,
   isAdmin,
+  disabled = false,
 }: {
   visible: Set<TenantColumn>
   onChange: (columns: Set<TenantColumn>) => void
   isAdmin: boolean
+  disabled?: boolean
 }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (disabled) setOpen(false)
+  }, [disabled])
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu
+      modal={false}
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!disabled) setOpen(nextOpen)
+      }}
+    >
       <DropdownMenuTrigger asChild>
-        <Button variant='outline' size='sm' className='h-8'>
+        <Button variant='outline' size='sm' className='h-8' disabled={disabled}>
           <SlidersHorizontal className='size-4' />
           <LocalizedText text={"\n          显示列\n        "} /></Button>
       </DropdownMenuTrigger>
@@ -773,6 +836,7 @@ export function TenantColumnOptions({
             <DropdownMenuCheckboxItem
               key={column.key}
               checked={visible.has(column.key)}
+              disabled={disabled}
               onCheckedChange={(checked) => {
                 const next = new Set(visible)
                 if (checked) next.add(column.key)
