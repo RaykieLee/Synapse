@@ -251,6 +251,28 @@ def test_f17a_attachment_storage_api_and_migration(tmp_path, monkeypatch):
         with factory() as db:
             assert db.get(Attachment, missing_id) is None
 
+        # Windows may report ACCESS_DENIED when another concurrent DELETE has
+        # already unlinked the file. Simulate that exact post-unlink state.
+        race_target = upload("f17a-uploader", "unlink-race.txt", b"already removed")
+        assert race_target.status_code == 201
+        race_id = race_target.json()["attachment_id"]
+        with factory() as db:
+            row = db.get(Attachment, race_id)
+            race_path = storage / row.storage_key[:2] / row.storage_key[2:]
+        original_unlink(race_path)
+
+        def permission_error_for_missing_target(path, *args, **kwargs):
+            if path == race_path:
+                raise PermissionError(5, "Access is denied", str(path))
+            return original_unlink(path, *args, **kwargs)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(Path, "unlink", permission_error_for_missing_target)
+            raced_delete = req("delete", f"{api}/{race_id}", "f17a-owner-a", workspace_ids["alpha"])
+        assert raced_delete.status_code == 204
+        with factory() as db:
+            assert db.get(Attachment, race_id) is None
+
         # DB commit failure after physical unlink leaves the metadata retryable; a second DELETE finalizes it.
         retry_target = upload("f17a-uploader", "delete-commit-retry.txt", b"retry")
         assert retry_target.status_code == 201

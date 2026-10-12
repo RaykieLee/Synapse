@@ -1,5 +1,12 @@
 # F17a 附件本地存储验收
 
+## 2026-10-12 Windows 并发 unlink 修复复核
+
+- 基线复跑发现，两个 DELETE 请求都读取同一附件后，Windows 偶发在后一个 `Path.unlink(missing_ok=True)` 上抛出 `PermissionError`（WinError 5 / errno 13），即使文件此时已经被另一个请求删除。临时探针确认异常后目标路径不存在；移除父目录操作的最小双线程环也能复现，300 轮中出现 121 次该异常。
+- `apps/api/app/api/attachments.py` 现在仅在 `PermissionError` 后 `stat()` 确认文件已不存在时按并发重复删除处理；文件仍存在或 `stat()` 仍失败时，保留原来的 `500 FILE_CLEANUP_FAILED` 和 metadata 回滚行为。
+- 回归用例通过真实 FastAPI `TestClient` 调用 DELETE，并在文件已删除的状态下注入 Windows `PermissionError`。**注入的是模拟的操作系统竞态结果**；原有双线程 API 并发删除用例仍实际运行。
+- 定向 F17a 用例在修复后连续 10 次通过；API 默认套件 `23 passed, 25 deselected`。这些是本地实现者复核，新的竞态修复仍待独立复验；不替代 PostgreSQL、多主机存储或真实 AgentScope 验收。
+
 ## 结果
 
 修复 DELETE 一致性问题后复验通过。本测试将临时 SQLite 数据库迁移到当前 Alembic head（本次运行是 `0013_tenant_resource_summaries`），并使用真实 FastAPI multipart 请求和临时文件目录。

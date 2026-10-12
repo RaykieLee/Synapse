@@ -244,6 +244,19 @@ def delete_attachment(
     path = _storage_path(row.storage_key)
     try:
         path.unlink(missing_ok=True)
+    except PermissionError as exc:
+        # Windows can report ACCESS_DENIED when another DELETE already unlinked
+        # the file. Treat it as idempotent only when a fresh stat proves absence.
+        try:
+            path.stat()
+        except FileNotFoundError:
+            pass
+        except OSError as stat_exc:
+            db.rollback()
+            raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from stat_exc
+        else:
+            db.rollback()
+            raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from exc
     except OSError as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from exc

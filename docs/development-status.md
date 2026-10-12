@@ -54,7 +54,7 @@
 | F15b | 字典管理前端迁移 | 通过 | verify_tenant_backend | verification/F15b-tenant-dictionary-frontend.md：build、真实API浏览器CRUD/筛选/排序/隔离通过 |
 | F16a | 参数配置后端迁移 | 通过 | agent_embedding_design | verification/F16a-tenant-config-api.md：1 passed；迁移、租户隔离、权限及敏感值边界独立复验通过 |
 | F16b | 参数配置前端迁移 | 通过 | agent_embedding_design | verification/F16b-tenant-config-frontend.md：build、真实API浏览器CRUD、敏感值延迟响应与租户切换隔离通过 |
-| F17a | 附件管理本地存储后端 | 通过 | verify_tenant_backend | verification/F17a-attachments-api.md：修复后两次1 passed，作用域、上传下载与删除失败/重试/并发一致性通过 |
+| F17a | 附件管理本地存储后端 | 历史验收通过；2026-10-12 Windows 并发 unlink 修复已写、定向 10 次与默认 API 套件通过，待独立复验 | verify_tenant_backend | verification/F17a-attachments-api.md：原作用域/上传下载/失败重试验收通过；本次新增模拟 WinError 5 缺文件回归和真实双线程并发复跑 |
 | F17b | 附件管理前端 | 通过 | verify_tenant_backend | verification/F17b-attachments-frontend.md：build、真实API/AgentScope/Redis浏览器多租户多空间附件与撤权通过 |
 | F18a | 系统任务定义后端迁移 | 通过 | verify_tenant_backend | verification/F18a-scheduled-task-definition.md：修复后1 passed，计划校验422且无写入、隔离、目标allowlist与迁移通过 |
 | F18b1 | 过期租户邀请任务目标 | 通过 | verify_tenant_backend | verification/F18b1-expire-invitations.md：1 passed，租户过滤、到期边界及重复/并发幂等通过 |
