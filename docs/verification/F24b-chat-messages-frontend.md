@@ -117,3 +117,13 @@ $env:F24B_REDIS_PORT = '16381'
 - 成员撤权后消息请求返回 `403`，页面不再显示撤权前内容。
 
 验收结束后已停止 Redis，清理临时 SQLite、附件目录和服务进程。未验证真实模型推理、工具确认、工具调用、外部任务和 SSE 重连。
+
+## 2026-10-12 当前主干工作树复跑
+
+在本地 `main` / `origin/main` 同步的 `704a477f9dfe0199f236b0b09d4e37a9a07a8e23` 上复跑；验证开始时工作区已有租户列表相关未提交改动，F24b 代码与验收脚本本身未改动。
+
+- 使用临时 `redis:7-alpine` 容器，绑定 `127.0.0.1:16391`；API 使用临时 SQLite，迁移到 `0016_tenant_validity`。
+- 命令：在 `apps/api` 执行 `.\.venv\Scripts\python.exe tests\verification\run_f24b_chat_messages_frontend.py`，并设置 `F24B_REDIS_HOST=127.0.0.1`、`F24B_REDIS_PORT=16391`。
+- `pnpm build` 通过；真实 FastAPI、Vite 和 Playwright 流程输出 `F24b chat messages frontend verification passed`，退出码为 `0`。
+- 错配 Workspace 的 `agent_id` 请求返回 `404`，消息正文未泄露；历史分页、附件、受控失败后的草稿保留与重试、Workspace/会话切换、撤权后拒绝访问等脚本断言通过。
+- 验收完成后临时 Redis 容器已停止并移除；未触碰既有 `8010` 服务。真实模型推理及前述未覆盖项仍未验证。
