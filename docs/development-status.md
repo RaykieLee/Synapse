@@ -6,6 +6,8 @@
 
 状态：待开始 → 开发中 → 待独立验收 → 通过；验证失败转回修复。外部运行条件不足的功能记为待实际验收，不记为通过。
 
+> 2026-10-12 当前 HEAD `2500a13` 基线与 P0 复验：工作区干净；API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、`pnpm build` 均通过；ESLint `0 errors, 24 warnings`。使用现有 Docker Redis `127.0.0.1:16381` 重跑 F24b 真实 FastAPI/AgentScope/Vite/Chromium 流程，输出 `F24b chat messages frontend verification passed`，退出码 `0`。验证后只清理本轮生成的 1 个 F24b Redis event key，保留原有 Redis 数据；真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证，详见 [F24b 聊天消息验收](verification/F24b-chat-messages-frontend.md) 与 [基线复验报告](verification/baseline-2026-10-12.md)。
+
 ## 功能任务
 
 > 2026-10-12 F17 附件域已完成渐进式 service 化与前端 API 收口：新增 `AttachmentService`、附件 schema 和 `src/api/attachments.ts`，保持现有 wire contract、权限矩阵、个人附件 404 隐私语义和文件补偿行为；F17a 定向 API、默认 API、compileall、build、ESLint 及 F17b 真实 Redis/Vite/Chromium 均通过。验收中修复了中文 locale 反向翻译和 Windows Vite 子进程清理；证据见 [F17 附件 Service 化方案](verification/F17-attachment-service-refactor.md)、[F17a 附件验收](verification/F17a-attachments-api.md) 和 [F17b 附件前端验收](verification/F17b-attachments-frontend.md)。

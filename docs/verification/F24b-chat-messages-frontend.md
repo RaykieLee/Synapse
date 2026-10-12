@@ -145,3 +145,15 @@ $env:F24B_REDIS_PORT = '16381'
 - 真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证；成功发送只证明聊天 API 接受请求。
 
 验收结束后已停止并移除临时 Redis、SQLite、附件目录和服务进程，未触碰既有 `8010` 服务。
+
+## 2026-10-12 当前 HEAD `2500a13` 复验
+
+在当前 `main` / `origin/main` 同步的 `2500a135b9bf01ccc8f9f014f87d25e1c636d494` 上复跑；验证前工作区干净。此次重点确认 F17 附件 API 收口后的会话消息页面仍能完成基础聊天流程。
+
+- 使用现有 Docker Redis `synapse-test-redis-f13c`，宿主机地址为 `127.0.0.1:16381`；Redis `PING` 返回 `PONG`。F24b 使用 AgentScope storage DB 5 和 message-bus DB 4，未执行 DB 级清空。
+- 运行命令：在 `apps/api` 设置 `F24B_REDIS_HOST=127.0.0.1`、`F24B_REDIS_PORT=16381` 后执行 `.\.venv\Scripts\python.exe tests\verification\run_f24b_chat_messages_frontend.py`。
+- `pnpm build` 通过；Alembic 临时 SQLite 迁移至 `0016_tenant_validity`；真实 FastAPI、AgentScope Redis storage/message bus、Vite 和 Playwright 流程输出 `F24b chat messages frontend verification passed`，退出码为 `0`。
+- 错配 `agent_id` 返回 `404 REQUEST_ERROR` 且响应不含会话正文；跨 Workspace session 返回 `404`；消息分页、附件 data block、受控 `503` 后草稿/附件保留与重试、Workspace/会话切换、成员撤权后的 `403 WORKSPACE_MEMBERSHIP_REQUIRED` 均通过。
+- 运行后 DB 4 恢复为验收前的 5 个 stream，DB 5 为 0；只删除了本轮生成且已确认属于 F24b fixture 的 1 个 event key，未触碰验收前已有 key。工作区仍干净。
+
+本次仍未验证真实模型提供方凭据下的助手推理/回复、工具确认/调用、外部任务和 SSE 重连；成功发送只证明聊天 API 接受请求。
