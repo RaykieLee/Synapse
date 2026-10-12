@@ -1,6 +1,7 @@
 """Build and browser-verify tenant department management against disposable API data."""
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -14,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[4]
 API = ROOT / "apps" / "api"
 WEB = ROOT / "apps" / "web"
 FLOW = Path(__file__).with_name("f14b_tenant_department_frontend.mjs")
+PNPM = shutil.which("pnpm") or ("pnpm.cmd" if os.name == "nt" else "pnpm")
 
 
 def free_port():
@@ -36,8 +38,25 @@ def wait_url(url, process):
     raise RuntimeError(f"Timed out waiting for {url}")
 
 
+def terminate_process_tree(process):
+    """Terminate the server and any child process holding temporary logs."""
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+            )
+        else:
+            process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
 def main():
-    build = subprocess.run(["pnpm", "build"], cwd=WEB)
+    build = subprocess.run([PNPM, "build"], cwd=WEB)
     if build.returncode:
         return build.returncode
 
@@ -110,7 +129,7 @@ def main():
         api_log = (temp / "api.log").open("w")
         web_log = (temp / "vite.log").open("w")
         api = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", str(api_port)], cwd=API, env=env, stdout=api_log, stderr=api_log)
-        web = subprocess.Popen(["pnpm", "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
+        web = subprocess.Popen([PNPM, "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
         seed.update({"web": f"http://127.0.0.1:{web_port}", "api": f"http://127.0.0.1:{api_port}/api/v1"})
         seed_path = temp / "seed.json"
         seed_path.write_text(json.dumps(seed))
@@ -122,11 +141,14 @@ def main():
                 print("API server log:\n", (temp / "api.log").read_text(errors="replace"), file=sys.stderr)
                 print("Vite server log:\n", (temp / "vite.log").read_text(errors="replace"), file=sys.stderr)
                 raise
-            return subprocess.run(["node", str(FLOW), str(seed_path)], cwd=WEB, env=env).returncode
+            return subprocess.run(["node", str(FLOW.resolve()), str(seed_path)], cwd=WEB, env=env).returncode
         finally:
-            web.terminate(); api.terminate()
-            web.wait(timeout=10); api.wait(timeout=10)
+            terminate_process_tree(web)
+            terminate_process_tree(api)
             api_log.close(); web_log.close()
+            get_engine().dispose()
+            get_session_factory.cache_clear()
+            get_engine.cache_clear()
 
 
 if __name__ == "__main__":
