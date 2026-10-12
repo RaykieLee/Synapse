@@ -8,7 +8,7 @@
 
 ## 功能任务
 
-> 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已提交（`51a6c61`）；构建/类型检查不代表这些增量已独立验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本次增量状态为**代码已写，待独立验收**。国际化为**代码已写，待完整覆盖与独立验收**。F24b 的 agent/session 绑定修复已完成本机真实 API/Playwright 复验，仍待独立子智能体验收；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
+> 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已提交（`51a6c61`）；构建/类型检查不代表这些增量已独立验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本次增量状态为**代码已写，待独立验收**。国际化为**代码已写，待完整覆盖与独立验收**。F24b 的 agent/session 绑定修复已完成本机真实 API/Playwright 复验，F24b 独立验收已在 `b069adf` 记录；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
 
 > 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停与正式导航方案已记入上述差距清单；F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)。这三项的代码已写且当前 TypeScript 编译通过，均**待独立验收**；设计与编译结论不能替代功能验收。
 
@@ -21,6 +21,8 @@
 > 2026-10-12 当前树基线复验（基于 `4d926bf`，包含当时工作树中未提交的前端 lint 整改）：API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、`pnpm build` 均通过；`pnpm exec eslint .` 退出码为 0，仍有 24 个 warning。详见[基线复验报告](verification/baseline-2026-10-12.md)。该记录不代表 P0 浏览器/API 独立验收已完成。
 
 > 2026-10-12 当前 HEAD 基线复跑：`git fetch origin` 后本地 `main` 与 `origin/main` 均为 `7da1eca`，运行前工作区干净。API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、`pnpm build` 通过；`pnpm exec eslint .` 退出码为 0（0 errors、24 warnings）。本次验证没有进行浏览器或独立功能验收，P0 项仍待处理；详见[基线复验报告](verification/baseline-2026-10-12.md)。
+
+> 2026-10-12 `b069adf` 文档更新后基线复跑：工作区干净；API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、`pnpm build` 均通过；`pnpm exec eslint .` 退出码为 0（0 errors、24 warnings）。F24b 已完成独立真实 API/Redis/Playwright 验收；近期租户优化仍待独立验收。
 
 | ID | 单一任务 | 状态 | 开发/设计智能体 | 独立验证与证据 |
 | --- | --- | --- | --- | --- |
