@@ -36,6 +36,8 @@
 
 > 2026-10-12 F16a/F16b 租户参数配置完成渐进式 service 化与类型化前端 API 收口：新增参数配置 schema/service 和 `src/api/tenant-configs.ts`，router 不再承载业务规则、HTTP 异常或显式事务；原有租户隔离、owner/admin 权限、public 投影、敏感值脱敏、详情 no-store、同租户唯一键冲突和字符串 ID 契约保持不变。F16a 定向 API `1 passed`，默认 API 套件 `23 passed, 25 deselected`，compileall、build、ESLint 和边界扫描通过；使用当前 Docker Redis `127.0.0.1:16381` 的真实 FastAPI/Vite/Playwright F16b 通过。UX 审查指出的 URL 状态、错误重试、并发版本、dialog 焦点、窄屏操作和完整双语列为后续独立功能点；证据见 [F16a service 化方案](verification/F16a-tenant-config-service-refactor.md)。
 
+> 2026-10-12 F19c 系统任务手工触发完成 service/API 与前端 API 收口，并通过独立验收：新增 `ManualScheduledTaskService`、运行记录 response schema 和 `src/api/scheduled-tasks.ts`；保持 `POST /tenants/{tenant_id}/scheduled-tasks/{task_id}/runs`、`201`、`TASK_UNAVAILABLE`、`TASK_ALREADY_RUNNING`、安全错误码及租户隔离契约。F19c API `1 passed`，默认 API 套件 `24 passed, 26 deselected`，真实 Vite/Playwright `1 passed`，build、compileall 和 ESLint 通过；浏览器覆盖双击单请求、响应丢失、权限、lease、失败脱敏、租户切换、撤权、窄屏键盘和中英文。证据见 [F19c service/API 收口方案](verification/F19c-manual-task-trigger-service-refactor.md)。相邻 F19a 迁移 fixture 已在独立提交 `7e9da42` 修正，当前 Docker Redis 定向测试 `1 passed`。
+
 > 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停方案已记入上述差距清单并完成 F09b 独立验收；正式导航仍需后续范围清理。F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)，其代码已写且当前 TypeScript 编译通过，仍待独立验收；设计与编译结论不能替代功能验收。
 
 > 2026-10-12 F11/F11a 增量复核：UX 与 API/服务子智能体审查完成，差距与待决策见 [全局用户管理复核](ux/F11a-global-users-review.md)。`%`/`_` 搜索匹配、用户页确认、结构化字段错误和双语反馈的代码已写，TypeScript 编译通过，待独立验收。软删身份复用、最后平台管理员保护和筛选范围仍待产品决定；历史验收不能覆盖本次增量。
@@ -100,10 +102,10 @@
 | F18b3 | 附件元数据核对任务目标 | 通过 | verify_tenant_backend | verification/F18b3-attachment-reconcile.md：1 passed；异常分类与租户只读隔离通过 |
 | F18b4 | 租户资源摘要刷新任务目标 | 通过 | verify_tenant_backend | verification/F18b4-resource-summary.md：1 passed，双租户计数、并发UPSERT与变更覆盖通过 |
 | F18c | 系统任务管理前端 | 通过 | verify_tenant_backend | verification/F18c-scheduled-task-frontend.md：build、真实API浏览器Cron/interval CRUD/权限/隔离通过 |
-| F19a | 系统任务执行记录后端 | 通过 | verify_tenant_backend | verification/F19a-scheduled-task-runs.md：1 passed，0015迁移、租户API权限/脱敏与复合FK通过 |
+| F19a | 系统任务执行记录后端 | 通过 | verify_tenant_backend | verification/F19a-scheduled-task-runs.md：1 passed，0014→0015→0016迁移、租户API权限/脱敏与复合FK通过 |
 | F19b | 系统任务执行记录前端 | 通过 | verify_tenant_backend | verification/F19b-task-runs-frontend.md：build、真实API浏览器分页筛选/脱敏/权限通过 |
-| F19c1 | 系统任务手工触发API | 待独立验收 | workspace_backend | owner/admin手工trigger与run持久化已实现；待独立验证 |
-| F19c2 | 系统任务手工触发前端 | 代码已写，静态检查通过，待独立验收 | manual_task_ux；manual_task_impl | ux/F19c2-manual-task-trigger.md；同步无幂等接口的超时重试风险待产品决策 |
+| F19c1 | 系统任务手工触发API | 通过（service 化独立验收通过） | workspace_backend | verification/F19c-manual-task-trigger-service-refactor.md：owner/admin、member/跨租户、停用/lease、失败脱敏、run 持久化和事务边界通过 |
+| F19c2 | 系统任务手工触发前端 | 通过（真实浏览器独立验收通过） | manual_task_ux；manual_task_impl | verification/F19c-manual-task-trigger-service-refactor.md：类型化 API 收口、双击、响应丢失、租户切换、撤权、窄屏键盘和中英文通过；同步无幂等接口的人工重试风险仍是契约限制 |
 | F20b | AgentScope 应用内嵌与生命周期 | 通过 | agent_embedding_design | verification/F20b-agentscope-embed.md：真实依赖、Redis、同端口JWT与父子lifespan独立验收通过；F21隔离另列 |
 | F20a | AgentScope 内嵌技术契约 | 静态核验完成 | agent_embedding_design | verification/F20a-embedding-contract.md；运行兼容与隔离仍待F20/F21 |
 | F21a | AgentScope 租户/Workspace身份网关 | 通过 | agent_embedding_design | verification/F21a-agentscope-gateway.md：真实Redis/同进程下105入口鉴权、撤权/归档与SSE/WS短路通过 |

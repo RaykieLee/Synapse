@@ -5,25 +5,24 @@ import { formatMessage, getLocale, useLocale } from '@/lib/i18n'
 import { Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
-import { ApiProblem, api } from '@/lib/api'
+import {
+  createScheduledTask,
+  deleteScheduledTask,
+  getScheduledTaskRun,
+  listScheduledTaskRuns,
+  listScheduledTaskTargets,
+  listScheduledTasks,
+  triggerScheduledTask,
+  updateScheduledTask,
+  type Target,
+  type Task,
+  type TaskRun,
+} from '@/api/scheduled-tasks'
+import { ApiProblem } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
-type Task = {
-  task_id: string; tenant_id: string; task_name: string; description: string | null; execution_target: string
-  parameters: Record<string, string | number | boolean | null>; schedule_type: 'cron' | 'interval'
-  cron_expression: string | null; interval_value: number | null; interval_unit: 'seconds' | 'minutes' | 'hours' | 'days' | 'weeks' | null
-  timezone: string; enabled: boolean; created_at: string; updated_at: string
-}
-type TaskPage = { items: Task[]; total: number; page: number; page_size: number }
-type Target = { target_id: string; name: string; description: string; scope: string }
-type TaskRun = {
-  run_id: string; tenant_id: string; task_id: string; slot_at: string; execution_target: string
-  started_at: string; finished_at: string | null; status: 'running' | 'succeeded' | 'failed'
-  result_summary: Record<string, unknown> | null; error_code: string | null
-}
-type RunPage = { items: TaskRun[]; total: number; page: number; page_size: number }
 type TaskDraft = {
   task_id?: string; task_name: string; description: string; execution_target: string; schedule_type: 'cron' | 'interval'
   cron_expression: string; interval_value: string; interval_unit: 'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
@@ -72,13 +71,19 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
   const tasks = useQuery({
     queryKey: listKey,
     enabled: canManage && active,
-    queryFn: () => api<TaskPage>(`/tenants/${tenantId}/scheduled-tasks?${params}`),
+    queryFn: () => listScheduledTasks(tenantId, {
+      page: Number(params.get('page') ?? '1'),
+      taskName: params.get('task_name') ?? undefined,
+      executionTarget: params.get('execution_target') ?? undefined,
+      scheduleType: params.get('schedule_type') as 'cron' | 'interval' | null ?? undefined,
+      enabled: params.has('enabled') ? params.get('enabled') === 'true' : undefined,
+    }),
   })
   const targetKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'targets'] as const
   const targets = useQuery({
     queryKey: targetKey,
     enabled: canManage && active,
-    queryFn: () => api<{ items: Target[] }>(`/tenants/${tenantId}/scheduled-tasks/targets`),
+    queryFn: () => listScheduledTaskTargets(tenantId),
   })
   const invalidate = async () => {
     await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks'] })
@@ -98,19 +103,19 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
         ...(value.task_id ? {} : { enabled: value.enabled }),
       }
       return value.task_id
-        ? api<Task>(`/tenants/${tenantId}/scheduled-tasks/${value.task_id}`, { method: 'PATCH', body: JSON.stringify(body) })
-        : api<Task>(`/tenants/${tenantId}/scheduled-tasks`, { method: 'POST', body: JSON.stringify(body) })
+        ? updateScheduledTask(tenantId, value.task_id, body)
+        : createScheduledTask(tenantId, body)
     },
     onSuccess: async () => { setDraft(null); setError(''); await invalidate() },
     onError: (cause) => setError(errorText(cause)),
   })
   const toggle = useMutation({
-    mutationFn: (task: Task) => api<Task>(`/tenants/${tenantId}/scheduled-tasks/${task.task_id}`, { method: 'PATCH', body: JSON.stringify({ enabled: !task.enabled }) }),
+    mutationFn: (task: Task) => updateScheduledTask(tenantId, task.task_id, { enabled: !task.enabled }),
     onSuccess: async () => { setError(''); await invalidate() },
     onError: (cause) => setError(errorText(cause)),
   })
   const remove = useMutation({
-    mutationFn: (taskId: string) => api<void>(`/tenants/${tenantId}/scheduled-tasks/${taskId}`, { method: 'DELETE' }),
+    mutationFn: (taskId: string) => deleteScheduledTask(tenantId, taskId),
     onSuccess: async () => { setError(''); await invalidate() },
     onError: (cause) => setError(errorText(cause)),
   })
@@ -120,7 +125,7 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
     const requestTenantId = tenantId
     setManualRunPendingId(task.task_id); setManualRunError(''); setManualRun(null); setRunConfirmation(null)
     try {
-      const run = await api<TaskRun>(`/tenants/${requestTenantId}/scheduled-tasks/${task.task_id}/runs`, { method: 'POST' })
+      const run = await triggerScheduledTask(requestTenantId, task.task_id)
       setManualRun({ tenantId: requestTenantId, task, run })
       setHistoryTask(task)
       setManualRunPendingId(null)
@@ -204,12 +209,20 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
   if (startedFrom) params.set('started_from', new Date(startedFrom).toISOString())
   if (startedTo) params.set('started_to', new Date(startedTo).toISOString())
   const runsKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'runs', task.task_id, params.toString()] as const
-  const runs = useQuery({ queryKey: runsKey, queryFn: () => api<RunPage>(`/tenants/${tenantId}/scheduled-tasks/${task.task_id}/runs?${params}`) })
+  const runs = useQuery({
+    queryKey: runsKey,
+    queryFn: () => listScheduledTaskRuns(tenantId, task.task_id, {
+      page: Number(params.get('page') ?? '1'),
+      status: params.get('status') as TaskRun['status'] | null ?? undefined,
+      startedFrom: params.get('started_from') ?? undefined,
+      startedTo: params.get('started_to') ?? undefined,
+    }),
+  })
   const detailKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'run', task.task_id, selectedRunId] as const
   const detail = useQuery({
     queryKey: detailKey,
     enabled: Boolean(selectedRunId),
-    queryFn: () => api<TaskRun>(`/tenants/${tenantId}/scheduled-tasks/${task.task_id}/runs/${selectedRunId}`),
+    queryFn: () => getScheduledTaskRun(tenantId, task.task_id, selectedRunId),
   })
   const invalidRange = startedFrom && startedTo && new Date(startedFrom) > new Date(startedTo)
   return <section className={`${panel} space-y-4`}>

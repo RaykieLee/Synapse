@@ -1,8 +1,5 @@
-"""Tenant-scoped scheduled task definition CRUD (no execution runtime)."""
+"""Tenant-scoped scheduled task definition and run HTTP endpoints."""
 import json
-import hashlib
-import threading
-import uuid
 from datetime import datetime, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -14,19 +11,16 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.database.session import get_db, get_session_factory
+from app.database.session import get_db
 from app.models.tenant_scheduled_task_run import TenantScheduledTaskRun
 from app.models.tenant_scheduled_task import TenantScheduledTask
-from app.models.tenant_task_schedule_state import TenantTaskScheduleState
+from app.schemas.scheduled_tasks import ScheduledTaskRunResponse
+from app.services.scheduled_tasks import ManualScheduledTaskService
 from app.task_targets import SCHEDULED_TASK_TARGETS
 from app.tenancy.context import TenantContext, get_tenant_context
 from app.tenancy.scopes import tenant_scope
-from app.tasks.dispatcher import dispatch_tenant_task
-from app.tasks.scheduler_runtime import _safe_error_code, _safe_result_summary
 
 router = APIRouter(prefix="/tenants/{tenant_id}/scheduled-tasks", tags=["scheduled tasks"])
-_manual_locks: dict[tuple[int, int], threading.Lock] = {}
-_manual_locks_guard = threading.Lock()
 INTERVAL_SECONDS = {"seconds": 1, "minutes": 60, "hours": 3600, "days": 86400, "weeks": 604800}
 MAX_INTERVAL_SECONDS = 365 * 86400
 MIN_INTERVAL_SECONDS = 10
@@ -123,22 +117,6 @@ class TaskPatch(BaseModel):
 
 def _fail(status: int, code: str) -> None:
     raise HTTPException(status_code=status, detail={"code": code})
-
-
-def _manual_lock(tenant_id: int, task_id: int) -> threading.Lock:
-    key = (tenant_id, task_id)
-    with _manual_locks_guard:
-        lock = _manual_locks.get(key)
-        if lock is None:
-            lock = threading.Lock()
-            _manual_locks[key] = lock
-        return lock
-
-
-def _as_utc(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
 
 
 def _authorize(context: TenantContext) -> None:
@@ -349,116 +327,17 @@ def get_scheduled_task_run(
     return _run_data(run)
 
 
-@router.post("/{task_id}/runs", status_code=201)
+def get_manual_scheduled_task_service() -> ManualScheduledTaskService:
+    return ManualScheduledTaskService()
+
+
+@router.post("/{task_id}/runs", status_code=201, response_model=ScheduledTaskRunResponse)
 def trigger_scheduled_task(
     task_id: int,
     context: TenantContext = Depends(get_tenant_context),
+    service: ManualScheduledTaskService = Depends(get_manual_scheduled_task_service),
 ):
-    """Run one active allowlisted definition now and persist its outcome.
-
-    Concurrent manual calls for the same task are serialized by an in-process
-    mutex and a database row lock. Each serialized call is a distinct run; this
-    endpoint does not deduplicate retries. An active scheduled lease returns
-    409 instead of overlapping that scheduled attempt.
-    """
-    _authorize(context)
-    factory = get_session_factory()
-    lock_db = factory()
-    try:
-        with _manual_lock(context.tenant_id, task_id):
-            task = lock_db.scalar(
-                select(TenantScheduledTask).where(
-                    TenantScheduledTask.task_id == task_id,
-                    TenantScheduledTask.tenant_id == context.tenant_id,
-                    TenantScheduledTask.del_flag.is_(False),
-                ).with_for_update()
-            )
-            if task is None:
-                _fail(404, "RESOURCE_NOT_FOUND")
-            if not task.enabled:
-                _fail(409, "TASK_UNAVAILABLE")
-
-            now = datetime.now(timezone.utc)
-            schedule_state = lock_db.scalar(
-                select(TenantTaskScheduleState).where(
-                    TenantTaskScheduleState.task_id == task_id,
-                    TenantTaskScheduleState.tenant_id == context.tenant_id,
-                ).with_for_update()
-            )
-            if (
-                schedule_state is not None
-                and schedule_state.claimed_slot_at is not None
-                and schedule_state.lease_until is not None
-                and _as_utc(schedule_state.lease_until) > now
-            ):
-                _fail(409, "TASK_ALREADY_RUNNING")
-            execution_target = task.execution_target
-            # SQLite has no SELECT FOR UPDATE and keeps a read lock until the
-            # transaction ends. The process mutex remains held for SQLite;
-            # release its read transaction before the handler writes data.
-            if lock_db.get_bind().dialect.name == "sqlite":
-                lock_db.rollback()
-
-            lease_token = str(uuid.uuid4())
-            run_db = factory()
-            try:
-                run = TenantScheduledTaskRun(
-                    tenant_id=context.tenant_id,
-                    task_id=task_id,
-                    slot_at=now,
-                    claim_token_hash=hashlib.sha256(lease_token.encode("utf-8")).hexdigest(),
-                    execution_target=execution_target,
-                    started_at=now,
-                    status="running",
-                )
-                run_db.add(run)
-                run_db.commit()
-                run_db.refresh(run)
-                run_id = run.run_id
-            except Exception as exc:
-                run_db.rollback()
-                raise HTTPException(status_code=500, detail={"code": "RUN_RECORD_ERROR"}) from exc
-            finally:
-                run_db.close()
-
-            succeeded = False
-            result_summary_json = None
-            error_code = None
-            dispatch_db = factory()
-            try:
-                result = dispatch_tenant_task(dispatch_db, task_id, context.tenant_id)
-                result_summary_json = json.dumps(
-                    _safe_result_summary(execution_target, result.get("result")),
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
-                succeeded = True
-            except Exception as exc:
-                dispatch_db.rollback()
-                error_code = _safe_error_code(exc)
-            finally:
-                dispatch_db.close()
-
-            finish_db = factory()
-            try:
-                persisted_run = finish_db.get(TenantScheduledTaskRun, run_id)
-                if persisted_run is None:
-                    raise LookupError("run record disappeared")
-                persisted_run.finished_at = datetime.now(timezone.utc)
-                persisted_run.status = "succeeded" if succeeded else "failed"
-                persisted_run.result_summary_json = result_summary_json if succeeded else None
-                persisted_run.error_code = None if succeeded else (error_code or "HANDLER_ERROR")
-                finish_db.commit()
-                finish_db.refresh(persisted_run)
-                return _run_data(persisted_run)
-            except Exception as exc:
-                finish_db.rollback()
-                raise HTTPException(status_code=500, detail={"code": "RUN_RECORD_ERROR"}) from exc
-            finally:
-                finish_db.close()
-    finally:
-        lock_db.rollback()
-        lock_db.close()
+    return service.trigger(context, task_id)
 
 
 @router.patch("/{task_id}")

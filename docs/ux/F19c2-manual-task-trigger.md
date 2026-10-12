@@ -1,6 +1,6 @@
 # F19c2 系统任务手工触发：UX 与契约检查
 
-状态：UX 子智能体已设计，前端实现与独立验收分开记录。依据现有 `POST /tenants/{tenant_id}/scheduled-tasks/{task_id}/runs` 和 [系统任务接口契约](../scheduled-task-api.md)。
+状态：UX 设计、前端实现与独立验收均已完成；证据见 [F19c service/API 收口与浏览器验收](../verification/F19c-manual-task-trigger-service-refactor.md)。依据现有 `POST /tenants/{tenant_id}/scheduled-tasks/{task_id}/runs` 和 [系统任务接口契约](../scheduled-task-api.md)。
 
 ## 首期交互
 
