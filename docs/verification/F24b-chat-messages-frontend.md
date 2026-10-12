@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-2026-10-12 本机真实 API + Playwright 复验通过：错误 `agent_id` 查询现在返回 404，不再返回 Alpha 消息；全套 F24b 浏览器流程通过。按仓库协作约定，仍需不同子智能体独立复验后，才能将本项标记为独立验收通过。
+2026-10-12 本机真实 API + Playwright 复验通过；同日由独立子智能体在干净工作树上重新运行真实 API/Redis/Playwright 流程并通过。本项现标记为**独立验收通过**。真实模型推理仍因未配置模型凭据而未验证。
 
 本次页面 `document.lang` 为 `zh-CN`、`localStorage['synapse-locale']` 未设置，但消息输入框实际 accessible name 为 `Type a message`。验收脚本按渲染出的 accessible name 定位输入框；本次没有修改产品 UI。该中英文标签不一致留作 UX/i18n 差距。
 
@@ -95,4 +95,25 @@ $env:F24B_REDIS_PORT = '16381'
 - 模型调用结果未断言；成功仅代表 API 接受聊天请求，不代表模型生成回复。
 - 修正了 Windows 子进程无法找到 `pnpm` 的 runner 问题，并让验收选择当前实际 accessible name、等待可见且启用的 textbox。测试退出时释放 SQLite engine，避免 Windows 删除临时数据库时发生文件占用。
 
-本记录是本机执行证据，不替代独立子智能体验收。Redis 容器需在独立复验完成后停止。
+## 2026-10-12 独立子智能体验收记录
+
+独立验收从当前 `HEAD` `addc25e` 的干净工作树开始，未修改产品代码、文档或提交。使用一次性 Redis 7、临时 SQLite、真实 FastAPI、AgentScope Redis storage/message bus、Vite 和 headless Playwright，执行：
+
+```powershell
+docker run --rm -d --name synapse-f24b-independent-20261012 `
+  -p 127.0.0.1:16381:6379 redis:7-alpine
+Set-Location apps/api
+$env:F24B_REDIS_HOST = '127.0.0.1'
+$env:F24B_REDIS_PORT = '16381'
+.\.venv\Scripts\python.exe tests\verification\run_f24b_chat_messages_frontend.py
+```
+
+结果：`pnpm build` 通过，迁移到 `0016_tenant_validity` 完成，输出 `F24b chat messages frontend verification passed`，退出码为 `0`。独立验收确认：
+
+- 错配 `agent_id` 返回 `404`，响应不含 Alpha 消息正文；
+- 正常历史、游标分页、附件显示和发送请求附件 data block 通过；
+- 受控 `503` 后文本草稿与附件选择保留，重试成功后清空；
+- Workspace/会话切换保持隔离；
+- 成员撤权后消息请求返回 `403`，页面不再显示撤权前内容。
+
+验收结束后已停止 Redis，清理临时 SQLite、附件目录和服务进程。未验证真实模型推理、工具确认、工具调用、外部任务和 SSE 重连。

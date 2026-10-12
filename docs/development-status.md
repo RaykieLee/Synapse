@@ -90,7 +90,7 @@
 | F21c | AgentScope SSE流鉴权上下文 | 通过（模型推理待验） | agent_embedding_design | verification/F21c-sse-auth-context.md：真实Redis SSE事件、上下文、断连与越权拒绝1 passed；无provider推理 |
 | F24a | 会话管理前端融合 | 通过 | agent_embedding_design | verification/F24a-session-management-frontend.md：build、真实API/Redis浏览器CRUD、跨空间和只读状态通过 |
 | F24c | 会话状态agent_id一致性 | 通过 | verify_tenant_backend | verification/F24c-session-status-agent-binding.md：真实Redis网关错配/跨scope 404且不探测run-lock |
-| F24b | 基础聊天消息前端融合 | agent/session 隔离修复已写；本机真实 API/Playwright 复验通过；待独立子智能体验收 | agent_embedding_design | verification/F24b-chat-messages-frontend.md：错配 `agent_id` 实际请求返回 404 且无消息正文；浏览器消息/分页/附件/切换/撤权流程通过；真实模型推理及独立复验未完成 |
+| F24b | 基础聊天消息前端融合 | 独立验收通过（真实模型推理除外） | agent_embedding_design | verification/F24b-chat-messages-frontend.md：独立真实 API/Redis/Playwright 验收确认错配 `agent_id` 返回 404 且无消息正文；消息分页、附件、失败保留草稿/重试、Workspace/会话切换与撤权流程通过；真实模型推理未配置凭据，工具/SSE 重连不属于本项 |
 | F25a | SSE文本增量展示 | 验收未通过，待修复 | agent_embedding_design | verification/F25a-sse-text-frontend.md：真实SSE浏览器流程通过；前端构建被未定义controller阻断，真实模型推理待验 |
 | F25b1 | 聊天生成中断 | 待独立验收 | agent_embedding_design | 当前scope会话interrupt与状态刷新完成；待独立浏览器验证 |
 | F25b2 | 工具执行事件展示 | 待独立验收 | agent_embedding_design | SSE/历史工具时间线、脱敏摘要与结果折叠完成；待独立浏览器验证 |
