@@ -14,7 +14,7 @@
 
 > 2026-10-12 F09 租户列表修复后，主代理诊断与随后独立子智能体验收均使用隔离临时数据和真实 FastAPI/Vite/Chromium；独立验收结果已覆盖真实 API 和核心浏览器路径，平台管理员零租户空态仍明确标为模拟。Redis 标记套件最新复跑使用临时 Redis 7.4.11，结果 `8 passed, 5 failed`；失败测试存在迁移版本、当前 API 契约和本机 `.env` 隔离等差异，详见[Redis suite 复跑记录](verification/redis-suite-2026-10-12.md)。
 
-> 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停与正式导航方案已记入上述差距清单；F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)。这三项的代码已写且当前 TypeScript 编译通过，均**待独立验收**；设计与编译结论不能替代功能验收。
+> 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停方案已记入上述差距清单并完成 F09b 独立验收；正式导航仍需后续范围清理。F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)，其代码已写且当前 TypeScript 编译通过，仍待独立验收；设计与编译结论不能替代功能验收。
 
 > 2026-10-12 F11/F11a 增量复核：UX 与 API/服务子智能体审查完成，差距与待决策见 [全局用户管理复核](ux/F11a-global-users-review.md)。`%`/`_` 搜索匹配、用户页确认、结构化字段错误和双语反馈的代码已写，TypeScript 编译通过，待独立验收。软删身份复用、最后平台管理员保护和筛选范围仍待产品决定；历史验收不能覆盖本次增量。
 
@@ -47,7 +47,7 @@
 | F07 | 作用域权限与资源隔离基础 | 通过 | verify_tenant_backend | verification/F07-resource-scopes.md：1 passed；多租户/空间/私有scope、撤权、归档及权限边界独立复验 |
 | F08 | 真实登录与个人中心前端 | 通过 | web_auth | verification/F08-web-auth.md；默认代理连接真实API，构建和13项浏览器流程通过 |
 | F09 | 租户管理前端 | 通过（本轮增量独立验收通过） | tenant_frontend | verification/F09-tenant-frontend.md 与 verification/tenant-optimization-acceptance-2026-10-12.md；真实 API/Chromium 覆盖筛选计数、UTC 边界、权限、owner、邀请 410、双语交互和窄屏 |
-| F09b | 租户列表批量启用/停用 | UX 已设计，代码已写，静态检查通过，待独立验收 | tenant_batch_ux；tenant_batch_impl | 复用单租户 PATCH；逐项结果、部分失败和权限需真实 API/浏览器复验 |
+| F09b | 租户列表批量启用/停用 | 独立验收通过 | tenant_batch_ux；tenant_batch_impl | verification/F09b-tenant-batch-actions.md：真实 API/Chromium 验证权限、逐项 PATCH、确认、进度锁定、部分失败/重试、英文、390px 与跨页清空选择；部分失败 UI 使用明确标注的 403 拦截模拟，真实 404 已验证 |
 | F10 | Workspace 管理与左上角切换 | 通过 | workspace_backend | verification/F10-workspace-frontend.md；构建及真实API浏览器流程通过，含跨租户回退与撤权后缓存清理 |
 | F11 | 全局用户管理后端迁移 | 通过 | agent_embedding_design | verification/F11-user-management-api.md；1 passed，权限、CRUD、JWT撤销、bcrypt兼容与软删独立复验 |
 | F11a | 全局用户管理前端迁移 | 通过 | workspace_backend | verification/F11a-user-management-frontend.md：build、真实API浏览器CRUD及权限通过；旧Clerk演示Faker清理另列F43 |
