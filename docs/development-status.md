@@ -16,6 +16,8 @@
 
 > 2026-10-12 F12a 租户角色后端完成渐进式 service 化：新增角色 schema/service，router 只保留依赖、参数、响应模型和状态码；独立验收确认现有 wire contract、跨租户隔离、权限版本、搜索转义和请求级 rollback 均通过。F12c 成员角色分配功能回归通过，但其 router 仍保留旧的显式事务实现，后续单独迁移，不在本次提交内混改。
 
+> 2026-10-12 F12c 租户成员自定义角色分配完成渐进式 service 化：新增 schema/service，保留原有赋权、替换、撤销、幂等、并发和 `membership_version` 行为；F12c 与 F12a 联合回归、compileall 及 router/service 边界扫描通过。前端 wire contract 未变，因此本项无新增 UX 范围；证据见 [F12c service 化验收](verification/F12c-tenant-member-role-service-refactor.md)。
+
 > 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停方案已记入上述差距清单并完成 F09b 独立验收；正式导航仍需后续范围清理。F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)，其代码已写且当前 TypeScript 编译通过，仍待独立验收；设计与编译结论不能替代功能验收。
 
 > 2026-10-12 F11/F11a 增量复核：UX 与 API/服务子智能体审查完成，差距与待决策见 [全局用户管理复核](ux/F11a-global-users-review.md)。`%`/`_` 搜索匹配、用户页确认、结构化字段错误和双语反馈的代码已写，TypeScript 编译通过，待独立验收。软删身份复用、最后平台管理员保护和筛选范围仍待产品决定；历史验收不能覆盖本次增量。
@@ -55,7 +57,7 @@
 | F11a | 全局用户管理前端迁移 | 通过 | workspace_backend | verification/F11a-user-management-frontend.md：build、真实API浏览器CRUD及权限通过；旧Clerk演示Faker清理另列F43 |
 | F12a | 角色管理后端迁移 | 通过（service 化独立验收通过） | agent_embedding_design | verification/F12a-tenant-role-api.md 与 verification/F12a-tenant-role-service-refactor.md：真实 API、wire contract、跨租户隔离、搜索转义、请求级 rollback 和 router/service 边界通过 |
 | F12b | 角色管理前端迁移 | 通过 | agent_embedding_design | verification/F12b-tenant-role-frontend.md：Outlet修复后build、真实API浏览器CRUD/权限/缓存复验通过 |
-| F12c | 租户角色分配给成员后端 | 功能通过；service 化待迁移 | agent_embedding_design | verification/F12c-member-role-assignment.md：功能 API、权限、版本、并发与跨租户复合FK回归通过；当前 `tenant_member_roles.py` 仍保留旧事务实现，后续单独提取 service |
+| F12c | 租户角色分配给成员后端 | 通过（service 化独立验收通过） | agent_embedding_design | verification/F12c-member-role-assignment.md 与 verification/F12c-tenant-member-role-service-refactor.md：功能 API、权限、版本、并发、跨租户复合FK及 router/service 事务边界通过 |
 | F12d | 租户成员角色分配前端 | 通过 | agent_embedding_design | verification/F12d-member-role-frontend.md：build、真实API浏览器分配/撤销、租户缓存隔离通过 |
 | F12e | 普通成员查看自身自定义角色 | 通过 | verify_tenant_backend | verification/F12e-self-role-view.md：build、API和浏览器自读/跨租户隔离/撤权复验通过 |
 | F13a | 菜单管理后端迁移 | 通过 | agent_embedding_design | verification/F13a-tenant-menu-api.md：1 passed；树CRUD、排序、跨租户父级复合FK和权限通过 |
