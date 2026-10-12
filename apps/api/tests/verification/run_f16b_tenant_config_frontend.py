@@ -1,6 +1,7 @@
 """Build and browser-verify tenant parameter configuration on disposable services."""
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -14,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[4]
 API = ROOT / "apps" / "api"
 WEB = ROOT / "apps" / "web"
 FLOW = Path(__file__).with_name("f16b_tenant_config_frontend.mjs")
+PNPM = shutil.which("pnpm") or ("pnpm.cmd" if os.name == "nt" else "pnpm")
 
 
 def free_port():
@@ -36,10 +38,30 @@ def wait_url(url, process):
     raise RuntimeError(f"Timed out waiting for {url}")
 
 
+def terminate_process_tree(process):
+    """Terminate a server and any child process holding temporary logs."""
+    if process is None:
+        return
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+            )
+        else:
+            process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
 def main():
-    build = subprocess.run(["pnpm", "build"], cwd=WEB)
-    if build.returncode:
-        return build.returncode
+    if os.environ.get("F16B_SKIP_BUILD") != "1":
+        build = subprocess.run([PNPM, "build"], cwd=WEB)
+        if build.returncode:
+            return build.returncode
     with tempfile.TemporaryDirectory(prefix="synapse-f16b-") as temporary:
         temp = Path(temporary)
         database_url = f"sqlite:///{temp / 'f16b.sqlite'}"
@@ -108,24 +130,56 @@ def main():
         api_port, web_port = free_port(), free_port()
         env = os.environ.copy()
         env.update({"SYNAPSE_DATABASE_URL": database_url, "SYNAPSE_JWT_SECRET": secret,
-                    "SYNAPSE_AGENTSCOPE_REDIS_HOST": "127.0.0.1", "SYNAPSE_AGENTSCOPE_REDIS_PORT": "16379",
+                    "SYNAPSE_AGENTSCOPE_REDIS_HOST": "127.0.0.1",
+                    "SYNAPSE_AGENTSCOPE_REDIS_PORT": os.environ.get("F16B_REDIS_PORT", "16381"),
                     "SYNAPSE_AGENTSCOPE_WORKSPACE_PATH": str(temp / "agentscope-workspaces"),
                     "SYNAPSE_API_PREFIX": "/api/v1", "VITE_API_PROXY_TARGET": f"http://127.0.0.1:{api_port}"})
-        api_log = (temp / "api.log").open("w"); web_log = (temp / "vite.log").open("w")
-        api = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", str(api_port)], cwd=API, env=env, stdout=api_log, stderr=api_log)
-        web = subprocess.Popen(["pnpm", "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
-        seed.update({"web": f"http://127.0.0.1:{web_port}", "api": f"http://127.0.0.1:{api_port}/api/v1"})
-        seed_path = temp / "seed.json"; seed_path.write_text(json.dumps(seed))
+        api_log = (temp / "api.log").open("w")
+        web_log = (temp / "vite.log").open("w")
+        api = None
+        web = None
         try:
-            wait_url(seed["api"] + "/health", api); wait_url(seed["web"], web)
-            return subprocess.run(["node", str(FLOW), str(seed_path)], cwd=WEB, env=env).returncode
-        except Exception:
-            print("API server log:\n", (temp / "api.log").read_text(errors="replace"), file=sys.stderr)
-            print("Vite server log:\n", (temp / "vite.log").read_text(errors="replace"), file=sys.stderr)
-            raise
+            api = subprocess.Popen(
+                [sys.executable, "-m", "uvicorn", "app.main:create_app", "--factory",
+                 "--host", "127.0.0.1", "--port", str(api_port)],
+                cwd=API,
+                env=env,
+                stdout=api_log,
+                stderr=api_log,
+            )
+            web = subprocess.Popen(
+                [PNPM, "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"],
+                cwd=WEB,
+                env=env,
+                stdout=web_log,
+                stderr=web_log,
+            )
+            seed.update({"web": f"http://127.0.0.1:{web_port}", "api": f"http://127.0.0.1:{api_port}/api/v1"})
+            seed_path = temp / "seed.json"
+            seed_path.write_text(json.dumps(seed))
+            try:
+                wait_url(seed["api"] + "/health", api)
+                wait_url(seed["web"], web)
+            except Exception:
+                print("API server log:\n", (temp / "api.log").read_text(errors="replace"), file=sys.stderr)
+                print("Vite server log:\n", (temp / "vite.log").read_text(errors="replace"), file=sys.stderr)
+                raise
+            result = subprocess.run(
+                ["node", str(FLOW.resolve()), str(seed_path)],
+                cwd=WEB,
+                env=env,
+            )
+            if result.returncode:
+                print("API server log:\n", (temp / "api.log").read_text(errors="replace"), file=sys.stderr)
+                print("Vite server log:\n", (temp / "vite.log").read_text(errors="replace"), file=sys.stderr)
+            return result.returncode
         finally:
-            web.terminate(); api.terminate(); web.wait(timeout=10); api.wait(timeout=10)
+            terminate_process_tree(web)
+            terminate_process_tree(api)
             api_log.close(); web_log.close()
+            get_engine().dispose()
+            get_session_factory.cache_clear()
+            get_engine.cache_clear()
 
 
 if __name__ == "__main__":

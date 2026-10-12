@@ -26,6 +26,8 @@
 
 > 2026-10-12 F15a 租户字典完成渐进式 service 化：新增字典 schema/service，保留原有类型/条目 CRUD、分页筛选、排序、唯一冲突、类型级联删除保护、复合外键、权限和跨租户隔离；F15a 定向 API、F15b 真实 API/Vite/Chromium、compileall、Redis 连通性和 router/service 边界扫描通过。F15b Windows runner 的 pnpm/子进程/日志句柄/SQLite engine 清理问题已一并修复；证据见 [F15a 字典 service 化验收](verification/F15a-tenant-dictionary-service-refactor.md)。
 
+> 2026-10-12 F16a/F16b 租户参数配置完成渐进式 service 化与类型化前端 API 收口：新增参数配置 schema/service 和 `src/api/tenant-configs.ts`，router 不再承载业务规则、HTTP 异常或显式事务；原有租户隔离、owner/admin 权限、public 投影、敏感值脱敏、详情 no-store、同租户唯一键冲突和字符串 ID 契约保持不变。F16a 定向 API `1 passed`，默认 API 套件 `23 passed, 25 deselected`，compileall、build、ESLint 和边界扫描通过；使用当前 Docker Redis `127.0.0.1:16381` 的真实 FastAPI/Vite/Playwright F16b 通过。UX 审查指出的 URL 状态、错误重试、并发版本、dialog 焦点、窄屏操作和完整双语列为后续独立功能点；证据见 [F16a service 化方案](verification/F16a-tenant-config-service-refactor.md)。
+
 > 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停方案已记入上述差距清单并完成 F09b 独立验收；正式导航仍需后续范围清理。F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)，其代码已写且当前 TypeScript 编译通过，仍待独立验收；设计与编译结论不能替代功能验收。
 
 > 2026-10-12 F11/F11a 增量复核：UX 与 API/服务子智能体审查完成，差距与待决策见 [全局用户管理复核](ux/F11a-global-users-review.md)。`%`/`_` 搜索匹配、用户页确认、结构化字段错误和双语反馈的代码已写，TypeScript 编译通过，待独立验收。软删身份复用、最后平台管理员保护和筛选范围仍待产品决定；历史验收不能覆盖本次增量。
@@ -78,8 +80,8 @@
 | F14b | 部门管理前端迁移 | 通过（当前 service 化后复验通过） | agent_embedding_design | verification/F14b-tenant-department-frontend.md 与 verification/F14a-tenant-department-service-refactor.md：真实 API/Vite/Chromium 树CRUD/移动/排序/隔离通过 |
 | F15a | 字典管理后端迁移 | 通过（service 化独立验收通过） | agent_embedding_design | verification/F15a-tenant-dictionary-api.md 与 verification/F15a-tenant-dictionary-service-refactor.md：定向 API、迁移、租户隔离、CRUD、权限、复合FK、compileall 和 router/service 边界通过 |
 | F15b | 字典管理前端迁移 | 通过（service 化后复验通过） | verify_tenant_backend | verification/F15b-tenant-dictionary-frontend.md 与 verification/F15a-tenant-dictionary-service-refactor.md：真实 API/Vite/Chromium CRUD、筛选、排序、隔离和 Redis 环境复验通过 |
-| F16a | 参数配置后端迁移 | 通过 | agent_embedding_design | verification/F16a-tenant-config-api.md：1 passed；迁移、租户隔离、权限及敏感值边界独立复验通过 |
-| F16b | 参数配置前端迁移 | 通过 | agent_embedding_design | verification/F16b-tenant-config-frontend.md：build、真实API浏览器CRUD、敏感值延迟响应与租户切换隔离通过 |
+| F16a | 参数配置后端迁移 | 通过（service 化独立复验通过） | agent_embedding_design | verification/F16a-tenant-config-api.md 与 verification/F16a-tenant-config-service-refactor.md：1 passed；迁移、租户隔离、权限、敏感值边界、router/service 事务边界通过 |
+| F16b | 参数配置前端迁移 | 通过（service 化后真实 Redis 复验通过） | agent_embedding_design | verification/F16b-tenant-config-frontend.md：build、真实 API/Vite/Chromium CRUD、敏感值延迟响应、租户切换隔离和当前 Redis `16381` 环境通过 |
 | F17a | 附件管理本地存储后端 | 历史验收通过；2026-10-12 Windows 并发 unlink 修复已写、定向 10 次与默认 API 套件通过，待独立复验 | verify_tenant_backend | verification/F17a-attachments-api.md：原作用域/上传下载/失败重试验收通过；本次新增模拟 WinError 5 缺文件回归和真实双线程并发复跑 |
 | F17b | 附件管理前端 | 通过 | verify_tenant_backend | verification/F17b-attachments-frontend.md：build、真实API/AgentScope/Redis浏览器多租户多空间附件与撤权通过 |
 | F18a | 系统任务定义后端迁移 | 通过 | verify_tenant_backend | verification/F18a-scheduled-task-definition.md：修复后1 passed，计划校验422且无写入、隔离、目标allowlist与迁移通过 |

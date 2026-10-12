@@ -1,17 +1,26 @@
-# F16a 租户参数配置 API 验收
+# F16a 租户参数配置 API 与 Service 化验收
 
 ## 结果
 
-通过。测试使用临时 SQLite 数据库，从 `0009_tenant_dictionaries` 升级到当前 Alembic head `0012_tenant_scheduled_tasks`，并通过真实 FastAPI `TestClient` 调用配置 API。
+通过。参数配置已完成渐进式 service 化；测试使用临时 SQLite 数据库，从既有租户/字典数据升级到当前 Alembic head `0016_tenant_validity`，并通过真实 FastAPI `TestClient` 调用配置 API。HTTP 路径、字段、状态码和错误码保持不变。
 
 执行命令：
 
 ```bash
 cd apps/api
-.venv/bin/python -m pytest -q tests/verification/test_f16a_tenant_configs.py
+.\.venv\Scripts\python.exe -m pytest -q tests\verification\test_f16a_tenant_configs.py
 ```
 
-结果：`1 passed`。测试期间记录 Starlette TestClient 与 Alembic 配置的弃用警告，不影响结果。
+结果：`1 passed, 3 warnings`。测试期间记录 Starlette TestClient 与 Alembic 配置的弃用警告，不影响结果。
+
+结构回归：
+
+```powershell
+cd apps/api
+.\.venv\Scripts\python.exe -m compileall -q app
+```
+
+`tenant_configs.py` router 与 `TenantConfigService` 均不直接抛 `HTTPException`，不显式 `commit()` 或 `rollback()`；请求事务仍由 `get_db()` 管理。
 
 ## 覆盖结果
 
@@ -22,6 +31,8 @@ cd apps/api
 - public 接口仅返回当前租户中已启用、前端可见且非敏感的键值；响应设置 `Cache-Control: private, no-store`。成员可调用 public 接口，但管理列表/详情/写入均返回 403。
 - 两个租户的 public 投影隔离；停用项从 public 结果消失。敏感且标为 frontend 的组合创建被拒绝。
 - 通过另一租户配置 ID 进行 GET、PATCH、DELETE 均返回 404；删除当前租户配置后详情返回 404。
+- Service 返回不可变结果对象；HTTP 响应投影集中在 `app/schemas/tenant_configs.py` 和 router。
+- 创建/修改敏感配置时保留脱敏写响应，只有详情读取按明确动作返回敏感明文。
 
 ## 验证范围说明
 
@@ -30,3 +41,8 @@ cd apps/api
 ## 验证文件
 
 - `apps/api/tests/verification/test_f16a_tenant_configs.py`
+- `apps/api/app/schemas/tenant_configs.py`
+- `apps/api/app/services/tenant_configs.py`
+- `apps/api/app/api/tenant_configs.py`
+- `apps/web/src/api/tenant-configs.ts`
+- `docs/verification/F16a-tenant-config-service-refactor.md`

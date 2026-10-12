@@ -2,18 +2,17 @@
 
 ## 结果
 
-通过。`pnpm build` 成功；使用临时 SQLite 数据库迁移至 Alembic head `0014_tenant_task_schedule_state`，启动真实 FastAPI 与 Vite，并通过 Playwright 对页面和 API 进行端到端验证。
+通过。`pnpm build` 成功；使用临时 SQLite 数据库迁移至 Alembic head `0016_tenant_validity`，启动真实 FastAPI 与 Vite，并通过 Playwright 对页面和 API 进行端到端验证。AgentScope/Redis 使用当前 Docker 容器的 `127.0.0.1:16381`。
 
 执行命令：
 
 ```bash
 docker run --rm -d --name synapse-f16b-redis -p 127.0.0.1:16379:6379 redis:7-alpine
 cd apps/api
-.venv/bin/python tests/verification/run_f16b_tenant_config_frontend.py
-docker rm -f synapse-f16b-redis
+.\.venv\Scripts\python.exe tests\verification\run_f16b_tenant_config_frontend.py
 ```
 
-真实 Redis 7 容器是 AgentScope 同进程挂载启动所需，本次仅供临时集成环境使用，验证后已删除。
+runner 默认使用 `F16B_REDIS_PORT=16381`，也可通过环境变量覆盖。Windows runner 使用 `pnpm.cmd` 解析、进程树清理、日志句柄关闭和 SQLite engine 清理，避免验收基础设施误报。
 
 ## 覆盖结果
 
@@ -24,12 +23,13 @@ docker rm -f synapse-f16b-redis
 - 延迟拦截 A 的敏感详情响应期间，在同一页面通过 SPA History/PopState 导航切换到 B；B 页面显示本租户数据且不显示 A 配置。释放晚到响应后，不出现敏感值或对话框。
 - 在 A 打开未提交草稿后切换至 B，草稿标题和内容都不出现；切回 A 后草稿也不会恢复。A/B 配置列表缓存内容隔离。
 - 普通成员查看租户详情时没有“参数配置”入口；直达管理页面显示权限提示且没有创建操作，真实管理列表、详情和创建 API 均返回 403。
+- 敏感详情响应断言确认明文只在显式查看动作后返回；验收定位兼容当前页面的中英文 dialog `aria-label`。
 
 ## 验证文件
 
 - `apps/api/tests/verification/run_f16b_tenant_config_frontend.py`
 - `apps/api/tests/verification/f16b_tenant_config_frontend.mjs`
 
-## 2026-10-02 复验记录
+## 2026-10-12 复验记录
 
-再次完整执行上述 runner，结果仍通过：`pnpm build` 的 `tsc -b` 与 Vite production build 成功；runner 在临时 SQLite 数据库迁移至 `0014_tenant_task_schedule_state` 后启动真实 FastAPI/Vite，Playwright 输出 `F16b tenant config frontend verification passed` 并以退出码 0 结束。首次尝试因未启动 runner 约定的 Redis `127.0.0.1:16379` 导致 API readiness 超时；随后启动临时 Redis 7 重跑通过，并已删除该容器。首次失败是环境依赖未就绪，不属于产品缺陷。
+完整执行上述 runner，结果：`F16b tenant config frontend verification passed`，退出码 `0`。`pnpm build` 的 `tsc -b` 与 Vite production build 成功；真实 Redis 容器 `synapse-test-redis-f13c` 的 `127.0.0.1:16381` 连接正常。

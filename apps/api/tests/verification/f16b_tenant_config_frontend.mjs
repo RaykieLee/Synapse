@@ -94,10 +94,14 @@ try {
   await row('Alpha Secret').waitFor()
 
   // The owner reveals a secret only by explicit action; closing clears it from rendered state.
+  const sensitiveDetailResponse = page.waitForResponse((response) => response.url().endsWith(`/configs/${seed.sensitive_a_id}`) && response.request().method() === 'GET')
   await row('Alpha Secret').getByRole('button', { name: '查看敏感值' }).click()
-  const dialog = page.getByRole('dialog', { name: '查看敏感配置值' })
+  const sensitiveDetail = await (await sensitiveDetailResponse).json()
+  assert.equal(sensitiveDetail.config_value, seed.sensitive_a_value)
+  const dialog = page.locator('[role="dialog"]')
+  await dialog.waitFor()
   await dialog.getByText(seed.sensitive_a_value, { exact: true }).waitFor()
-  await dialog.getByRole('button', { name: '关闭' }).click()
+  await dialog.locator('button').click()
   assert.equal(await page.getByRole('dialog').count(), 0)
   assert.equal(await page.getByText(seed.sensitive_a_value, { exact: true }).count(), 0, 'closing removes secret from page state')
 

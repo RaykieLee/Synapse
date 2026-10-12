@@ -4,28 +4,20 @@ import { Input } from '@/components/ui/input'
 import { formatMessage, useLocaleText } from '@/lib/i18n'
 import { Link, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getTenant, type Page } from '@/api/tenants'
-import { ApiProblem, api } from '@/lib/api'
+import { getTenant } from '@/api/tenants'
+import {
+  createTenantConfig,
+  deleteTenantConfig,
+  getTenantConfig,
+  listTenantConfigs,
+  type TenantConfig,
+  type TenantConfigPatchPayload,
+  updateTenantConfig,
+} from '@/api/tenant-configs'
+import { ApiProblem } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
 
-type TenantConfig = {
-  config_id: string
-  tenant_id: string
-  config_name: string
-  config_key: string
-  config_value: string | null
-  value_redacted: boolean
-  group_name: string
-  is_frontend: boolean
-  is_sensitive: boolean
-  status: '0' | '1'
-  remark: string | null
-  created_by: string
-  updated_by: string
-  created_at: string
-  updated_at: string
-}
 type ConfigDraft = {
   config_id?: string
   config_name: string
@@ -69,17 +61,20 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
   const tenantActive = tenant.data?.status === 'active'
-  const params = new URLSearchParams({ page: String(page), page_size: '20' })
-  if (nameFilter.trim()) params.set('config_name', nameFilter.trim())
-  if (keyFilter.trim()) params.set('config_key', keyFilter.trim())
-  if (groupFilter.trim()) params.set('group_name', groupFilter.trim())
-  if (statusFilter) params.set('status', statusFilter)
-  if (sensitiveFilter) params.set('is_sensitive', sensitiveFilter)
-  const listKey = ['synapse', actorId, tenantId, 'tenant', 'configs', tenant.data?.membership_version ?? 0, page, params.toString()] as const
+  const listParams = {
+    page,
+    pageSize: 20,
+    ...(nameFilter.trim() ? { configName: nameFilter.trim() } : {}),
+    ...(keyFilter.trim() ? { configKey: keyFilter.trim() } : {}),
+    ...(groupFilter.trim() ? { groupName: groupFilter.trim() } : {}),
+    ...(statusFilter ? { status: statusFilter as '0' | '1' } : {}),
+    ...(sensitiveFilter ? { isSensitive: sensitiveFilter === 'true' } : {}),
+  }
+  const listKey = ['synapse', actorId, tenantId, 'tenant', 'configs', tenant.data?.membership_version ?? 0, listParams] as const
   const configs = useQuery({
     queryKey: listKey,
     enabled: canManage && tenantActive,
-    queryFn: () => api<Page<TenantConfig>>(`/tenants/${tenantId}/configs?${params}`),
+    queryFn: () => listTenantConfigs(tenantId, listParams),
   })
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'tenant', 'configs'] })
@@ -88,22 +83,21 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
   const save = useMutation({
     mutationFn: (value: ConfigDraft) => {
       const { config_id, replaceSensitiveValue, ...body } = value
-      const payload: Record<string, unknown> = { ...body }
-      if (config_id && value.is_sensitive && !replaceSensitiveValue) delete payload.config_value
-      return config_id
-        ? api<TenantConfig>(`/tenants/${tenantId}/configs/${config_id}`, { method: 'PATCH', body: JSON.stringify(payload) })
-        : api<TenantConfig>(`/tenants/${tenantId}/configs`, { method: 'POST', body: JSON.stringify(payload) })
+      if (!config_id) return createTenantConfig(tenantId, body)
+      const payload: TenantConfigPatchPayload = { ...body }
+      if (value.is_sensitive && !replaceSensitiveValue) delete payload.config_value
+      return updateTenantConfig(tenantId, config_id, payload)
     },
     onSuccess: async () => { setDraft(null); setDraftTenantId(null); setError(''); await refresh() },
     onError: (cause) => setError(errorText(cause)),
   })
   const remove = useMutation({
-    mutationFn: (id: string) => api<void>(`/tenants/${tenantId}/configs/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: string) => deleteTenantConfig(tenantId, id),
     onSuccess: async () => { setError(''); await refresh() },
     onError: (cause) => setError(errorText(cause)),
   })
   const toggle = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: '0' | '1' }) => api<TenantConfig>(`/tenants/${tenantId}/configs/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    mutationFn: ({ id, status }: { id: string; status: '0' | '1' }) => updateTenantConfig(tenantId, id, { status }),
     onSuccess: async () => { setError(''); await refresh() },
     onError: (cause) => setError(errorText(cause)),
   })
@@ -114,7 +108,7 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
     setReveal({ tenantId: requestedTenantId, id: row.config_id, name: row.config_name, value: null, loading: true, error: '' })
     try {
       // Sensitive detail deliberately bypasses React Query and its query cache.
-      const detail = await api<TenantConfig>(`/tenants/${requestedTenantId}/configs/${row.config_id}`)
+      const detail = await getTenantConfig(requestedTenantId, row.config_id)
       if (revealRequest.current !== requestId) return
       setReveal({ tenantId: requestedTenantId, id: row.config_id, name: row.config_name, value: detail.config_value, loading: false, error: '' })
     } catch (cause) {
