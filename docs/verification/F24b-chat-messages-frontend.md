@@ -6,6 +6,13 @@
 
 本次页面 `document.lang` 为 `zh-CN`、`localStorage['synapse-locale']` 未设置，但消息输入框实际 accessible name 为 `Type a message`。验收脚本按渲染出的 accessible name 定位输入框；本次没有修改产品 UI。该中英文标签不一致留作 UX/i18n 差距。
 
+## 2026-10-12 当前主干 `bfb7bf9` 复验
+
+- 在当前已推送主干 `bfb7bf9` 上，使用现有 Docker Redis `127.0.0.1:16381`，执行 `F24B_REDIS_HOST=127.0.0.1`、`F24B_REDIS_PORT=16381` 的 `run_f24b_chat_messages_frontend.py`；脚本先运行 `pnpm build`，再启动真实 FastAPI、AgentScope Redis storage/message bus、Vite 和 Playwright。
+- 结果：输出 `F24b chat messages frontend verification passed`，退出码 `0`；本次没有修改产品代码或 Redis 容器配置。
+- 真实请求再次确认：错配 `agent_id` 返回 `404` 且响应不含 Alpha 会话正文；跨 Workspace session 返回 `404`；成员撤权后的消息请求返回 `403 WORKSPACE_MEMBERSHIP_REQUIRED`；历史分页、附件、受控失败后草稿保留与重试、Workspace/会话切换均通过。
+- 真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证。
+
 ## 原验收结论
 
 **未通过。** 消息页面的历史展示、分页、附件引用、发送失败保留草稿、重试成功、切换会话/Workspace 和成员撤权后清除页面内容均在浏览器中得到验证；但当前 `pnpm build` 被 TypeScript 错误阻断，且真实 API 存在跨 Workspace `agent_id` 不匹配仍返回 Alpha 会话消息的越权结果。

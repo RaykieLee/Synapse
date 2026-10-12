@@ -8,6 +8,8 @@
 
 ## 功能任务
 
+> 2026-10-12 F24b 当前主干复验：在已推送 `bfb7bf9` 上使用现有 Docker Redis `127.0.0.1:16381` 重跑真实 FastAPI/Vite/Playwright，构建和脚本均通过；错配 `agent_id` 返回 `404` 且无消息正文泄露，撤权后返回 `403`。真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证，详见 [F24b 聊天消息验收](verification/F24b-chat-messages-frontend.md)。
+
 > 2026-10-12 基线修复：实际当前树 `896b66a` 首次默认 API 复跑暴露 F17a Windows 瞬态 unlink 竞态（`22 passed, 1 failed, 25 deselected`）。已在附件删除路径加入有限重试，并增加确定性 FastAPI 回归；F17a 定向、F16a→F17a 连续 8 轮、默认 API、compileall、build 和 ESLint 均通过。该修复的 Redis、浏览器、多副本共享存储仍待独立验收，证据见 [F17a 附件验收](verification/F17a-attachments-api.md) 和 [基线复验报告](verification/baseline-2026-10-12.md)。
 
 > 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已实现；本轮增量已完成独立真实 API/Chromium 验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本轮 F09 增量现为**独立验收通过**，加载态仍未做人为延迟下的独立时序断言。F24b 的 agent/session 绑定修复已完成本机真实 API/Playwright 复验，F24b 独立验收已在 `b069adf` 记录；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
