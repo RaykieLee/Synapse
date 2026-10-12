@@ -106,7 +106,30 @@ def test_f18b2b_persisted_scheduler_claims_lifecycle_and_migration(tmp_path, mon
         # Their just-created next run is base + 10; no state mutation needed.
         assert task_ids[name]
 
+    def isolate_due_tasks(*due_names: str, future_names: tuple[str, ...] = ()) -> None:
+        """Keep each lifecycle phase's due rows from competing with later phases."""
+        due_names_set = set(due_names)
+        future_names_set = set(future_names)
+        with factory() as db:
+            states = {
+                row.task_id: row
+                for row in db.scalars(select(TenantTaskScheduleState)).all()
+            }
+            for name, task_id in task_ids.items():
+                state = states.get(task_id)
+                if state is None or name == "cron ny" or name == "interval b":
+                    continue
+                if name in due_names_set:
+                    state.next_run_at = due_at
+                elif name in future_names_set and state.lease_token is None:
+                    state.next_run_at = due_at + timedelta(days=1)
+            db.commit()
+
     # Two independent SQLite sessions/workers race for the same due slot.
+    isolate_due_tasks(
+        "concurrent slot",
+        future_names=("lease slot", "success slot", "failure slot", "disable slot", "modify slot", "delete slot"),
+    )
     barrier = Barrier(2)
     def concurrent_claim(worker: str):
         with factory() as db:
@@ -122,6 +145,7 @@ def test_f18b2b_persisted_scheduler_claims_lifecycle_and_migration(tmp_path, mon
 
     # A claim can be reclaimed when its lease expires; the previous token is
     # stale and cannot complete the newly claimed slot.
+    isolate_due_tasks("lease slot")
     with factory() as db:
         lease_claim = claim_due_tasks(db, "lease-old", now=due_at, lease_seconds=5, limit=100)
     old_lease = next(item for item in lease_claim if item["task_id"] == str(task_ids["lease slot"]))
@@ -149,6 +173,7 @@ def test_f18b2b_persisted_scheduler_claims_lifecycle_and_migration(tmp_path, mon
 
     # Success advances the interval; failure clears the lease but preserves the
     # same due slot for immediate retry.
+    isolate_due_tasks("success slot", "failure slot")
     with factory() as db:
         claims = claim_due_tasks(db, "finish-worker", now=due_at, lease_seconds=30, limit=100)
     success_claim = next(item for item in claims if item["task_id"] == str(task_ids["success slot"]))
@@ -179,6 +204,7 @@ def test_f18b2b_persisted_scheduler_claims_lifecycle_and_migration(tmp_path, mon
 
     # Disabling, editing, or soft-deleting a definition invalidates an old
     # slot/lease; the stale claim cannot advance it.
+    isolate_due_tasks("disable slot", "modify slot", "delete slot", future_names=("failure slot",))
     with factory() as db:
         claims = claim_due_tasks(db, "invalidate-worker", now=due_at, lease_seconds=30, limit=100)
     invalidation_claims = {
@@ -215,8 +241,9 @@ def test_f18b2b_persisted_scheduler_claims_lifecycle_and_migration(tmp_path, mon
     restarted_engine = get_engine()
     with restarted_engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        assert revision == "0016_tenant_validity"
-        assert revision == ScriptDirectory.from_config(alembic).get_current_head()
+        script = ScriptDirectory.from_config(alembic)
+        assert script.get_heads() == [script.get_current_head()]
+        assert revision == script.get_current_head()
     with get_session_factory()() as db:
         saved = db.get(TenantTaskScheduleState, task_ids["success slot"])
         assert saved is not None
