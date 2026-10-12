@@ -15,6 +15,8 @@
 
 **8 passed, 5 failed, 35 deselected, 12 warnings。**
 
+随后单独修正 F19a 的迁移基线 fixture，并使用当前 Docker Redis `127.0.0.1:16381` 重跑该测试：`1 passed, 2 warnings`。下表的完整 suite 数字保留为修复前记录，不能作为修复后的完整 suite 结果。
+
 本次完整 suite 中 `F18b2c` 通过；此前记录的 `7 passed, 6 failed` 结果未作为本次结论。当前 5 个失败均为验收断言或本机配置隔离差异，不是 Redis `PING`/连接失败。
 
 | 测试 | 观察到的结果 | 初步判断 |

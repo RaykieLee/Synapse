@@ -11,7 +11,7 @@ from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect, select
+from sqlalchemy import insert, inspect, select
 from sqlalchemy.exc import IntegrityError
 
 pytestmark = [
@@ -54,7 +54,7 @@ def test_f19a_task_run_migration_api_scope_filters_and_redaction(tmp_path, monke
     os.chdir(api_dir)
     alembic = Config("alembic.ini")
     try:
-        command.upgrade(alembic, "0016_tenant_validity")
+        command.upgrade(alembic, "0014_tenant_task_schedule_state")
     finally:
         os.chdir(old_cwd)
 
@@ -73,12 +73,37 @@ def test_f19a_task_run_migration_api_scope_filters_and_redaction(tmp_path, monke
         owner_b = User(user_name="f19a-owner-b", email="f19a-owner-b@example.test", password_hash="unused", status="active", del_flag=False)
         outsider_platform = User(user_name="f19a-platform", email="f19a-platform@example.test", password_hash="unused", status="active", del_flag=False, platform_role="platform_admin")
         db.add_all([owner_a, admin_a, member_a, owner_b, outsider_platform]); db.flush()
-        tenants = [
-            Tenant(slug="f19a-alpha", name="F19a Alpha", status="active", settings_json="{}"),
-            Tenant(slug="f19a-beta", name="F19a Beta", status="active", settings_json="{}"),
+        created_at = datetime(2026, 10, 1, 8, 0, tzinfo=timezone.utc)
+        # The ORM model already includes columns introduced by 0016. Use a
+        # Core insert with only the columns that existed at the 0014 fixture
+        # point, then let the later migrations add the new columns.
+        db.execute(
+            insert(Tenant.__table__),
+            [
+                {
+                    "slug": "f19a-alpha",
+                    "name": "F19a Alpha",
+                    "status": "active",
+                    "settings_json": "{}",
+                    "membership_version": 0,
+                    "created_at": created_at,
+                    "updated_at": created_at,
+                },
+                {
+                    "slug": "f19a-beta",
+                    "name": "F19a Beta",
+                    "status": "active",
+                    "settings_json": "{}",
+                    "membership_version": 0,
+                    "created_at": created_at,
+                    "updated_at": created_at,
+                },
+            ],
+        )
+        tenant_a, tenant_b = [
+            db.scalar(select(Tenant.tenant_id).where(Tenant.slug == slug))
+            for slug in ("f19a-alpha", "f19a-beta")
         ]
-        db.add_all(tenants); db.flush()
-        tenant_a, tenant_b = [row.tenant_id for row in tenants]
         db.add_all([
             TenantMember(tenant_id=tenant_a, user_id=owner_a.user_id, status="active", tenant_role="owner"),
             TenantMember(tenant_id=tenant_a, user_id=admin_a.user_id, status="active", tenant_role="admin"),
@@ -86,7 +111,6 @@ def test_f19a_task_run_migration_api_scope_filters_and_redaction(tmp_path, monke
             TenantMember(tenant_id=tenant_b, user_id=owner_b.user_id, status="active", tenant_role="owner"),
         ])
 
-        created_at = datetime(2026, 10, 1, 8, 0, tzinfo=timezone.utc)
         def task(tenant_id: int, creator_id: int, name: str):
             return TenantScheduledTask(
                 tenant_id=tenant_id, task_name=name, execution_target="tenant.expire_pending_invitations",
@@ -106,8 +130,8 @@ def test_f19a_task_run_migration_api_scope_filters_and_redaction(tmp_path, monke
                           "member": member_a.token_version, "owner_b": owner_b.token_version,
                           "platform": outsider_platform.token_version}
 
-    # Upgrade from 0014 after task definitions already exist; migration must
-    # retain them and add the append-only run table.
+    # Upgrade from 0014 after task definitions already exist; migrations must
+    # retain them, add the append-only run table, and apply later changes.
     os.chdir(api_dir)
     try:
         command.upgrade(alembic, "head")
@@ -116,7 +140,9 @@ def test_f19a_task_run_migration_api_scope_filters_and_redaction(tmp_path, monke
     engine = get_engine()
     with engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        assert revision == "0015_tenant_scheduled_task_runs"
+        # The current migration head includes tenant validity after the run
+        # history migration; the run table must still be preserved.
+        assert revision == "0016_tenant_validity"
         inspector = inspect(connection)
         assert "tenant_scheduled_task_runs" in inspector.get_table_names()
         assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one() == 1

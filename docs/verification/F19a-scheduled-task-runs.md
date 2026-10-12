@@ -2,7 +2,7 @@
 
 ## 结果
 
-通过。验证 `0014 → 0015` 数据库迁移、真实 FastAPI TestClient 下的租户任务运行记录查询、权限及返回字段脱敏。只新增验收脚本和本报告，没有修改产品实现。
+通过。验证 `0014 → 0015 → 0016` 数据库迁移、真实 FastAPI TestClient 下的租户任务运行记录查询、权限及返回字段脱敏。只修正验收 fixture 的迁移基线和本报告，没有修改产品实现。
 
 ## 执行
 
@@ -12,9 +12,9 @@
 .venv/bin/pytest -q --tb=short tests/verification/test_f19a_scheduled_task_runs.py
 ```
 
-结果：`1 passed, 2 warnings in 1.09s`。两条 warning 是 Alembic `path_separator` 缺省弃用提示。TestClient 使用实际 Synapse app lifespan 和本地 Redis；调度器通过设置关闭，以便运行记录数据可确定复现。
+结果：`1 passed, 2 warnings in 4.36s`。两条 warning 是 Alembic `path_separator` 缺省弃用提示。TestClient 使用实际 Synapse app lifespan 和本地 Redis `127.0.0.1:16381`；调度器通过设置关闭，以便运行记录数据可确定复现。
 
-临时 SQLite 先迁移到 `0014_tenant_task_schedule_state`，创建两个租户的既有任务定义，再升级到 `0015_tenant_scheduled_task_runs`。迁移后确认版本为 0015、运行记录表存在、SQLite 外键开启，且原两个任务定义仍保留。
+临时 SQLite 先迁移到 `0014_tenant_task_schedule_state`，使用该版本已有列创建两个租户的既有任务定义，再升级到当前 head `0016_tenant_validity`。迁移后确认版本为 0016、运行记录表存在、SQLite 外键开启，且原两个任务定义仍保留。
 
 ## 覆盖结果
 
