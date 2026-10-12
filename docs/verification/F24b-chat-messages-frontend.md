@@ -127,3 +127,14 @@ $env:F24B_REDIS_PORT = '16381'
 - `pnpm build` 通过；真实 FastAPI、Vite 和 Playwright 流程输出 `F24b chat messages frontend verification passed`，退出码为 `0`。
 - 错配 Workspace 的 `agent_id` 请求返回 `404`，消息正文未泄露；历史分页、附件、受控失败后的草稿保留与重试、Workspace/会话切换、撤权后拒绝访问等脚本断言通过。
 - 验收完成后临时 Redis 容器已停止并移除；未触碰既有 `8010` 服务。真实模型推理及前述未覆盖项仍未验证。
+
+## 2026-10-12 `af0c889` 提交复验
+
+在 `main` / `origin/main` 同步的 `af0c889`（`Add tenant role service layer`）上重新执行；验证前工作区干净，未修改产品代码。使用一次性 Redis 7 容器映射到 `127.0.0.1:16381`，并由脚本创建临时 SQLite、FastAPI、Vite 和 headless Playwright 进程。
+
+- 命令：在 `apps/api` 设置 `F24B_REDIS_HOST=127.0.0.1`、`F24B_REDIS_PORT=16381` 后执行 `.\.venv\Scripts\python.exe tests\verification\run_f24b_chat_messages_frontend.py`。
+- Redis `PING` 返回 `PONG`；脚本先运行 `pnpm build`，随后输出 `F24b chat messages frontend verification passed`，退出码为 `0`。
+- 错配 Workspace 的 `agent_id` 请求返回 `404` 且响应不含 Alpha 会话正文；历史分页、附件、受控失败后的草稿保留与重试、Workspace/会话切换、成员撤权后的 `403` 均通过。
+- 真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证；成功发送只证明聊天 API 接受请求。
+
+验收结束后已停止并移除临时 Redis、SQLite、附件目录和服务进程，未触碰既有 `8010` 服务。
