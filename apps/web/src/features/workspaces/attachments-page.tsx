@@ -49,21 +49,38 @@ function WorkspaceAttachmentsContent({ workspace, actorId }: { workspace: { tena
   const canUpload = ['owner', 'admin', 'member'].includes(workspace.workspace_role) && workspace.status === 'active'
   const canDeleteWorkspaceFiles = ['owner', 'admin'].includes(workspace.workspace_role)
   const keyPrefix = scopePrefix(actorId, workspace.tenant_id, workspace.workspace_id)
-  const queryKey = [...keyPrefix, scopeKind, page, 20, workspace.membership_version ?? 0] as const
+  const queryKey = [
+    ...keyPrefix,
+    {
+      scopeKind,
+      page,
+      pageSize: 20,
+      workspaceId: workspace.workspace_id,
+      membershipVersion: workspace.membership_version ?? 0,
+    },
+  ] as const
 
-  React.useEffect(() => {
+  const changeScope = (nextScope: ScopeKind) => {
+    if (nextScope === scopeKind) return
+    setScopeKind(nextScope)
     setSelectedFile(null)
     setError('')
     setPage(1)
     if (fileInput.current) fileInput.current.value = ''
-  }, [scopeKind])
+  }
 
   const attachments = useQuery({
     queryKey,
     enabled: workspace.status === 'active',
-    queryFn: () => api<AttachmentPage>(`${attachmentBase(workspace.workspace_id)}?scope_kind=${scopeKind}&page=${page}&page_size=20`, { headers: scopedHeaders(workspace.workspace_id) }),
+    queryFn: ({ queryKey: key }) => {
+      const request = key[5]
+      return api<AttachmentPage>(
+        `${attachmentBase(request.workspaceId)}?scope_kind=${request.scopeKind}&page=${request.page}&page_size=${request.pageSize}`,
+        { headers: scopedHeaders(request.workspaceId) },
+      )
+    },
   })
-  const refresh = () => client.invalidateQueries({ queryKey: [...keyPrefix, scopeKind] })
+  const refresh = () => client.invalidateQueries({ queryKey: [...keyPrefix, { scopeKind }] })
   const upload = useMutation({
     mutationFn: (file: File) => {
       const body = new FormData()
@@ -142,8 +159,8 @@ function WorkspaceAttachmentsContent({ workspace, actorId }: { workspace: { tena
             <p className='mt-1 text-sm text-muted-foreground'><LocalizedText text={"Workspace 附件对有访问权限的空间成员开放；个人附件仅当前账号可见。"} /></p>
           </div>
           <div className='flex flex-wrap gap-2' role='group' aria-label={t('附件存储范围')}>
-            <Button type='button' variant={scopeKind === 'workspace' ? "default" : "outline"} aria-pressed={scopeKind === 'workspace'} onClick={() => setScopeKind('workspace')}><LocalizedText text={"Workspace 附件"} /></Button>
-            <Button type='button' variant={scopeKind === 'personal' ? "default" : "outline"} aria-pressed={scopeKind === 'personal'} onClick={() => setScopeKind('personal')}><LocalizedText text={"我的个人附件"} /></Button>
+            <Button type='button' variant={scopeKind === 'workspace' ? "default" : "outline"} aria-pressed={scopeKind === 'workspace'} onClick={() => changeScope('workspace')}><LocalizedText text={"Workspace 附件"} /></Button>
+            <Button type='button' variant={scopeKind === 'personal' ? "default" : "outline"} aria-pressed={scopeKind === 'personal'} onClick={() => changeScope('personal')}><LocalizedText text={"我的个人附件"} /></Button>
           </div>
           <div className='flex flex-col gap-3 sm:flex-row sm:items-end'>
             <div className='min-w-0 flex-1 space-y-2'>

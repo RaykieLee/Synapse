@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
 import { formatMessage, useLocaleText } from '@/lib/i18n'
@@ -45,9 +45,14 @@ const button = 'rounded-md border px-3 py-2 text-sm hover:bg-muted disabled:opac
 const primary = 'rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50'
 
 export function TenantConfigsPage() {
-  const t = useLocaleText()
-  const actor = useAuthStore((state) => state.auth.user)
   const { tenantId } = useParams({ from: '/_authenticated/tenants/$tenantId/configs' })
+  const actorId = useAuthStore((state) => state.auth.user?.user_id ?? 'anonymous')
+  // key 重置本地草稿、敏感值展示与请求令牌，避免跨租户串态。
+  return <TenantConfigsPanel key={`${actorId}:${tenantId}`} tenantId={tenantId} actorId={actorId} />
+}
+
+function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: string }) {
+  const t = useLocaleText()
   const client = useQueryClient()
   const [page, setPage] = useState(1)
   const [nameFilter, setNameFilter] = useState('')
@@ -60,9 +65,6 @@ export function TenantConfigsPage() {
   const [error, setError] = useState('')
   const [reveal, setReveal] = useState<{ tenantId: string; id: string; name: string; value: string | null; loading: boolean; error: string }>({ tenantId: '', id: '', name: '', value: null, loading: false, error: '' })
   const revealRequest = useRef(0)
-  const tenantIdRef = useRef(tenantId)
-  tenantIdRef.current = tenantId
-  const actorId = actor?.user_id ?? 'anonymous'
   const tenantKey = ['synapse', actorId, tenantId, 'personal', 'tenant'] as const
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
@@ -73,7 +75,7 @@ export function TenantConfigsPage() {
   if (groupFilter.trim()) params.set('group_name', groupFilter.trim())
   if (statusFilter) params.set('status', statusFilter)
   if (sensitiveFilter) params.set('is_sensitive', sensitiveFilter)
-  const listKey = ['synapse', actorId, tenantId, 'tenant', 'configs', tenant.data?.membership_version ?? 0, page, nameFilter.trim(), keyFilter.trim(), groupFilter.trim(), statusFilter, sensitiveFilter] as const
+  const listKey = ['synapse', actorId, tenantId, 'tenant', 'configs', tenant.data?.membership_version ?? 0, page, params.toString()] as const
   const configs = useQuery({
     queryKey: listKey,
     enabled: canManage && tenantActive,
@@ -106,14 +108,6 @@ export function TenantConfigsPage() {
     onError: (cause) => setError(errorText(cause)),
   })
 
-  useEffect(() => {
-    revealRequest.current += 1
-    setReveal({ tenantId: '', id: '', name: '', value: null, loading: false, error: '' })
-    setDraft(null)
-    setDraftTenantId(null)
-    setError('')
-  }, [tenantId])
-
   const revealValue = async (row: TenantConfig) => {
     const requestId = ++revealRequest.current
     const requestedTenantId = tenantId
@@ -121,10 +115,10 @@ export function TenantConfigsPage() {
     try {
       // Sensitive detail deliberately bypasses React Query and its query cache.
       const detail = await api<TenantConfig>(`/tenants/${requestedTenantId}/configs/${row.config_id}`)
-      if (revealRequest.current !== requestId || tenantIdRef.current !== requestedTenantId) return
+      if (revealRequest.current !== requestId) return
       setReveal({ tenantId: requestedTenantId, id: row.config_id, name: row.config_name, value: detail.config_value, loading: false, error: '' })
     } catch (cause) {
-      if (revealRequest.current !== requestId || tenantIdRef.current !== requestedTenantId) return
+      if (revealRequest.current !== requestId) return
       setReveal({ tenantId: requestedTenantId, id: row.config_id, name: row.config_name, value: null, loading: false, error: errorText(cause) })
     }
   }

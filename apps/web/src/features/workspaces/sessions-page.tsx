@@ -1,8 +1,7 @@
 import * as React from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { formatMessage, useLocaleText } from '@/lib/i18n'
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { InfiniteData } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { ArrowLeft, Bot, Loader2, MessageSquare, Paperclip, Plus, Send, Settings2, Square, Trash2 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -64,6 +63,8 @@ function formatError(error: unknown): string {
 const statusLabel: Record<SessionStatus, string> = {
   running: '运行中', idle: '空闲', awaiting_permission: '等待授权', awaiting_external_result: '等待外部结果',
 }
+const emptyAgents: AgentView[] = []
+const emptySessions: SessionView[] = []
 
 export function WorkspaceSessionsPage() {
   const { workspace, actorId } = useWorkspace()
@@ -89,16 +90,16 @@ function WorkspaceSessionsContent({ workspace, actorId }: { workspace: Workspace
     queryKey: agentsKey,
     queryFn: () => api<AgentList>(`${aiPath}/agent/`, { headers: headers(workspace) }),
   })
-  const availableAgents = agents.data?.agents ?? []
+  const availableAgents = agents.data?.agents ?? emptyAgents
   const selectedAgent = availableAgents.find((agent) => agent.id === agentId) ?? null
 
-  React.useEffect(() => {
-    if (!agentId && availableAgents.length) setAgentId(availableAgents[0].id)
-    else if (agentId && availableAgents.length && !availableAgents.some((agent) => agent.id === agentId)) {
-      setAgentId(availableAgents[0].id)
+  if (agents.data && (!agentId || !availableAgents.some((agent) => agent.id === agentId))) {
+    const nextAgentId = availableAgents[0]?.id ?? ''
+    if (nextAgentId !== agentId) {
+      setAgentId(nextAgentId)
       setSessionId(null)
     }
-  }, [agentId, availableAgents])
+  }
 
   const sessions = useQuery({
     queryKey: sessionListKey,
@@ -106,12 +107,12 @@ function WorkspaceSessionsContent({ workspace, actorId }: { workspace: Workspace
     enabled: Boolean(agentId),
     refetchInterval: (query) => query.state.data?.sessions.some((entry) => entry.status === 'running') ? 3000 : false,
   })
-  const entries = sessions.data?.sessions ?? []
+  const entries = sessions.data?.sessions ?? emptySessions
   const selected = entries.find((entry) => entry.session.id === sessionId) ?? null
 
-  React.useEffect(() => {
-    if (sessionId && entries.length && !entries.some((entry) => entry.session.id === sessionId)) setSessionId(null)
-  }, [entries, sessionId])
+  if (sessions.data && sessionId && !entries.some((entry) => entry.session.id === sessionId)) {
+    setSessionId(null)
+  }
 
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: sessionListKey })
@@ -536,12 +537,30 @@ function SessionMessagesPanel({
   const externalRequestsRef = React.useRef<PendingExternalResult[]>([])
   const historyExternalRequestsRef = React.useRef<PendingExternalResult[]>([])
   const messagesKey = React.useMemo(
-    () => [...scopedKey(actorId, workspace, 'ai-messages'), agentId, sessionId] as const,
-    [actorId, workspace.tenant_id, workspace.workspace_id, workspace.membership_version, agentId, sessionId],
+    () => [
+      'synapse',
+      actorId,
+      workspace.tenant_id,
+      workspace.workspace_id,
+      'ai-messages',
+      workspace.membership_version ?? 0,
+      agentId,
+      sessionId,
+      headers,
+    ] as const,
+    [actorId, workspace.tenant_id, workspace.workspace_id, workspace.membership_version, agentId, sessionId, headers],
   )
   const attachmentKey = React.useMemo(
-    () => scopedKey(actorId, workspace, 'workspace-attachments-chat'),
-    [actorId, workspace.tenant_id, workspace.workspace_id, workspace.membership_version],
+    () => [
+      'synapse',
+      actorId,
+      workspace.tenant_id,
+      workspace.workspace_id,
+      'workspace-attachments-chat',
+      workspace.membership_version ?? 0,
+      headers,
+    ] as const,
+    [actorId, workspace.tenant_id, workspace.workspace_id, workspace.membership_version, headers],
   )
 
   const history = useInfiniteQuery<
@@ -587,9 +606,27 @@ function SessionMessagesPanel({
   externalRequestsRef.current = externalRequests
   const pickedAttachments = (attachments.data?.items ?? []).filter((item) => selectedAttachments.includes(item.attachment_id))
   const pickedBytes = pickedAttachments.reduce((sum, item) => sum + item.size_bytes, 0)
+  const runStatusKey = React.useMemo(
+    () => [
+      'synapse',
+      actorId,
+      workspace.tenant_id,
+      workspace.workspace_id,
+      'ai-messages',
+      workspace.membership_version ?? 0,
+      agentId,
+      sessionId,
+      headers,
+      'status',
+    ] as const,
+    [actorId, workspace.tenant_id, workspace.workspace_id, workspace.membership_version, agentId, sessionId, headers],
+  )
   const runStatus = useQuery({
-    queryKey: [...messagesKey, 'status'],
-    queryFn: () => api<ChatStatus>(`${aiPath}/sessions/${encodeURIComponent(sessionId)}/status?agent_id=${encodeURIComponent(agentId)}`, { headers }),
+    queryKey: runStatusKey,
+    queryFn: ({ queryKey }) => api<ChatStatus>(
+      `${aiPath}/sessions/${encodeURIComponent(queryKey[7])}/status?agent_id=${encodeURIComponent(queryKey[6])}`,
+      { headers: queryKey[8] },
+    ),
     enabled: workspace.status === 'active' && (sending || interruptPending || stopRequested),
     refetchInterval: (query) => query.state.data?.status === 'running' ? 1000 : false,
     retry: false,

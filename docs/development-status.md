@@ -16,6 +16,10 @@
 
 > 2026-10-12 F12 增量复核：角色 UX 审查见 [租户角色与成员分配复核](ux/F12-tenant-roles-review.md)。列表 URL 状态、无匹配空态、停用/软删与历史菜单授权确认、内置成员保护原因、权限版本缓存键和搜索通配符修复已写，TypeScript/Python 静态检查通过；独立静态复核已完成，真实浏览器/API 验收仍待做，英文模式 API 错误与读屏行操作仍待核。历史 F12 验收不覆盖本次增量。
 
+> 2026-10-12 基线验证（起点 `38bbf24`）：API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、前端 `pnpm build` 通过。首次全量 ESLint 发现 29 个 error；修复后 `pnpm exec eslint .` 退出码为 0（仍有 24 个 warning）。验证过程中发现并单独提交/推送 F17a Windows 并发 unlink 修复（`4d926bf`）；新竞态修复仍待独立复验。
+
+> 2026-10-12 当前树基线复验（基于 `4d926bf`，包含当时工作树中未提交的前端 lint 整改）：API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、`pnpm build` 均通过；`pnpm exec eslint .` 退出码为 0，仍有 24 个 warning。详见[基线复验报告](verification/baseline-2026-10-12.md)。该记录不代表 P0 浏览器/API 独立验收已完成。
+
 | ID | 单一任务 | 状态 | 开发/设计智能体 | 独立验证与证据 |
 | --- | --- | --- | --- | --- |
 | F01 | shadcn-admin 前端基础与品牌 | 基础通过 | web_foundation | verification/F01-web-foundation.md：构建、品牌、桌面/移动浏览器渲染通过；仍含待替换模板业务 |

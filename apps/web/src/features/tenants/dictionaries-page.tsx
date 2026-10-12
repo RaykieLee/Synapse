@@ -43,7 +43,7 @@ export function TenantDictionariesPage() {
   const typeParams = new URLSearchParams({ page: String(typePage), page_size: '20' })
   if (normalizedTypeSearch) typeParams.set(typeSearchField, normalizedTypeSearch)
   if (typeStatus) typeParams.set('status', typeStatus)
-  const typesKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'types', tenant.data?.membership_version ?? 0, typePage, typeSearchField, normalizedTypeSearch, typeStatus] as const
+  const typesKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'types', tenant.data?.membership_version ?? 0, typePage, typeParams.toString()] as const
   const types = useQuery({
     queryKey: typesKey,
     enabled: canManage && tenantActive,
@@ -59,7 +59,7 @@ export function TenantDictionariesPage() {
   const entryParams = new URLSearchParams({ page: String(entryPage), page_size: '20' })
   if (normalizedEntrySearch) entryParams.set('dict_label', normalizedEntrySearch)
   if (entryStatus) entryParams.set('status', entryStatus)
-  const entriesKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'data', selectedTypeId, tenant.data?.membership_version ?? 0, entryPage, normalizedEntrySearch, entryStatus] as const
+  const entriesKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'data', selectedTypeId, tenant.data?.membership_version ?? 0, entryPage, entryParams.toString()] as const
   const entries = useQuery({
     queryKey: entriesKey,
     enabled: canManage && tenantActive && Boolean(selectedTypeId) && !selectedType.isError,

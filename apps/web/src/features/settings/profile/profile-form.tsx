@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
@@ -11,11 +11,19 @@ import { LocalizedText } from '@/components/localized-text'
 export function ProfileForm() {
   const user = useAuthStore((s) => s.auth.user)
   const setUser = useAuthStore((s) => s.auth.setUser)
-  const [form, setForm] = useState({ nick_name: '', email: '', phonenumber: '', sex: '', avatar: '' })
+  const [form, setForm] = useState(() => ({
+    nick_name: user?.nick_name ?? '',
+    email: user?.email ?? '',
+    phonenumber: user?.phonenumber ?? '',
+    sex: user?.sex ?? '',
+    avatar: user?.avatar ?? '',
+  }))
+  const [lastUser, setLastUser] = useState(user)
+  if (user !== lastUser) {
+    setLastUser(user)
+    setForm({ nick_name: user?.nick_name ?? '', email: user?.email ?? '', phonenumber: user?.phonenumber ?? '', sex: user?.sex ?? '', avatar: user?.avatar ?? '' })
+  }
   const [saving, setSaving] = useState(false)
-  useEffect(() => {
-    if (user) setForm({ nick_name: user.nick_name ?? '', email: user.email ?? '', phonenumber: user.phonenumber ?? '', sex: user.sex ?? '', avatar: user.avatar ?? '' })
-  }, [user])
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }))
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setSaving(true)

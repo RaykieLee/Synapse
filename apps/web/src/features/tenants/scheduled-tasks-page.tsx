@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
 import { formatMessage, getLocale, useLocale } from '@/lib/i18n'
@@ -38,14 +38,13 @@ const intervalUnits: TaskDraft['interval_unit'][] = ['seconds', 'minutes', 'hour
 const unitLabels: Record<TaskDraft['interval_unit'], string> = { seconds: '秒', minutes: '分钟', hours: '小时', days: '天', weeks: '周' }
 
 export function TenantScheduledTasksPage() {
-  const actor = useAuthStore((state) => state.auth.user)
+  const actorId = useAuthStore((state) => state.auth.user?.user_id ?? 'anonymous')
   const { tenantId } = useParams({ from: '/_authenticated/tenants/$tenantId/scheduled-tasks' })
-  const actorId = actor?.user_id ?? 'anonymous'
-  const contextKey = `${actorId}:${tenantId}`
-  const requestContext = useRef({ key: contextKey, generation: 0 })
-  if (requestContext.current.key !== contextKey) {
-    requestContext.current = { key: contextKey, generation: requestContext.current.generation + 1 }
-  }
+  // key 重置本地任务草稿与运行上下文，避免跨租户串态。
+  return <TenantScheduledTasksPanel key={`${actorId}:${tenantId}`} tenantId={tenantId} actorId={actorId} />
+}
+
+function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; actorId: string }) {
   const client = useQueryClient()
   const isEnglish = useLocale() === 'en'
   const [draft, setDraft] = useState<TaskDraft | null>(null)
@@ -64,16 +63,12 @@ export function TenantScheduledTasksPage() {
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
   const active = tenant.data?.status === 'active'
-  useEffect(() => {
-    setDraft(null); setHistoryTask(null); setRunConfirmation(null); setManualRun(null)
-    setManualRunError(''); setManualRunPendingId(null)
-  }, [actorId, tenantId])
   const params = new URLSearchParams({ page: String(page), page_size: '20' })
   if (search.trim()) params.set('task_name', search.trim())
   if (targetFilter) params.set('execution_target', targetFilter)
   if (scheduleFilter) params.set('schedule_type', scheduleFilter)
   if (enabledFilter) params.set('enabled', enabledFilter)
-  const listKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'list', page, search.trim(), targetFilter, scheduleFilter, enabledFilter] as const
+  const listKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'list', page, params.toString()] as const
   const tasks = useQuery({
     queryKey: listKey,
     enabled: canManage && active,
@@ -123,18 +118,14 @@ export function TenantScheduledTasksPage() {
     if (!runConfirmation || manualRunPendingId) return
     const task = runConfirmation
     const requestTenantId = tenantId
-    const requestActorId = actorId
-    const requestGeneration = requestContext.current.generation
     setManualRunPendingId(task.task_id); setManualRunError(''); setManualRun(null); setRunConfirmation(null)
     try {
       const run = await api<TaskRun>(`/tenants/${requestTenantId}/scheduled-tasks/${task.task_id}/runs`, { method: 'POST' })
-      if (requestGeneration !== requestContext.current.generation || requestContext.current.key !== `${requestActorId}:${requestTenantId}`) return
       setManualRun({ tenantId: requestTenantId, task, run })
       setHistoryTask(task)
       setManualRunPendingId(null)
       await client.invalidateQueries({ queryKey: ['synapse', actorId, requestTenantId, 'tenant', 'scheduled-tasks'] })
     } catch (cause) {
-      if (requestGeneration !== requestContext.current.generation || requestContext.current.key !== `${requestActorId}:${requestTenantId}`) return
       setManualRunError(manualRunErrorText(cause))
       setManualRunPendingId(null)
       if (cause instanceof ApiProblem && cause.status === 409 && cause.code === 'TASK_UNAVAILABLE') {
@@ -203,14 +194,16 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
   const [startedTo, setStartedTo] = useState('')
   const [page, setPage] = useState(1)
   const [selectedRunId, setSelectedRunId] = useState(initialSelectedRunId ?? '')
-  useEffect(() => {
+  const [lastInitialSelectedRunId, setLastInitialSelectedRunId] = useState(initialSelectedRunId)
+  if (initialSelectedRunId !== lastInitialSelectedRunId) {
+    setLastInitialSelectedRunId(initialSelectedRunId)
     if (initialSelectedRunId) setSelectedRunId(initialSelectedRunId)
-  }, [initialSelectedRunId])
+  }
   const params = new URLSearchParams({ page: String(page), page_size: '20' })
   if (status) params.set('status', status)
   if (startedFrom) params.set('started_from', new Date(startedFrom).toISOString())
   if (startedTo) params.set('started_to', new Date(startedTo).toISOString())
-  const runsKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'runs', task.task_id, page, status, startedFrom, startedTo] as const
+  const runsKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'runs', task.task_id, params.toString()] as const
   const runs = useQuery({ queryKey: runsKey, queryFn: () => api<RunPage>(`/tenants/${tenantId}/scheduled-tasks/${task.task_id}/runs?${params}`) })
   const detailKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'run', task.task_id, selectedRunId] as const
   const detail = useQuery({

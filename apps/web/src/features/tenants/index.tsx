@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { formatMessage } from '@/lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, getRouteApi, useParams } from '@tanstack/react-router'
 import { LoaderCircle, Plus, RotateCcw } from 'lucide-react'
@@ -65,7 +64,7 @@ import {
 } from './components/tenant-table'
 import { tenantText, type TenantRoleRecord } from './types'
 import { LocalizedText } from '@/components/localized-text'
-import { useLocale } from '@/lib/i18n'
+import { formatMessage, useLocale } from '@/lib/i18n'
 
 const tenantsRoute = getRouteApi('/_authenticated/tenants/')
 
@@ -99,7 +98,7 @@ export function Tenants() {
   const updatedFrom = search.updatedFrom ?? ''
   const expiresBefore = search.expiresBefore ?? ''
   const [searchInput, setSearchInput] = useState(query)
-  useEffect(() => setSearchInput(query), [query])
+  const [lastQuery, setLastQuery] = useState(query)
   const [createOpen, setCreateOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<Tenant | null>(null)
   const [batchDialog, setBatchDialog] = useState<TenantBatchTarget[] | null>(null)
@@ -114,12 +113,12 @@ export function Tenants() {
   } | null>(null)
   const [batchFailures, setBatchFailures] = useState<Record<string, TenantBatchFailure>>({})
   const [error, setError] = useState('')
+  if (query !== lastQuery) {
+    setLastQuery(query)
+    setSearchInput(query)
+  }
   useEffect(() => {
-    if (batchProgress) {
-      if (searchInput !== query) setSearchInput(query)
-      return
-    }
-    if (searchInput.trim() === query) return
+    if (batchProgress || searchInput.trim() === query) return
     const timer = window.setTimeout(() => {
       void navigate({
         search: (previous) => ({
@@ -156,14 +155,7 @@ export function Tenants() {
     admin ? 'platform' : 'member',
     page,
     pageSize,
-    query,
-    status,
-    validity,
-    slug,
-    createdFrom,
-    createdTo,
-    updatedFrom,
-    expiresBefore,
+    request,
   ]
   const tenants = useQuery({
     queryKey: key,
@@ -270,25 +262,25 @@ export function Tenants() {
     setBatchSummary({ succeeded, failed })
     await refresh()
   }
-  useEffect(
-    () => {
-      setSelectedIds(new Set())
-      setBatchFailures({})
-      setBatchSummary(null)
-    },
-    [
-      page,
-      pageSize,
-      query,
-      status,
-      validity,
-      slug,
-      createdFrom,
-      createdTo,
-      updatedFrom,
-      expiresBefore,
-    ]
-  )
+  const filtersKey = JSON.stringify([
+    page,
+    pageSize,
+    query,
+    status,
+    validity,
+    slug,
+    createdFrom,
+    createdTo,
+    updatedFrom,
+    expiresBefore,
+  ])
+  const [lastFiltersKey, setLastFiltersKey] = useState(filtersKey)
+  if (filtersKey !== lastFiltersKey) {
+    setLastFiltersKey(filtersKey)
+    setSelectedIds(new Set())
+    setBatchFailures({})
+    setBatchSummary(null)
+  }
 
   return (
     <main className='space-y-5 p-6'>

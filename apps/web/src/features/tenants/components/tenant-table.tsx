@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { CheckIcon, PlusCircledIcon } from '@radix-ui/react-icons'
 import { Link } from '@tanstack/react-router'
 import {
@@ -95,10 +95,12 @@ function TenantFacetFilter<T extends string>({
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const selected = options.find((option) => option.value === value)
-  useEffect(() => {
+  const [wasDisabled, setWasDisabled] = useState(disabled)
+  if (disabled !== wasDisabled) {
+    setWasDisabled(disabled)
     if (disabled) setOpen(false)
-  }, [disabled])
+  }
+  const selected = options.find((option) => option.value === value)
   return (
     <Popover
       open={open}
@@ -210,6 +212,7 @@ export function TenantToolbar({
 }) {
   const t = useLocaleText()
   const [dateOpen, setDateOpen] = useState(false)
+  const [wasDisabled, setWasDisabled] = useState(disabled)
   const [draft, setDraft] = useState<AdvancedTenantFilters>({
     slug,
     createdFrom,
@@ -225,9 +228,10 @@ export function TenantToolbar({
   ].filter(Boolean).length
   const hasFilters = Boolean(query || status || validity || advancedCount)
 
-  useEffect(() => {
+  if (disabled !== wasDisabled) {
+    setWasDisabled(disabled)
     if (disabled) setDateOpen(false)
-  }, [disabled])
+  }
 
   return (
     <div
@@ -811,9 +815,11 @@ export function TenantColumnOptions({
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  useEffect(() => {
+  const [wasDisabled, setWasDisabled] = useState(disabled)
+  if (disabled !== wasDisabled) {
+    setWasDisabled(disabled)
     if (disabled) setOpen(false)
-  }, [disabled])
+  }
   return (
     <DropdownMenu
       modal={false}
