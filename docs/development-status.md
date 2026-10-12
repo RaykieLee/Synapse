@@ -8,6 +8,8 @@
 
 ## 功能任务
 
+> 2026-10-12 基线修复：实际当前树 `896b66a` 首次默认 API 复跑暴露 F17a Windows 瞬态 unlink 竞态（`22 passed, 1 failed, 25 deselected`）。已在附件删除路径加入有限重试，并增加确定性 FastAPI 回归；F17a 定向、F16a→F17a 连续 8 轮、默认 API、compileall、build 和 ESLint 均通过。该修复的 Redis、浏览器、多副本共享存储仍待独立验收，证据见 [F17a 附件验收](verification/F17a-attachments-api.md) 和 [基线复验报告](verification/baseline-2026-10-12.md)。
+
 > 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已实现；本轮增量已完成独立真实 API/Chromium 验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本轮 F09 增量现为**独立验收通过**，加载态仍未做人为延迟下的独立时序断言。F24b 的 agent/session 绑定修复已完成本机真实 API/Playwright 复验，F24b 独立验收已在 `b069adf` 记录；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
 
 > 2026-10-12 租户优化独立验收：筛选/计数、UTC 边界、权限隔离、owner API 落库、邀请过期 `410` 与持久化 5 项真实 API 检查通过；独立 Chromium 复验确认中英文标题/说明/状态/角色/日期/分页、错误重试、超范围页码、筛选空态、成员空态、列显隐、可访问名称和 390px 窄屏均通过。平台管理员零租户空态仍为拦截模拟，加载态未做人为延迟下的独立时序断言；详见[租户优化验收记录](verification/tenant-optimization-acceptance-2026-10-12.md)。
@@ -82,7 +84,7 @@
 | F15b | 字典管理前端迁移 | 通过（service 化后复验通过） | verify_tenant_backend | verification/F15b-tenant-dictionary-frontend.md 与 verification/F15a-tenant-dictionary-service-refactor.md：真实 API/Vite/Chromium CRUD、筛选、排序、隔离和 Redis 环境复验通过 |
 | F16a | 参数配置后端迁移 | 通过（service 化独立复验通过） | agent_embedding_design | verification/F16a-tenant-config-api.md 与 verification/F16a-tenant-config-service-refactor.md：1 passed；迁移、租户隔离、权限、敏感值边界、router/service 事务边界通过 |
 | F16b | 参数配置前端迁移 | 通过（service 化后真实 Redis 复验通过） | agent_embedding_design | verification/F16b-tenant-config-frontend.md：build、真实 API/Vite/Chromium CRUD、敏感值延迟响应、租户切换隔离和当前 Redis `16381` 环境通过 |
-| F17a | 附件管理本地存储后端 | 历史验收通过；2026-10-12 Windows 并发 unlink 修复已写、定向 10 次与默认 API 套件通过，待独立复验 | verify_tenant_backend | verification/F17a-attachments-api.md：原作用域/上传下载/失败重试验收通过；本次新增模拟 WinError 5 缺文件回归和真实双线程并发复跑 |
+| F17a | 附件管理本地存储后端 | 历史验收通过；2026-10-12 瞬态 Windows unlink 修复已写，定向回归、F16a→F17a 顺序复跑和默认 API 套件通过；Redis/浏览器/多副本仍待独立验收 | verify_tenant_backend | verification/F17a-attachments-api.md：原作用域/上传下载/失败重试、模拟瞬态 WinError 5 回归和真实双线程并发复跑 |
 | F17b | 附件管理前端 | 通过 | verify_tenant_backend | verification/F17b-attachments-frontend.md：build、真实API/AgentScope/Redis浏览器多租户多空间附件与撤权通过 |
 | F18a | 系统任务定义后端迁移 | 通过 | verify_tenant_backend | verification/F18a-scheduled-task-definition.md：修复后1 passed，计划校验422且无写入、隔离、目标allowlist与迁移通过 |
 | F18b1 | 过期租户邀请任务目标 | 通过 | verify_tenant_backend | verification/F18b1-expire-invitations.md：1 passed，租户过滤、到期边界及重复/并发幂等通过 |

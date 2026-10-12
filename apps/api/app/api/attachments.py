@@ -5,6 +5,7 @@ import io
 import mimetypes
 import os
 import re
+import time
 import unicodedata
 import uuid
 import zipfile
@@ -111,6 +112,45 @@ def _storage_path(storage_key: str) -> Path:
     if root not in path.parents:
         raise RuntimeError("Attachment path escaped configured storage root")
     return path
+
+
+def _unlink_storage_file(path: Path) -> None:
+    """Remove a stored object while tolerating a short Windows unlink race."""
+    try:
+        path.unlink(missing_ok=True)
+        return
+    except PermissionError as initial_error:
+        last_error = initial_error
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from exc
+
+    for delay in (0.01, 0.05, 0.1):
+        try:
+            path.stat()
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from exc
+
+        time.sleep(delay)
+        try:
+            path.unlink(missing_ok=True)
+        except FileNotFoundError:
+            return
+        except PermissionError as exc:
+            last_error = exc
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from exc
+        else:
+            return
+
+    try:
+        path.stat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from exc
+    raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from last_error
 
 
 def _statement(context: WorkspaceContext, scope_kind: str, attachment_id: str | None = None):
@@ -242,24 +282,7 @@ def delete_attachment(
     elif row.owner_user_id != context.actor_user_id:
         _fail(404, "RESOURCE_NOT_FOUND")
     path = _storage_path(row.storage_key)
-    try:
-        path.unlink(missing_ok=True)
-    except PermissionError as exc:
-        # Windows can report ACCESS_DENIED when another DELETE already unlinked
-        # the file. Treat it as idempotent only when a fresh stat proves absence.
-        try:
-            path.stat()
-        except FileNotFoundError:
-            pass
-        except OSError as stat_exc:
-            db.rollback()
-            raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from stat_exc
-        else:
-            db.rollback()
-            raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from exc
-    except OSError as exc:
-        db.rollback()
-        raise HTTPException(status_code=500, detail={"code": "FILE_CLEANUP_FAILED"}) from exc
+    _unlink_storage_file(path)
     # Keep the row available for an API retry if unlink fails. Delete the row
     # conditionally after unlink so concurrent requests are idempotent. If the
     # DB commit fails after unlink, the retained row points at a missing file;

@@ -273,6 +273,36 @@ def test_f17a_attachment_storage_api_and_migration(tmp_path, monkeypatch):
         with factory() as db:
             assert db.get(Attachment, race_id) is None
 
+        # A transient Windows sharing violation can occur while the
+        # competing DELETE still owns the file handle. The retry path must
+        # wait briefly and complete cleanup once the handle is released.
+        transient_target = upload("f17a-uploader", "unlink-transient.txt", b"retry unlink")
+        assert transient_target.status_code == 201
+        transient_id = transient_target.json()["attachment_id"]
+        with factory() as db:
+            row = db.get(Attachment, transient_id)
+            transient_path = storage / row.storage_key[:2] / row.storage_key[2:]
+        permission_attempts = [0]
+
+        def transient_permission_error(path, *args, **kwargs):
+            if path == transient_path and permission_attempts[0] == 0:
+                permission_attempts[0] += 1
+                raise PermissionError(5, "Access is denied", str(path))
+            return original_unlink(path, *args, **kwargs)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(Path, "unlink", transient_permission_error)
+            transient_delete = req(
+                "delete",
+                f"{api}/{transient_id}",
+                "f17a-owner-a",
+                workspace_ids["alpha"],
+            )
+        assert transient_delete.status_code == 204
+        with factory() as db:
+            assert db.get(Attachment, transient_id) is None
+        assert not transient_path.exists()
+
         # DB commit failure after physical unlink leaves the metadata retryable; a second DELETE finalizes it.
         retry_target = upload("f17a-uploader", "delete-commit-retry.txt", b"retry")
         assert retry_target.status_code == 201

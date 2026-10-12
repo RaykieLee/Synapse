@@ -1,5 +1,14 @@
 # F17a 附件本地存储验收
 
+## 2026-10-12 基线回归：瞬态 Windows unlink 冲突
+
+- 当前实际基线 `896b66a` 的默认 API 套件首次复跑为 `22 passed, 1 failed, 25 deselected`；失败发生在 F17a 两个并发 DELETE 的一个请求，返回 `500 INTERNAL_ERROR`。
+- 根因是 Windows 并发删除时，第二次 `Path.unlink(missing_ok=True)` 可能短暂抛出 `PermissionError`，而目标文件在一次性的 `stat()` 检查时仍存在。旧逻辑将这个短暂共享冲突误判为 `FILE_CLEANUP_FAILED`。
+- `apps/api/app/api/attachments.py` 新增有限重试的 `_unlink_storage_file()`：确认文件仍存在后按 `10ms/50ms/100ms` 重试；文件已经消失时按幂等成功处理；持续占用或其他 I/O 错误仍返回 `500 FILE_CLEANUP_FAILED`。
+- `tests/verification/test_f17a_attachments.py` 新增确定性 FastAPI 回归：第一次 unlink 注入“文件仍存在的 `PermissionError`”，第二次调用恢复真实 unlink，要求 DELETE 返回 `204`、metadata 删除且磁盘文件不存在。该段是模拟操作系统竞态，不等同于真实 Windows 内核故障注入。
+- 修复后证据：F17a 定向用例 `1 passed`；F16a→F17a 顺序组合连续 `8/8` 通过；默认 API 套件 `23 passed, 25 deselected, 37 warnings`；`compileall`、`pnpm build` 通过；ESLint `0 errors, 24 warnings`。
+- 这些证据仍不替代 PostgreSQL、多副本共享存储、Redis 标记套件或浏览器独立验收。
+
 ## 2026-10-12 Windows 并发 unlink 修复复核
 
 - 基线复跑发现，两个 DELETE 请求都读取同一附件后，Windows 偶发在后一个 `Path.unlink(missing_ok=True)` 上抛出 `PermissionError`（WinError 5 / errno 13），即使文件此时已经被另一个请求删除。临时探针确认异常后目标路径不存在；移除父目录操作的最小双线程环也能复现，300 轮中出现 121 次该异常。
