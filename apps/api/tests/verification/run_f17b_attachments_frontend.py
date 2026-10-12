@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -20,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[4]
 API = ROOT / "apps" / "api"
 WEB = ROOT / "apps" / "web"
 FLOW = Path(__file__).with_name("f17b_attachments_frontend.mjs")
+PNPM = shutil.which("pnpm") or ("pnpm.cmd" if os.name == "nt" else "pnpm")
 
 
 def free_port():
@@ -42,8 +44,25 @@ def wait_url(url, process=None):
     raise RuntimeError(f"Timed out waiting for {url}")
 
 
+def terminate_process_tree(process):
+    """Terminate pnpm's child Vite process as well as the command wrapper."""
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+            )
+        else:
+            process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
 def main():
-    build = subprocess.run(["pnpm", "build"], cwd=WEB)
+    build = subprocess.run([PNPM, "build"], cwd=WEB)
     if build.returncode:
         return build.returncode
 
@@ -153,7 +172,7 @@ def main():
         web_log_path = temp / "vite.log"
         api_log = api_log_path.open("w")
         web_log = web_log_path.open("w")
-        web = subprocess.Popen(["pnpm", "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
+        web = subprocess.Popen([PNPM, "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
         seed.update({"web": f"http://127.0.0.1:{web_port}", "api": f"http://127.0.0.1:{api_port}/api/v1", "control_secret": secret})
         seed_path = temp / "seed.json"
         seed_path.write_text(json.dumps(seed))
@@ -166,12 +185,14 @@ def main():
             print("Vite log:\n", web_log_path.read_text(errors="replace") if web_log_path.exists() else "", file=sys.stderr)
             raise
         finally:
-            web.terminate()
-            web.wait(timeout=10)
+            terminate_process_tree(web)
             server.should_exit = True
             api_thread.join(timeout=15)
             api_log.close(); web_log.close()
             main_module.create_agentscope_app = original_factory
+            get_engine().dispose()
+            get_session_factory.cache_clear()
+            get_engine.cache_clear()
             redis_client.flushdb()
             redis.Redis(host=redis_host, port=redis_port, db=14).flushdb()
             if api_thread.is_alive():

@@ -10,7 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ApiProblem, api, apiBlob } from '@/lib/api'
+import { ApiProblem, api } from '@/lib/api'
+import {
+  downloadAttachment,
+  listAttachments,
+} from '@/api/attachments'
 import { useAuthStore } from '@/stores/auth-store'
 import { Textarea } from '@/components/ui/textarea'
 import { useWorkspace } from './context'
@@ -299,8 +303,6 @@ type ChatBlock = {
 }
 type ChatMessage = { id: string; role: 'user' | 'assistant' | 'system'; name: string; content: ChatBlock[]; created_at?: string }
 type MessagePage = { messages: ChatMessage[]; is_running: boolean; has_more: boolean }
-type Attachment = { attachment_id: string; filename: string; media_type: string; size_bytes: number; scope_kind: 'workspace' | 'personal' }
-type AttachmentPage = { items: Attachment[]; total: number; page: number; page_size: number }
 type ChatStatus = { session_id: string; status: SessionStatus }
 type DataBlock = { type: 'data'; name: string; source: { type: 'base64'; data: string; media_type: string } }
 type StreamEvent = {
@@ -582,7 +584,14 @@ function SessionMessagesPanel({
   })
   const attachments = useQuery({
     queryKey: attachmentKey,
-    queryFn: () => api<AttachmentPage>(`/workspaces/${workspace.workspace_id}/attachments?scope_kind=workspace&page=1&page_size=100`, { headers }),
+    queryFn: () =>
+      listAttachments({
+        workspaceId: workspace.workspace_id,
+        scopeKind: 'workspace',
+        page: 1,
+        pageSize: 100,
+        headers,
+      }),
     enabled: workspace.status === 'active',
   })
   const allMessages = history.data?.pages.flatMap((page) => page.messages) ?? []
@@ -1049,7 +1058,12 @@ function SessionMessagesPanel({
       const blocks: Array<{ type: 'text'; text: string } | DataBlock> = []
       if (contentText) blocks.push({ type: 'text', text: contentText })
       for (const attachment of pickedAttachments) {
-        const blob = await apiBlob(`/workspaces/${workspace.workspace_id}/attachments/${encodeURIComponent(attachment.attachment_id)}/download?scope_kind=workspace`, { headers, signal: controller.signal })
+        const blob = await downloadAttachment(
+          workspace.workspace_id,
+          attachment.attachment_id,
+          'workspace',
+          { headers, signal: controller.signal },
+        )
         blocks.push({
           type: 'data', name: attachment.filename,
           source: { type: 'base64', data: await blobToBase64(blob), media_type: attachment.media_type || blob.type || 'application/octet-stream' },

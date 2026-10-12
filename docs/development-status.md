@@ -8,7 +8,7 @@
 
 ## 功能任务
 
-> 2026-10-12 F17 附件域 UX/架构方案已审：独立 UX 审查覆盖数据归属、权限撤销、错误恢复、并发删除、URL 状态、移动端、可访问性和双语；方案冻结现有 attachment wire contract，规划 `router → AttachmentService → SQLAlchemy ORM` 与 `src/api/attachments.ts` 收口。代码尚未开始，方案见 [F17 附件 Service 化方案](verification/F17-attachment-service-refactor.md)。
+> 2026-10-12 F17 附件域已完成渐进式 service 化与前端 API 收口：新增 `AttachmentService`、附件 schema 和 `src/api/attachments.ts`，保持现有 wire contract、权限矩阵、个人附件 404 隐私语义和文件补偿行为；F17a 定向 API、默认 API、compileall、build、ESLint 及 F17b 真实 Redis/Vite/Chromium 均通过。验收中修复了中文 locale 反向翻译和 Windows Vite 子进程清理；证据见 [F17 附件 Service 化方案](verification/F17-attachment-service-refactor.md)、[F17a 附件验收](verification/F17a-attachments-api.md) 和 [F17b 附件前端验收](verification/F17b-attachments-frontend.md)。
 
 > 2026-10-12 F24b 当前主干复验：在已推送 `bfb7bf9` 上使用现有 Docker Redis `127.0.0.1:16381` 重跑真实 FastAPI/Vite/Playwright，构建和脚本均通过；错配 `agent_id` 返回 `404` 且无消息正文泄露，撤权后返回 `403`。真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证，详见 [F24b 聊天消息验收](verification/F24b-chat-messages-frontend.md)。
 
@@ -88,8 +88,8 @@
 | F15b | 字典管理前端迁移 | 通过（service 化后复验通过） | verify_tenant_backend | verification/F15b-tenant-dictionary-frontend.md 与 verification/F15a-tenant-dictionary-service-refactor.md：真实 API/Vite/Chromium CRUD、筛选、排序、隔离和 Redis 环境复验通过 |
 | F16a | 参数配置后端迁移 | 通过（service 化独立复验通过） | agent_embedding_design | verification/F16a-tenant-config-api.md 与 verification/F16a-tenant-config-service-refactor.md：1 passed；迁移、租户隔离、权限、敏感值边界、router/service 事务边界通过 |
 | F16b | 参数配置前端迁移 | 通过（service 化后真实 Redis 复验通过） | agent_embedding_design | verification/F16b-tenant-config-frontend.md：build、真实 API/Vite/Chromium CRUD、敏感值延迟响应、租户切换隔离和当前 Redis `16381` 环境通过 |
-| F17a | 附件管理本地存储后端 | 方案已审；历史实现通过，service 化待实现 | verify_tenant_backend | verification/F17-attachment-service-refactor.md；当前 F17a 回归/竞态修复证据见 verification/F17a-attachments-api.md |
-| F17b | 附件管理前端 | 方案已审；类型化 API 与恢复体验待实现 | verify_tenant_backend | verification/F17-attachment-service-refactor.md；历史主流程证据见 verification/F17b-attachments-frontend.md |
+| F17a | 附件管理本地存储后端 | 通过（service 化独立验收通过） | verify_tenant_backend | verification/F17-attachment-service-refactor.md 与 verification/F17a-attachments-api.md：AttachmentService、请求级事务补偿、文件校验、并发删除、权限隔离、定向 API、默认 API 和 compileall 通过 |
+| F17b | 附件管理前端 | 通过（service 化后真实 Redis/Chromium 复验通过） | verify_tenant_backend | verification/F17b-attachments-frontend.md：类型化附件 API、URL scope/page、错误重试、AlertDialog、权限/撤权/租户切换、真实 Redis/Vite/Playwright 通过；ESLint 0 errors、24 warnings |
 | F18a | 系统任务定义后端迁移 | 通过 | verify_tenant_backend | verification/F18a-scheduled-task-definition.md：修复后1 passed，计划校验422且无写入、隔离、目标allowlist与迁移通过 |
 | F18b1 | 过期租户邀请任务目标 | 通过 | verify_tenant_backend | verification/F18b1-expire-invitations.md：1 passed，租户过滤、到期边界及重复/并发幂等通过 |
 | F18b2a | 系统任务内部目标分发 | 通过 | verify_tenant_backend | verification/F18b2a-task-dispatcher.md：1 passed，三个真实目标与跨租户/参数拒绝通过 |

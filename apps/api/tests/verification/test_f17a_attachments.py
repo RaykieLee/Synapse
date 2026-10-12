@@ -303,17 +303,19 @@ def test_f17a_attachment_storage_api_and_migration(tmp_path, monkeypatch):
             assert db.get(Attachment, transient_id) is None
         assert not transient_path.exists()
 
-        # DB commit failure after physical unlink leaves the metadata retryable; a second DELETE finalizes it.
+        # A transaction flush failure after physical unlink leaves the metadata
+        # retryable; a second DELETE finalizes it. Request commit itself is
+        # owned by get_db() and runs after the response has been prepared.
         retry_target = upload("f17a-uploader", "delete-commit-retry.txt", b"retry")
         assert retry_target.status_code == 201
         retry_id = retry_target.json()["attachment_id"]
         with factory() as db:
             row = db.get(Attachment, retry_id)
             retry_path = storage / row.storage_key[:2] / row.storage_key[2:]
-        def fail_delete_commit(session):
-            raise RuntimeError("injected attachment delete commit failure")
+        def fail_delete_flush(session, *args, **kwargs):
+            raise RuntimeError("injected attachment delete flush failure")
         with monkeypatch.context() as patch:
-            patch.setattr(Session, "commit", fail_delete_commit)
+            patch.setattr(Session, "flush", fail_delete_flush)
             commit_failed = req("delete", f"{api}/{retry_id}", "f17a-owner-a", workspace_ids["alpha"])
         assert commit_failed.status_code == 500
         with factory() as db:
@@ -331,16 +333,16 @@ def test_f17a_attachment_storage_api_and_migration(tmp_path, monkeypatch):
         with factory() as db:
             row = db.get(Attachment, concurrent_id)
             concurrent_path = storage / row.storage_key[:2] / row.storage_key[2:]
-        import app.api.attachments as attachment_api
-        original_get_attachment = attachment_api._get_attachment
+        from app.services.attachments import AttachmentService
+        original_get_attachment = AttachmentService._get_attachment
         read_barrier = Barrier(2)
-        def synchronize_get(db, context, scope_kind, attachment_id):
-            result = original_get_attachment(db, context, scope_kind, attachment_id)
+        def synchronize_get(service, context, scope_kind, attachment_id):
+            result = original_get_attachment(service, context, scope_kind, attachment_id)
             if attachment_id == concurrent_id:
                 read_barrier.wait(timeout=5)
             return result
         with monkeypatch.context() as patch:
-            patch.setattr(attachment_api, "_get_attachment", synchronize_get)
+            patch.setattr(AttachmentService, "_get_attachment", synchronize_get)
             with ThreadPoolExecutor(max_workers=2) as pool:
                 futures = [pool.submit(req, "delete", f"{api}/{concurrent_id}", "f17a-owner-a", workspace_ids["alpha"])
                            for _ in range(2)]
@@ -353,11 +355,12 @@ def test_f17a_attachment_storage_api_and_migration(tmp_path, monkeypatch):
         assert not concurrent_path.exists()
         assert not any(storage.rglob("*.tmp"))
 
-        # DB commit failure after disk write must roll metadata and file back.
-        def fail_commit(session):
-            raise RuntimeError("injected metadata commit failure")
+        # A transaction flush failure after disk write must roll metadata and
+        # file back. The request-scoped dependency owns the later commit.
+        def fail_upload_flush(session, *args, **kwargs):
+            raise RuntimeError("injected metadata flush failure")
         with monkeypatch.context() as patch:
-            patch.setattr(Session, "commit", fail_commit)
+            patch.setattr(Session, "flush", fail_upload_flush)
             failed_upload = upload("f17a-uploader", "rollback.txt", b"rollback")
         assert failed_upload.status_code == 500
         with factory() as db:

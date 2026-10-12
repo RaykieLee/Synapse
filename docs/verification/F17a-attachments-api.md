@@ -1,5 +1,12 @@
 # F17a 附件本地存储验收
 
+## 2026-10-12 F17 Service 化最终复验
+
+- `apps/api/app/api/attachments.py` 已收窄为 HTTP 适配层；业务规则、文件校验、作用域查询、文件系统补偿和 `flush()` 由 `AttachmentService` 承担。
+- `apps/api/app/database/session.py` 继续作为请求级事务边界，并在上传文件已写入但请求失败时执行文件清理补偿。
+- 真实临时 SQLite/Alembic head 下，F17a 定向用例为 `1 passed, 3 warnings`；默认 API 套件为 `23 passed, 25 deselected, 37 warnings`；`compileall app` 通过。
+- 证据仍是本机单进程 SQLite 和临时本地文件目录；PostgreSQL、多副本共享存储及断电恢复不在本次验收范围内。
+
 ## 2026-10-12 基线回归：瞬态 Windows unlink 冲突
 
 - 当前实际基线 `896b66a` 的默认 API 套件首次复跑为 `22 passed, 1 failed, 25 deselected`；失败发生在 F17a 两个并发 DELETE 的一个请求，返回 `500 INTERNAL_ERROR`。

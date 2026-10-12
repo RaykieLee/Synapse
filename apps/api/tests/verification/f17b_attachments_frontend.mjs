@@ -7,6 +7,9 @@ const { chromium } = require('playwright')
 const seed = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({ acceptDownloads: true })
+await context.addInitScript(() => {
+  window.localStorage.setItem('synapse-locale', 'zh-CN')
+})
 await context.addCookies([{ name: 'synapse_access_token', value: seed.actor_a_token, url: seed.web }])
 const page = await context.newPage()
 page.setDefaultTimeout(15000)
@@ -24,6 +27,12 @@ const attachmentUrl = (id, suffix = '') => `${seed.api}/workspaces/${id}/attachm
 const fileInput = page.locator('#workspace-attachment-file')
 const alertText = () => page.getByRole('alert').last().innerText()
 const fileRow = (filename, target = page) => target.locator('article').filter({ hasText: filename })
+const deleteFromUi = async (row) => {
+  const response = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/attachments/'))
+  await row.getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
+  return response
+}
 const setFile = async (name, data, mimeType = 'text/plain') => {
   await fileInput.setInputFiles({ name, mimeType, buffer: Buffer.isBuffer(data) ? data : Buffer.from(data) })
 }
@@ -42,6 +51,7 @@ const uploadFromUi = async (filename, data, { mimeType = 'text/plain', scope = '
 try {
   await page.goto(`${seed.web}/w/${seed.workspace_a1}`)
   await page.getByRole('heading', { name: 'Alpha One' }).waitFor()
+  await page.getByRole('button', { name: '选择工作区' }).waitFor()
   assert.equal(await page.getByRole('button', { name: '选择工作区' }).count(), 1, 'workspace switcher is rendered')
   const attachmentNav = page.getByRole('link', { name: '附件', exact: true })
   await attachmentNav.first().waitFor()
@@ -60,9 +70,7 @@ try {
   const download = await downloadPromise
   assert.equal(download.suggestedFilename(), 'a1-shared.txt')
   assert.equal(fs.readFileSync(await download.path(), 'utf8'), 'A1 shared bytes')
-  page.once('dialog', (dialog) => dialog.accept())
-  const deleteA = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/attachments/'))
-  await fileRow('a1-shared.txt').getByRole('button', { name: '删除' }).click()
+  const deleteA = deleteFromUi(fileRow('a1-shared.txt'))
   assert.equal((await deleteA).status(), 204)
   await fileRow('a1-shared.txt').waitFor({ state: 'detached' })
 
@@ -152,14 +160,15 @@ try {
   const adminRow = fileRow('b1-admin-file.txt')
   await adminRow.waitFor()
   assert.equal(await adminRow.getByRole('button', { name: '删除' }).count(), 1, 'admin can delete workspace attachment')
-  page.once('dialog', (dialog) => dialog.accept())
-  const deleteB = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/attachments/'))
-  await adminRow.getByRole('button', { name: '删除' }).click()
+  const deleteB = deleteFromUi(adminRow)
   assert.equal((await deleteB).status(), 204)
   await adminRow.waitFor({ state: 'detached' })
 
   // A second actor can read the shared A1 attachment but has no delete control.
   const memberContext = await browser.newContext({ acceptDownloads: true })
+  await memberContext.addInitScript(() => {
+    window.localStorage.setItem('synapse-locale', 'zh-CN')
+  })
   await memberContext.addCookies([{ name: 'synapse_access_token', value: seed.actor_b_token, url: seed.web }])
   const memberPage = await memberContext.newPage()
   memberPage.setDefaultTimeout(15000)
@@ -219,9 +228,7 @@ try {
   await page.getByRole('heading', { name: '附件', exact: true }).waitFor()
   await page.getByRole('button', { name: '我的个人附件' }).click()
   await fileRow('a1-private.txt').waitFor()
-  page.once('dialog', (dialog) => dialog.accept())
-  const deletePersonal = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/attachments/'))
-  await fileRow('a1-private.txt').getByRole('button', { name: '删除' }).click()
+  const deletePersonal = deleteFromUi(fileRow('a1-private.txt'))
   assert.equal((await deletePersonal).status(), 204)
   await fileRow('a1-private.txt').waitFor({ state: 'detached' })
 

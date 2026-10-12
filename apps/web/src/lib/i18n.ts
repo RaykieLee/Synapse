@@ -166,6 +166,44 @@ const tenantZhToEn: Record<string, string> = {
     'Select all actionable tenants on this page',
 }
 
+const attachmentZhToEn: Record<string, string> = {
+  '重试加载': 'Retry loading',
+  '删除附件': 'Delete attachment',
+  '确认删除': 'Confirm delete',
+  '删除中…': 'Deleting…',
+  '下载中…': 'Downloading…',
+  '下载失败：': 'Download failed: ',
+  '删除失败：': 'Delete failed: ',
+  '文件名过长。': 'The filename is too long.',
+  '附件文件已不存在，请刷新列表后重试。':
+    'The attachment file no longer exists. Refresh the list and try again.',
+  '附件清理失败，请稍后重试。':
+    'Attachment cleanup failed. Please try again later.',
+  '附件操作失败，请稍后重试。':
+    'Attachment operation failed. Please try again later.',
+  '文件类型不受支持。': 'This file type is not supported.',
+  '文件类型不受支持。请选择 PNG、JPEG、GIF、WebP、PDF、TXT、CSV、DOCX、XLSX 或 PPTX。':
+    'This file type is not supported. Choose PNG, JPEG, GIF, WebP, PDF, TXT, CSV, DOCX, XLSX, or PPTX.',
+  '不能上传空文件。': 'Empty files cannot be uploaded.',
+  '文件超过 25 MiB 限制。': 'The file exceeds the 25 MiB limit.',
+  '文件扩展名与类型不匹配。':
+    'The filename extension does not match the content type.',
+  '文件内容与所选类型不匹配。':
+    'The file content does not match the selected type.',
+  '文件名无效。': 'The filename is invalid.',
+  '当前账号没有执行此操作的权限。':
+    'Your account does not have permission to perform this action.',
+  '附件不存在或当前账号无权访问。':
+    'The attachment does not exist or you do not have access to it.',
+  '无法连接服务器，请检查网络后重试。':
+    'Unable to reach the server. Check your network and try again.',
+  '删除后无法恢复。': 'This action cannot be undone.',
+}
+
+const attachmentEnToZh: Record<string, string> = Object.fromEntries(
+  Object.entries(attachmentZhToEn).map(([key, value]) => [value, key]),
+)
+
 const remainingProductEnToZh: Record<string, string> = {
   'No Publishable Key Found!': '未找到可发布密钥！', 'You need to generate a publishable key from Clerk and put it inside the': '请在 Clerk 中生成可发布密钥，并将其放入', 'file.': '文件。', 'Set your Clerk API key': '设置 Clerk API 密钥', 'In the': '在', 'Clerk': 'Clerk', 'Dashboard, navigate to the API keys page.': '控制台中，前往 API 密钥页面。', 'Quick Copy': '快速复制', 'section, copy your Clerk Publishable Key.': '区域，复制 Clerk 可发布密钥。', 'Rename': '重命名', 'to': '为', 'Paste your key into your': '将密钥粘贴到', 'The final result should resemble the following:': '最终结果应类似如下：', '.env': '.env', 'Clerk Integration is Optional': 'Clerk 集成是可选的', 'The Clerk integration lives entirely inside': 'Clerk 集成完全位于', '. If you plan to use Clerk as your auth service, you might want to place': '。如果计划使用 Clerk 作为身份验证服务，可以将', 'at the root route.': '放在根路由中。', 'User List': '用户列表', 'This is the same as': '这与', 'You can sign out or manage/delete your account via the User Profile menu in the top-right corner of the page.': '你可以通过页面右上角的用户资料菜单退出登录或管理/删除账号。', 'Unauthorized Access': '未授权访问', 'You must be authenticated via Clerk': '你必须通过 Clerk 完成身份验证', 'You must first sign in using Clerk to access this route.': '请先使用 Clerk 登录，再访问此路由。', 'to access this resource.': '以访问此资源。', 'Go Back': '返回', 'Redirecting...': '正在跳转…', 'Cancel Redirect': '取消跳转', 'Welcome to the example Clerk auth page.': '欢迎使用 Clerk 身份验证示例页面。', 'Back to': '返回',
   'Manage your account settings and set e-mail preferences.': '管理账号设置和电子邮件偏好。', 'Configure how you receive notifications.': '配置接收通知的方式。', 'Update your account settings. Set your preferred language and display currency.': '更新账号设置。设置首选语言和显示货币。', "Turn items on or off to control what's displayed in the app.": '开启或关闭项目以控制应用中显示的内容。', 'This is how others will see you on the site.': '其他用户将在网站上看到这些资料。', 'Sign out': '退出登录', 'Are you sure you want to sign out? You will need to sign in again to access your account.': '确定要退出登录吗？你需要重新登录才能访问账号。', 'Cancel': '取消', 'Continue': '继续', 'Font': '字体', 'Set the font you want to use in the dashboard.': '设置控制台使用的字体。', 'Select the theme for the dashboard.': '选择控制台主题。', 'Light': '浅色', 'Dark': '深色', 'Update preferences': '更新偏好设置', 'Display name': '显示名称', 'Phone': '电话', 'Sex': '性别', 'Unspecified': '未指定', 'Unknown': '未知', 'Male': '男', 'Female': '女', 'Avatar URL': '头像 URL', 'Saving…': '保存中…', 'Save profile': '保存资料', 'Select the items you want to display in the sidebar.': '选择要在侧栏中显示的项目。', 'Update display': '更新显示设置', 'Current password': '当前密码', 'New password': '新密码', 'At least 12 characters. You will need to sign in again after changing it.': '至少 12 个字符。更改后需要重新登录。', 'Updating…': '更新中…', 'Change password': '修改密码', 'Notify me about...': '通知内容…', 'All new messages': '所有新消息', 'Direct messages and mentions': '私信和提及', 'Nothing': '不接收', 'Email Notifications': '电子邮件通知', 'Communication emails': '沟通邮件', 'Receive emails about your account activity.': '接收有关账号活动的邮件。', 'Marketing emails': '营销邮件', 'Receive emails about new products, features, and more.': '接收有关新产品、新功能等的邮件。', 'Social emails': '社交邮件', 'Receive emails for friend requests, follows, and more.': '接收有关好友请求、关注等的邮件。', 'Security emails': '安全邮件', 'Receive emails about your account activity and security.': '接收有关账号活动和安全的信息。', 'Use different settings for my mobile devices': '为我的移动设备使用不同设置', 'You can manage your mobile notifications in the': '你可以在', 'mobile settings': '移动设备设置', 'page.': '页面中管理移动通知', 'Update notifications': '更新通知设置',
@@ -181,10 +219,16 @@ export function translate(text: string, target: Locale = locale) {
   const trimmed = text.trim()
   const preserve = (value: string) => `${text.slice(0, text.indexOf(trimmed))}${value}${text.slice(text.indexOf(trimmed) + trimmed.length)}`
   if (target === 'en') {
-    const translated = zhToEn[trimmed] ?? extraZhToEn[trimmed] ?? productZhToEn[trimmed] ?? remainingProductZhToEn[trimmed] ?? tenantZhToEn[trimmed] ?? templateZhToEn[trimmed]
+    const translated = zhToEn[trimmed] ?? extraZhToEn[trimmed] ?? productZhToEn[trimmed] ?? remainingProductZhToEn[trimmed] ?? tenantZhToEn[trimmed] ?? attachmentZhToEn[trimmed] ?? templateZhToEn[trimmed]
     return translated ? preserve(translated) : text
   }
-  if (enToZh[trimmed] ?? extraEnToZh[trimmed] ?? remainingProductEnToZh[trimmed]) return preserve(enToZh[trimmed] ?? extraEnToZh[trimmed] ?? remainingProductEnToZh[trimmed])
+  const translated = enToZh[trimmed] ?? extraEnToZh[trimmed] ?? attachmentEnToZh[trimmed]
+  if (translated) return preserve(translated)
+  // Some legacy entries use Chinese source keys in the English-to-Chinese map.
+  // Keep authored Chinese text unchanged instead of translating it backwards.
+  if (!/[\u3400-\u9fff]/.test(trimmed) && remainingProductEnToZh[trimmed]) {
+    return preserve(remainingProductEnToZh[trimmed])
+  }
   return text
 }
 export function formatMessage(message: string, values: Record<string, string>, target: Locale = locale) {

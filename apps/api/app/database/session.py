@@ -1,10 +1,34 @@
 from functools import lru_cache
 from collections.abc import Generator
+from collections.abc import Callable
+import logging
 
 from sqlalchemy import Engine, create_engine, event, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
+
+
+_ROLLBACK_CLEANUPS_KEY = "synapse.rollback_cleanups"
+_logger = logging.getLogger(__name__)
+
+
+def register_rollback_cleanup(session: Session, cleanup: Callable[[], None]) -> None:
+    """Register idempotent compensating work for a request transaction."""
+    session.info.setdefault(_ROLLBACK_CLEANUPS_KEY, []).append(cleanup)
+
+
+def _clear_rollback_cleanups(session: Session) -> None:
+    session.info.pop(_ROLLBACK_CLEANUPS_KEY, None)
+
+
+def _run_rollback_cleanups(session: Session) -> None:
+    cleanups = session.info.pop(_ROLLBACK_CLEANUPS_KEY, [])
+    for cleanup in cleanups:
+        try:
+            cleanup()
+        except Exception:
+            _logger.exception("Request transaction cleanup failed")
 
 
 @lru_cache
@@ -43,7 +67,12 @@ def get_db() -> Generator[Session, None, None]:
         yield session
         session.commit()
     except Exception:
-        session.rollback()
+        try:
+            session.rollback()
+        finally:
+            _run_rollback_cleanups(session)
         raise
+    else:
+        _clear_rollback_cleanups(session)
     finally:
         session.close()
