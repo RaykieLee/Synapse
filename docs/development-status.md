@@ -6,7 +6,7 @@
 
 状态：待开始 → 开发中 → 待独立验收 → 通过；验证失败转回修复。外部运行条件不足的功能记为待实际验收，不记为通过。
 
-> 2026-10-12 当前 HEAD `2500a13` 基线与 P0 复验：工作区干净；API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、`pnpm build` 均通过；ESLint `0 errors, 24 warnings`。使用现有 Docker Redis `127.0.0.1:16381` 重跑 F24b 真实 FastAPI/AgentScope/Vite/Chromium 流程，输出 `F24b chat messages frontend verification passed`，退出码 `0`。验证后只清理本轮生成的 1 个 F24b Redis event key，保留原有 Redis 数据；真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证，详见 [F24b 聊天消息验收](verification/F24b-chat-messages-frontend.md) 与 [基线复验报告](verification/baseline-2026-10-12.md)。
+> 2026-10-12 当前 HEAD `bb4351b` 基线与 P0 复验：工作区干净；API 默认套件 `24 passed, 26 deselected, 38 warnings`、`compileall app`、`pnpm build` 均通过；ESLint `0 errors, 24 warnings`。使用现有 Docker Redis `127.0.0.1:16381` 由主线程重跑 F24b 真实 FastAPI/AgentScope/Vite/Chromium 流程，输出 `F24b chat messages frontend verification passed`，退出码 `0`。验证后只清理本轮生成的 1 个 F24b Redis event key，DB4/DB5 恢复为 `6/0`；真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证，详见 [F24b 聊天消息验收](verification/F24b-chat-messages-frontend.md) 与 [基线复验报告](verification/baseline-2026-10-12.md)。
 
 ## 功能任务
 

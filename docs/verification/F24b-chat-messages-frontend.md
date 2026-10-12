@@ -6,6 +6,16 @@
 
 本次页面 `document.lang` 为 `zh-CN`、`localStorage['synapse-locale']` 未设置，但消息输入框实际 accessible name 为 `Type a message`。验收脚本按渲染出的 accessible name 定位输入框；本次没有修改产品 UI。该中英文标签不一致留作 UX/i18n 差距。
 
+## 2026-10-12 `bb4351b` 主线程复验
+
+本轮在已推送的 `bb4351b` 上由主线程执行既有真实验收脚本；由于当前子智能体线程已达上限，本轮不计作新的独立子智能体验收，作为当前提交的回归证据。
+
+- 使用已有 Docker Redis `127.0.0.1:16381`，脚本使用 storage DB5、bus DB4；未执行 `FLUSHDB`。
+- 在 `apps/api` 设置 `F24B_REDIS_HOST=127.0.0.1`、`F24B_REDIS_PORT=16381` 后执行 `.\.venv\Scripts\python.exe tests\verification\run_f24b_chat_messages_frontend.py`。
+- `pnpm build` 通过；真实 FastAPI、AgentScope Redis、Vite 和 Playwright 流程输出 `F24b chat messages frontend verification passed`，退出码为 `0`。
+- 实际请求确认错配 `agent_id`/跨 Workspace 资源返回 `404`，成员撤权后的消息请求返回 `403 WORKSPACE_MEMBERSHIP_REQUIRED`；消息分页、附件、失败后草稿保留/重试、会话和 Workspace 切换断言通过。
+- 脚本结束后仅删除本轮新增的 `agentscope:session:events:synapse-s1-w1-u1-b858ab0284984238ac244996e5ba3934` key；Redis DB4/DB5 恢复为 `6/0`。真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证。
+
 ## 2026-10-12 当前主干 `bfb7bf9` 复验
 
 - 在当前已推送主干 `bfb7bf9` 上，使用现有 Docker Redis `127.0.0.1:16381`，执行 `F24B_REDIS_HOST=127.0.0.1`、`F24B_REDIS_PORT=16381` 的 `run_f24b_chat_messages_frontend.py`；脚本先运行 `pnpm build`，再启动真实 FastAPI、AgentScope Redis storage/message bus、Vite 和 Playwright。
