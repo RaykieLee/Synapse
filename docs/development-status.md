@@ -18,6 +18,8 @@
 
 > 2026-10-12 F12c 租户成员自定义角色分配完成渐进式 service 化：新增 schema/service，保留原有赋权、替换、撤销、幂等、并发和 `membership_version` 行为；F12c 与 F12a 联合回归、compileall 及 router/service 边界扫描通过。前端 wire contract 未变，因此本项无新增 UX 范围；证据见 [F12c service 化验收](verification/F12c-tenant-member-role-service-refactor.md)。
 
+> 2026-10-12 F13a 租户菜单管理与 F13d1 可见菜单树完成渐进式 service 化：新增菜单 schema/service，router 只保留 HTTP 关注点；F13a/F13d1 定向回归、默认 API 套件、compileall、build、ESLint 和 router/service 边界扫描通过。F13c 角色-菜单授权未混入本次改动；证据见 [F13a service 化验收](verification/F13a-tenant-menu-service-refactor.md)。
+
 > 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停方案已记入上述差距清单并完成 F09b 独立验收；正式导航仍需后续范围清理。F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)，其代码已写且当前 TypeScript 编译通过，仍待独立验收；设计与编译结论不能替代功能验收。
 
 > 2026-10-12 F11/F11a 增量复核：UX 与 API/服务子智能体审查完成，差距与待决策见 [全局用户管理复核](ux/F11a-global-users-review.md)。`%`/`_` 搜索匹配、用户页确认、结构化字段错误和双语反馈的代码已写，TypeScript 编译通过，待独立验收。软删身份复用、最后平台管理员保护和筛选范围仍待产品决定；历史验收不能覆盖本次增量。
@@ -60,7 +62,7 @@
 | F12c | 租户角色分配给成员后端 | 通过（service 化独立验收通过） | agent_embedding_design | verification/F12c-member-role-assignment.md 与 verification/F12c-tenant-member-role-service-refactor.md：功能 API、权限、版本、并发、跨租户复合FK及 router/service 事务边界通过 |
 | F12d | 租户成员角色分配前端 | 通过 | agent_embedding_design | verification/F12d-member-role-frontend.md：build、真实API浏览器分配/撤销、租户缓存隔离通过 |
 | F12e | 普通成员查看自身自定义角色 | 通过 | verify_tenant_backend | verification/F12e-self-role-view.md：build、API和浏览器自读/跨租户隔离/撤权复验通过 |
-| F13a | 菜单管理后端迁移 | 通过 | agent_embedding_design | verification/F13a-tenant-menu-api.md：1 passed；树CRUD、排序、跨租户父级复合FK和权限通过 |
+| F13a | 菜单管理后端迁移 | 通过（service 化独立验收通过） | agent_embedding_design | verification/F13a-tenant-menu-api.md 与 verification/F13a-tenant-menu-service-refactor.md：树 CRUD、排序、跨租户父级复合FK、权限、可见树和 router/service 边界通过 |
 | F13b | 租户菜单管理前端 | 通过 | agent_embedding_design | verification/F13b-tenant-menu-frontend.md：build、真实API浏览器树CRUD/排序/权限/租户隔离通过 |
 | F13c | 菜单与角色授权后端 | 通过 | agent_embedding_design | verification/F13c-role-menu-api.md：1 passed；ID序列化、幂等版本、并发及复合FK复验通过 |
 | F13e | 菜单与角色授权前端 | 通过 | agent_embedding_design | verification/F13e-role-menu-frontend.md：build、真实API浏览器授权保存/历史项/权限/租户缓存通过 |
