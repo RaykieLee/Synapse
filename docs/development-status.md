@@ -8,9 +8,11 @@
 
 ## 功能任务
 
-> 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已提交（`51a6c61`）；构建/类型检查不代表这些增量已独立验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本次增量状态为**代码已写，待独立验收**。国际化为**代码已写，待完整覆盖与独立验收**。F24b 的 agent/session 绑定修复已完成本机真实 API/Playwright 复验，F24b 独立验收已在 `b069adf` 记录；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
+> 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已实现；本轮增量已完成独立真实 API/Chromium 验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本轮 F09 增量现为**独立验收通过**，加载态仍未做人为延迟下的独立时序断言。F24b 的 agent/session 绑定修复已完成本机真实 API/Playwright 复验，F24b 独立验收已在 `b069adf` 记录；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
 
-> 2026-10-12 租户优化独立验收：筛选/计数、UTC 边界、权限隔离、owner API 落库、邀请过期 `410` 与持久化 5 项真实 API 检查通过；浏览器确认搜索/owner 选择、字段 accessible name 和窄屏主流程可用，但英文页面仍有标题、说明、分页文案遗漏，中文页面筛选工具栏的 accessible name 语言不一致。整体仍未通过，需先 UX 审查并修复，再由独立子智能体复验；详见[租户优化验收记录](verification/tenant-optimization-acceptance-2026-10-12.md)。
+> 2026-10-12 租户优化独立验收：筛选/计数、UTC 边界、权限隔离、owner API 落库、邀请过期 `410` 与持久化 5 项真实 API 检查通过；独立 Chromium 复验确认中英文标题/说明/状态/角色/日期/分页、错误重试、超范围页码、筛选空态、成员空态、列显隐、可访问名称和 390px 窄屏均通过。平台管理员零租户空态仍为拦截模拟，加载态未做人为延迟下的独立时序断言；详见[租户优化验收记录](verification/tenant-optimization-acceptance-2026-10-12.md)。
+
+> 2026-10-12 F09 租户列表修复后，主代理诊断与随后独立子智能体验收均使用隔离临时数据和真实 FastAPI/Vite/Chromium；独立验收结果已覆盖真实 API 和核心浏览器路径，平台管理员零租户空态仍明确标为模拟。Redis 标记套件最新复跑使用临时 Redis 7.4.11，结果 `8 passed, 5 failed`；失败测试存在迁移版本、当前 API 契约和本机 `.env` 隔离等差异，详见[Redis suite 复跑记录](verification/redis-suite-2026-10-12.md)。
 
 > 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停与正式导航方案已记入上述差距清单；F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)。这三项的代码已写且当前 TypeScript 编译通过，均**待独立验收**；设计与编译结论不能替代功能验收。
 
@@ -25,6 +27,8 @@
 > 2026-10-12 当前 HEAD 基线复跑：`git fetch origin` 后本地 `main` 与 `origin/main` 均为 `7da1eca`，运行前工作区干净。API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、`pnpm build` 通过；`pnpm exec eslint .` 退出码为 0（0 errors、24 warnings）。本次验证没有进行浏览器或独立功能验收，P0 项仍待处理；详见[基线复验报告](verification/baseline-2026-10-12.md)。
 
 > 2026-10-12 `b069adf` 文档更新后基线复跑：工作区干净；API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、`pnpm build` 均通过；`pnpm exec eslint .` 退出码为 0（0 errors、24 warnings）。F24b 已完成独立真实 API/Redis/Playwright 验收；近期租户优化仍待独立验收。
+
+> 2026-10-12 当前工作树基线复跑：实际 `HEAD` 与 `origin/main` 为 `704a477`，不是接续提示所列的 `38bbf24`；工作区已有租户列表 UX/i18n 未提交改动，未清理。API 默认套件 `23 passed, 25 deselected, 37 warnings`、`compileall app`、`pnpm build` 通过；ESLint `0 errors, 24 warnings`。这是当前脏工作树的验证，不代表干净提交基线；详见[基线复验报告](verification/baseline-2026-10-12.md)。F24b 当前工作树复跑通过；F09 增量仍待独立验收。
 
 | ID | 单一任务 | 状态 | 开发/设计智能体 | 独立验证与证据 |
 | --- | --- | --- | --- | --- |
@@ -42,7 +46,7 @@
 | F06b | 归档 Workspace 管理列表 | 通过 | tenant_backend | verification/F06b-archived-workspace.md；归档发现、范围、撤权与计数独立验证通过 |
 | F07 | 作用域权限与资源隔离基础 | 通过 | verify_tenant_backend | verification/F07-resource-scopes.md：1 passed；多租户/空间/私有scope、撤权、归档及权限边界独立复验 |
 | F08 | 真实登录与个人中心前端 | 通过 | web_auth | verification/F08-web-auth.md；默认代理连接真实API，构建和13项浏览器流程通过 |
-| F09 | 租户管理前端 | 通过 | tenant_frontend | verification/F09-tenant-frontend.md；真实API浏览器覆盖平台管理、成员权限和跨页筛选 |
+| F09 | 租户管理前端 | 通过（本轮增量独立验收通过） | tenant_frontend | verification/F09-tenant-frontend.md 与 verification/tenant-optimization-acceptance-2026-10-12.md；真实 API/Chromium 覆盖筛选计数、UTC 边界、权限、owner、邀请 410、双语交互和窄屏 |
 | F09b | 租户列表批量启用/停用 | UX 已设计，代码已写，静态检查通过，待独立验收 | tenant_batch_ux；tenant_batch_impl | 复用单租户 PATCH；逐项结果、部分失败和权限需真实 API/浏览器复验 |
 | F10 | Workspace 管理与左上角切换 | 通过 | workspace_backend | verification/F10-workspace-frontend.md；构建及真实API浏览器流程通过，含跨租户回退与撤权后缓存清理 |
 | F11 | 全局用户管理后端迁移 | 通过 | agent_embedding_design | verification/F11-user-management-api.md；1 passed，权限、CRUD、JWT撤销、bcrypt兼容与软删独立复验 |

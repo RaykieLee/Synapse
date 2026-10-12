@@ -64,7 +64,7 @@ import {
 } from './components/tenant-table'
 import { tenantText, type TenantRoleRecord } from './types'
 import { LocalizedText } from '@/components/localized-text'
-import { formatMessage, useLocale } from '@/lib/i18n'
+import { formatMessage, useLocale, useLocaleText } from '@/lib/i18n'
 
 const tenantsRoute = getRouteApi('/_authenticated/tenants/')
 
@@ -78,6 +78,7 @@ function dateBoundary(value: string, nextDay = false): string {
 
 export function Tenants() {
   const locale = useLocale()
+  const t = useLocaleText()
   const isEnglish = locale === 'en'
   const actor = useAuthStore((s) => s.auth.user)
   const admin = actor?.platform_role === 'platform_admin'
@@ -193,6 +194,31 @@ export function Tenants() {
   const total = tenants.data?.total ?? 0
   const pages = Math.max(1, Math.ceil(total / pageSize))
   const pageTenants = tenants.data?.items ?? []
+  const hasFilters = Boolean(
+    query ||
+      status ||
+      validity ||
+      slug ||
+      createdFrom ||
+      createdTo ||
+      updatedFrom ||
+      expiresBefore
+  )
+  const hasOutOfRangePage = Boolean(tenants.data) && page > pages
+  useEffect(() => {
+    if (!hasOutOfRangePage) return
+    void navigate({
+      search: (previous) => ({ ...previous, page: 1 }),
+      replace: true,
+    })
+  }, [hasOutOfRangePage, navigate])
+  const listErrorMessage = tenants.isError
+    ? tenants.error instanceof ApiProblem
+      ? `${t('租户列表加载失败，请重试。')}${
+          tenants.error.code ? ` (${tenants.error.code})` : ''
+        }`
+      : t('租户列表加载失败，请重试。')
+    : ''
   const selectedTenants = admin
     ? pageTenants.filter(
         (tenant) => selectedIds.has(tenant.tenant_id) && tenant.status !== 'archived'
@@ -285,9 +311,13 @@ export function Tenants() {
   return (
     <main className='space-y-5 p-6'>
       <PageHeader
-        title='租户管理'
+        title={t('租户管理')}
         description={
-          admin ? "平台租户目录用于管理租户状态，不代表您拥有租户内业务或成员访问权限。" : "查看您所属的启用租户。"
+          admin
+            ? t(
+                '平台租户目录用于管理租户状态，不代表您拥有租户内业务或成员访问权限。'
+              )
+            : t('查看您所属的启用租户。')
         }
         actions={
           admin ? (
@@ -310,6 +340,21 @@ export function Tenants() {
         />
       ) : null}
       {error ? <ErrorBox message={error} /> : null}
+      {listErrorMessage ? (
+        <div
+          role='alert'
+          className='flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive'
+        >
+          <span>{listErrorMessage}</span>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => void tenants.refetch()}
+          >
+            {t('重试')}
+          </Button>
+        </div>
+      ) : null}
       <section className='space-y-4'>
         <div className='flex flex-wrap items-start justify-between gap-2'>
           <TenantToolbar
@@ -374,7 +419,8 @@ export function Tenants() {
               : '批量更新期间，筛选、列设置和分页暂不可用。'}
           </p>
         ) : null}
-        <div className='overflow-hidden rounded-md border'>
+        {!tenants.isError || tenants.data ? (
+          <div className='overflow-hidden rounded-md border'>
           {admin && (selectedIds.size > 0 || batchProgress || visibleBatchFailures.length > 0 || batchSummary) ? (
             <div className='space-y-3 border-b bg-muted/20 px-4 py-3'>
               <div className='flex flex-wrap items-center gap-2'>
@@ -451,6 +497,7 @@ export function Tenants() {
             tenants={pageTenants}
             isAdmin={admin}
             loading={tenants.isLoading}
+            hasFilters={hasFilters}
             selectedIds={selectedIds}
             onSelectionChange={(ids) => {
               setSelectedIds(ids)
@@ -494,7 +541,8 @@ export function Tenants() {
               })
             }
           />
-        </div>
+          </div>
+        ) : null}
       </section>
       <AlertDialog
         open={Boolean(batchDialog)}

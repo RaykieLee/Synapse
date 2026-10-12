@@ -138,6 +138,34 @@ const remainingProductZhToEn: Record<string, string> = {
   '确定归档租户“': 'Archive tenant “', '”吗？归档后租户进入终态，无法重新启用。': '”? Archived tenants enter a terminal state and cannot be reactivated.', '← 返回租户列表': '← Back to tenant list', '快捷配置': 'Quick settings', '收件人使用已有 Synapse 账号登录后接受邀请。租户管理员只能邀请为成员。': 'Recipients accept the invitation by signing in to an existing Synapse account. Tenant admins can only invite them as members.', '← 返回': '← Back', '同级菜单可用上移/下移调整顺序。已停用项会保留在树中并标明状态。': 'Move sibling menus up or down to change their order. Disabled items remain in the tree with their status shown.', '· 顺序': '· Order', '编辑菜单': 'Edit menu', '保存菜单': 'Save menu', '创建字典类型': 'Create dictionary type', '可按名称或标识筛选；上移/下移会重排当前租户全部类型。': 'Filter by name or key. Moving items reorders all types in this tenant.', '字典条目：': 'Dictionary entries:', '· 类型状态：': '· Type status:', '编辑字典类型': 'Edit dictionary type', '保存类型': 'Save type', '编辑字典条目': 'Edit dictionary entry', '创建字典条目': 'Create dictionary entry', 'CSS 样式': 'CSS style', '列表样式': 'List style', '保存条目': 'Save entry', '敏感配置：': 'Secret setting:', '租户成员可读': 'Readable by tenant members', '仅管理员': 'Admins only', '编辑参数配置': 'Edit setting', '创建参数配置': 'Create setting', '向租户成员公开读取': 'Allow tenant members to read', '（保留现值）': '(keep current value)', '保存配置': 'Save settings', '上移或下移调整同级顺序；编辑部门可移动到其他有效父级。停用部门会保留在树中。': 'Move items up or down to reorder siblings. Edit a department to move it under another valid parent. Disabled departments remain in the tree.', '负责人：': 'Owner:', '编辑部门': 'Edit department', '保存部门': 'Save department', '系统任务定义': 'System task definitions', '配置当前租户的 cron 或间隔任务。执行目标来自平台 allowlist；编辑计划会由服务端校验完整定义。': 'Configure cron or interval tasks for the current tenant. Execution targets come from the platform allowlist; the server validates the complete definition when a schedule is edited.', '正在加载任务…': 'Loading tasks…', '只显示服务端保存的安全结果摘要或错误码，不包含任务参数、凭据或异常详情。': 'Only the safe result summary or error code saved by the server is shown. Task parameters, credentials, and exception details are excluded.', '详情': 'Details', '已选择': 'Selected', '安全结果摘要': 'Safe result summary', '编辑任务': 'Edit task', '选择 allowlist 目标': 'Select an allowlist target', '固定间隔': 'Fixed interval', 'IANA 时区': 'IANA time zone', '按所选 IANA 时区计算；服务端会校验表达式。': 'Calculated in the selected IANA time zone; the server validates the expression.', '· 租户': '· Tenant', '个角色': ' roles', '· 菜单授权': '· Menu grants', '个启用菜单': ' enabled menus', '· 已停用': '· Disabled', '成员邮箱': 'Member email', '撤销后，原邀请链接将不可使用。确定继续吗？': 'The invitation link will stop working after revocation. Continue?', '应用筛选': 'Apply filters', '租户': 'Tenant', '停用租户': 'Suspend tenant', '重新启用': 'Reactivate', '已终态': 'Terminal state', '项，共': ' items total', '页，共': ' pages total', '已选择：': 'Selected:', '角色列表加载失败：': 'Failed to load roles:', '选择其他角色…': 'Select another role…', '未分配': 'Unassigned', '管理': 'Manage', '保存有效期': 'Save validity period', '全局用户': 'Global users', '正常': 'Active', '已停用': 'Disabled', '没有匹配的用户。': 'No matching users.', '暂无用户。': 'No users yet.', '个账号 · 第': ' accounts · Page', '创建全局用户': 'Create global user', '创建账号': 'Create account', '。用户名和平台角色不能在此修改。': '. Usernames and platform roles cannot be changed here.', '保存资料': 'Save profile', '设置至少 12 个字符的新密码；旧登录令牌会被撤销。': 'Set a new password with at least 12 characters. Existing login tokens will be revoked.', '新密码': 'New password', '重置中…': 'Resetting…', '未设置': 'Not set',
 }
 
+const tenantZhToEn: Record<string, string> = {
+  '已停用': 'Suspended',
+  '已归档': 'Archived',
+  '待加入': 'Invited',
+  '已移除': 'Removed',
+  '所有者': 'Owner',
+  '管理员': 'Administrator',
+  '成员': 'Member',
+  '当前有效': 'Currently valid',
+  '未开始': 'Not started',
+  '长期有效': 'Unlimited',
+  '不限': 'No limit',
+  '没有匹配的租户': 'No matching tenants',
+  '调整搜索条件或重置筛选。': 'Adjust your search or clear the filters.',
+  '当前没有可访问的启用租户': 'No active tenants are accessible to you',
+  '请联系租户管理员为你添加成员资格。':
+    'Ask a tenant administrator to add you as a member.',
+  '创建新的租户后，它会出现在此处。':
+    'Create a tenant and it will appear here.',
+  '平台租户目录用于管理租户状态，不代表您拥有租户内业务或成员访问权限。':
+    'The platform tenant directory manages tenant status; it does not grant access to tenant business data or members.',
+  '查看您所属的启用租户。': 'View the active tenants you belong to.',
+  '正在加载租户列表…': 'Loading tenants…',
+  '租户列表加载失败，请重试。': 'Failed to load tenants. Please try again.',
+  '选择当前页全部可操作租户':
+    'Select all actionable tenants on this page',
+}
+
 const remainingProductEnToZh: Record<string, string> = {
   'No Publishable Key Found!': '未找到可发布密钥！', 'You need to generate a publishable key from Clerk and put it inside the': '请在 Clerk 中生成可发布密钥，并将其放入', 'file.': '文件。', 'Set your Clerk API key': '设置 Clerk API 密钥', 'In the': '在', 'Clerk': 'Clerk', 'Dashboard, navigate to the API keys page.': '控制台中，前往 API 密钥页面。', 'Quick Copy': '快速复制', 'section, copy your Clerk Publishable Key.': '区域，复制 Clerk 可发布密钥。', 'Rename': '重命名', 'to': '为', 'Paste your key into your': '将密钥粘贴到', 'The final result should resemble the following:': '最终结果应类似如下：', '.env': '.env', 'Clerk Integration is Optional': 'Clerk 集成是可选的', 'The Clerk integration lives entirely inside': 'Clerk 集成完全位于', '. If you plan to use Clerk as your auth service, you might want to place': '。如果计划使用 Clerk 作为身份验证服务，可以将', 'at the root route.': '放在根路由中。', 'User List': '用户列表', 'This is the same as': '这与', 'You can sign out or manage/delete your account via the User Profile menu in the top-right corner of the page.': '你可以通过页面右上角的用户资料菜单退出登录或管理/删除账号。', 'Unauthorized Access': '未授权访问', 'You must be authenticated via Clerk': '你必须通过 Clerk 完成身份验证', 'You must first sign in using Clerk to access this route.': '请先使用 Clerk 登录，再访问此路由。', 'to access this resource.': '以访问此资源。', 'Go Back': '返回', 'Redirecting...': '正在跳转…', 'Cancel Redirect': '取消跳转', 'Welcome to the example Clerk auth page.': '欢迎使用 Clerk 身份验证示例页面。', 'Back to': '返回',
   'Manage your account settings and set e-mail preferences.': '管理账号设置和电子邮件偏好。', 'Configure how you receive notifications.': '配置接收通知的方式。', 'Update your account settings. Set your preferred language and display currency.': '更新账号设置。设置首选语言和显示货币。', "Turn items on or off to control what's displayed in the app.": '开启或关闭项目以控制应用中显示的内容。', 'This is how others will see you on the site.': '其他用户将在网站上看到这些资料。', 'Sign out': '退出登录', 'Are you sure you want to sign out? You will need to sign in again to access your account.': '确定要退出登录吗？你需要重新登录才能访问账号。', 'Cancel': '取消', 'Continue': '继续', 'Font': '字体', 'Set the font you want to use in the dashboard.': '设置控制台使用的字体。', 'Select the theme for the dashboard.': '选择控制台主题。', 'Light': '浅色', 'Dark': '深色', 'Update preferences': '更新偏好设置', 'Display name': '显示名称', 'Phone': '电话', 'Sex': '性别', 'Unspecified': '未指定', 'Unknown': '未知', 'Male': '男', 'Female': '女', 'Avatar URL': '头像 URL', 'Saving…': '保存中…', 'Save profile': '保存资料', 'Select the items you want to display in the sidebar.': '选择要在侧栏中显示的项目。', 'Update display': '更新显示设置', 'Current password': '当前密码', 'New password': '新密码', 'At least 12 characters. You will need to sign in again after changing it.': '至少 12 个字符。更改后需要重新登录。', 'Updating…': '更新中…', 'Change password': '修改密码', 'Notify me about...': '通知内容…', 'All new messages': '所有新消息', 'Direct messages and mentions': '私信和提及', 'Nothing': '不接收', 'Email Notifications': '电子邮件通知', 'Communication emails': '沟通邮件', 'Receive emails about your account activity.': '接收有关账号活动的邮件。', 'Marketing emails': '营销邮件', 'Receive emails about new products, features, and more.': '接收有关新产品、新功能等的邮件。', 'Social emails': '社交邮件', 'Receive emails for friend requests, follows, and more.': '接收有关好友请求、关注等的邮件。', 'Security emails': '安全邮件', 'Receive emails about your account activity and security.': '接收有关账号活动和安全的信息。', 'Use different settings for my mobile devices': '为我的移动设备使用不同设置', 'You can manage your mobile notifications in the': '你可以在', 'mobile settings': '移动设备设置', 'page.': '页面中管理移动通知', 'Update notifications': '更新通知设置',
@@ -153,7 +181,7 @@ export function translate(text: string, target: Locale = locale) {
   const trimmed = text.trim()
   const preserve = (value: string) => `${text.slice(0, text.indexOf(trimmed))}${value}${text.slice(text.indexOf(trimmed) + trimmed.length)}`
   if (target === 'en') {
-    const translated = zhToEn[trimmed] ?? extraZhToEn[trimmed] ?? productZhToEn[trimmed] ?? remainingProductZhToEn[trimmed] ?? templateZhToEn[trimmed]
+    const translated = zhToEn[trimmed] ?? extraZhToEn[trimmed] ?? productZhToEn[trimmed] ?? remainingProductZhToEn[trimmed] ?? tenantZhToEn[trimmed] ?? templateZhToEn[trimmed]
     return translated ? preserve(translated) : text
   }
   if (enToZh[trimmed] ?? extraEnToZh[trimmed] ?? remainingProductEnToZh[trimmed]) return preserve(enToZh[trimmed] ?? extraEnToZh[trimmed] ?? remainingProductEnToZh[trimmed])

@@ -59,7 +59,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatDateTime, tenantText } from '../types'
+import {
+  formatDateRange,
+  formatDateTime,
+  localizedTenantText,
+} from '../types'
 import { EmptyState, TableSkeleton } from './shared'
 import { LocalizedText } from '@/components/localized-text'
 import { useLocale, useLocaleText } from '@/lib/i18n'
@@ -74,9 +78,10 @@ const statusStyles: Record<TenantStatus, string> = {
 }
 
 export function StatusBadge({ status }: { status: TenantStatus }) {
+  const locale = useLocale()
   return (
     <Badge variant='outline' className={statusStyles[status]}>
-      {tenantText[status]}
+      {localizedTenantText(status, locale)}
     </Badge>
   )
 }
@@ -241,35 +246,35 @@ export function TenantToolbar({
     >
       <Input
         value={query}
-        aria-label='搜索租户'
-        placeholder='搜索名称、标识或 ID'
+        aria-label={t('搜索租户')}
+        placeholder={t('搜索名称、标识或 ID')}
         className='h-8 w-full sm:w-64'
         disabled={disabled}
         onChange={(event) => onQueryChange(event.target.value)}
       />
       {isAdmin ? (
         <TenantFacetFilter
-          title='状态'
+          title={t('状态')}
           value={status}
           onChange={onStatusChange}
           disabled={disabled}
           options={[
-            { value: 'active', label: '启用' },
-            { value: 'suspended', label: '已停用' },
-            { value: 'archived', label: '已归档' },
+            { value: 'active', label: t('启用') },
+            { value: 'suspended', label: t('已停用') },
+            { value: 'archived', label: t('已归档') },
           ]}
         />
       ) : null}
       <TenantFacetFilter
-        title='有效期'
+        title={t('有效期')}
         value={validity}
         onChange={onValidityChange}
         disabled={disabled}
         options={[
-          { value: 'current', label: '当前有效' },
-          { value: 'not_started', label: '未开始' },
-          { value: 'expired', label: '已过期' },
-          { value: 'unlimited', label: '长期有效' },
+          { value: 'current', label: t('当前有效') },
+          { value: 'not_started', label: t('未开始') },
+          { value: 'expired', label: t('已过期') },
+          { value: 'unlimited', label: t('长期有效') },
         ]}
       />
       <Popover
@@ -296,7 +301,7 @@ export function TenantToolbar({
             disabled={disabled}
           >
             <Filter className='size-4' />
-            <LocalizedText text={"\n            更多筛选"} />{advancedCount ? ` · ${advancedCount}` : <LocalizedText text={""} />}
+            {t('更多筛选')}{advancedCount ? ` · ${advancedCount}` : ''}
           </Button>
         </PopoverTrigger>
         <PopoverContent
@@ -305,22 +310,22 @@ export function TenantToolbar({
         >
           <div className='space-y-3'>
             <label className='block space-y-1 text-sm'>
-              <span className='font-medium'><LocalizedText text={"租户标识"} /></span>
+              <span className='font-medium'>{t('租户标识')}</span>
               <Input
                 value={draft.slug}
                 disabled={disabled}
-                placeholder='精确匹配，例如 acme'
+                placeholder={t('精确匹配，例如 acme')}
                 onChange={(event) =>
                   setDraft({ ...draft, slug: event.target.value })
                 }
               />
             </label>
             <div className='space-y-1'>
-              <span className='text-sm font-medium'><LocalizedText text={"创建时间"} /></span>
+              <span className='text-sm font-medium'>{t('创建时间')}</span>
               <div className='grid grid-cols-2 gap-2'>
                 <Input
                   type='date'
-                  aria-label='创建时间起始'
+                  aria-label={t('创建时间起始')}
                   value={draft.createdFrom}
                   disabled={disabled}
                   max={draft.createdTo || undefined}
@@ -330,7 +335,7 @@ export function TenantToolbar({
                 />
                 <Input
                   type='date'
-                  aria-label='创建时间结束'
+                  aria-label={t('创建时间结束')}
                   value={draft.createdTo}
                   disabled={disabled}
                   min={draft.createdFrom || undefined}
@@ -362,11 +367,11 @@ export function TenantToolbar({
                     })
                   }}
                 >
-                  <LocalizedText text={"\n                  最近 "} />{days} <LocalizedText text={" 天\n                "} /></Button>
+                  {t('最近')} {days} {t('天')}</Button>
               ))}
             </div>
             <label className='block space-y-1 text-sm'>
-              <span className='font-medium'><LocalizedText text={"最近更新不早于"} /></span>
+              <span className='font-medium'>{t('最近更新不早于')}</span>
               <Input
                 type='date'
                 value={draft.updatedFrom}
@@ -377,7 +382,7 @@ export function TenantToolbar({
               />
             </label>
             <label className='block space-y-1 text-sm'>
-              <span className='font-medium'><LocalizedText text={"到期时间不晚于"} /></span>
+              <span className='font-medium'>{t('到期时间不晚于')}</span>
               <Input
                 type='date'
                 value={draft.expiresBefore}
@@ -406,7 +411,7 @@ export function TenantToolbar({
                   setDateOpen(false)
                 }}
               >
-                <LocalizedText text={"\n                清空\n              "} /></Button>
+                {t('清空')}</Button>
               <Button
                 type='button'
                 size='sm'
@@ -421,7 +426,7 @@ export function TenantToolbar({
                   setDateOpen(false)
                 }}
               >
-                <LocalizedText text={"\n                应用筛选\n              "} /></Button>
+                {t('应用筛选')}</Button>
             </div>
           </div>
         </PopoverContent>
@@ -464,6 +469,7 @@ export function TenantTable({
   selectedIds,
   onSelectionChange,
   visibleColumns,
+  hasFilters,
   selectionDisabled = false,
 }: {
   tenants: Tenant[]
@@ -474,9 +480,11 @@ export function TenantTable({
   selectedIds: Set<string>
   onSelectionChange: (ids: Set<string>) => void
   visibleColumns: Set<TenantColumn>
+  hasFilters: boolean
   selectionDisabled?: boolean
 }) {
   const locale = useLocale()
+  const t = useLocaleText()
   const columns = tenantColumns.filter(
     (column) => column.key !== 'role' || !isAdmin
   )
@@ -509,7 +517,7 @@ export function TenantTable({
             {isAdmin ? (
               <TableHead className='w-10 ps-4'>
                 <Checkbox
-                  aria-label={locale === 'en' ? 'Select all selectable tenants on this page' : '选择当前页全部可操作租户'}
+                  aria-label={t('选择当前页全部可操作租户')}
                   checked={
                     allSelected ? true : someSelected ? 'indeterminate' : false
                   }
@@ -537,7 +545,10 @@ export function TenantTable({
           {loading ? (
             <TableRow>
               <TableCell colSpan={columnCount} className='p-0'>
-                <TableSkeleton columns={columnCount} />
+                <div role='status' aria-live='polite' aria-busy='true'>
+                  <span className='sr-only'>{t('正在加载租户列表…')}</span>
+                  <TableSkeleton columns={columnCount} />
+                </div>
               </TableCell>
             </TableRow>
           ) : tenants.length ? (
@@ -587,17 +598,17 @@ export function TenantTable({
                 ) : null}
                 {visibleColumns.has('validity') ? (
                   <TableCell className='max-w-56 text-xs text-muted-foreground'>
-                    {formatDateRangeCell(tenant)}
+                    {formatDateRangeCell(tenant, locale)}
                   </TableCell>
                 ) : null}
                 {!isAdmin && visibleColumns.has('role') ? (
                   <TableCell>
-                    {tenantText[tenant.tenant_role ?? 'member']}
+                    {localizedTenantText(tenant.tenant_role ?? 'member', locale)}
                   </TableCell>
                 ) : null}
                 {visibleColumns.has('created') ? (
                   <TableCell className='text-xs text-muted-foreground'>
-                    {formatDateTime(tenant.created_at)}
+                    {formatDateTime(tenant.created_at, locale)}
                   </TableCell>
                 ) : null}
                 <TableCell className='pe-4'>
@@ -611,7 +622,11 @@ export function TenantTable({
                       <Link
                         to='/tenants/$tenantId'
                         params={{ tenantId: tenant.tenant_id }}
-                        aria-label={`查看 ${tenant.name}`}
+                        aria-label={
+                          locale === 'en'
+                            ? `View ${tenant.name}`
+                            : `查看 ${tenant.name}`
+                        }
                       >
                         <Eye className='size-4' />
                       </Link>
@@ -623,7 +638,11 @@ export function TenantTable({
                             variant='ghost'
                             size='icon'
                             className='size-8'
-                            aria-label={`操作 ${tenant.name}`}
+                            aria-label={
+                              locale === 'en'
+                                ? `Actions for ${tenant.name}`
+                                : `操作 ${tenant.name}`
+                            }
                           >
                             <MoreHorizontal className='size-4' />
                           </Button>
@@ -669,8 +688,20 @@ export function TenantTable({
             <TableRow className='hover:bg-transparent'>
               <TableCell colSpan={columnCount} className='p-4'>
                 <EmptyState
-                  title='暂无租户'
-                  description='调整搜索条件或创建新的租户。'
+                  title={
+                    hasFilters
+                      ? '没有匹配的租户'
+                      : isAdmin
+                        ? '暂无租户'
+                        : '当前没有可访问的启用租户'
+                  }
+                  description={
+                    hasFilters
+                      ? '调整搜索条件或重置筛选。'
+                      : isAdmin
+                        ? '创建新的租户后，它会出现在此处。'
+                        : '请联系租户管理员为你添加成员资格。'
+                  }
                 />
               </TableCell>
             </TableRow>
@@ -681,15 +712,11 @@ export function TenantTable({
   )
 }
 
-function formatDateRangeCell(tenant: Tenant) {
-  if (!tenant.valid_from && !tenant.valid_until) return '长期有效'
-  const from = tenant.valid_from
-    ? new Date(tenant.valid_from).toLocaleDateString('zh-CN')
-    : '不限'
-  const until = tenant.valid_until
-    ? new Date(tenant.valid_until).toLocaleDateString('zh-CN')
-    : '不限'
-  return `${from} ~ ${until}`
+function formatDateRangeCell(
+  tenant: Tenant,
+  locale: Parameters<typeof formatDateTime>[1]
+) {
+  return formatDateRange(tenant.valid_from, tenant.valid_until, locale)
 }
 
 export function TablePager({
@@ -713,26 +740,34 @@ export function TablePager({
   onClearSelection?: () => void
   disabled?: boolean
 }) {
+  const locale = useLocale()
+  const t = useLocaleText()
+  const selectionSummary =
+    locale === 'en'
+      ? `${selectedCount} selected, ${total} total`
+      : `已选择 ${selectedCount} 项，共 ${total} 项`
+  const pageSummary =
+    locale === 'en' ? `Page ${page} of ${pages}` : `第 ${page} 页，共 ${pages} 页`
+
   return (
     <div className='flex flex-col gap-3 border-t px-4 py-3 text-sm lg:flex-row lg:items-center lg:justify-between'>
       <div className='flex items-center gap-2 text-muted-foreground'>
-        <span>
-          <LocalizedText text={"\n          已选择 "} />{selectedCount} <LocalizedText text={" 项，共 "} />{total} <LocalizedText text={" 项\n        "} /></span>
+        <span aria-live='polite'>{selectionSummary}</span>
         {selectedCount > 0 && onClearSelection ? (
           <Button variant='ghost' size='sm' disabled={disabled} onClick={onClearSelection}>
-            <LocalizedText text={"\n            取消选择\n          "} /></Button>
+            {t('取消选择')}</Button>
         ) : null}
       </div>
       <div className='flex flex-wrap items-center gap-4'>
         {onPageSizeChange ? (
           <div className='flex items-center gap-2'>
-            <span><LocalizedText text={"每页行数"} /></span>
+            <span>{t('每页行数')}</span>
             <Select
               value={String(pageSize)}
               disabled={disabled}
               onValueChange={(value) => onPageSizeChange?.(Number(value))}
             >
-              <SelectTrigger className='h-8 w-18' aria-label='每页行数' disabled={disabled}>
+              <SelectTrigger className='h-8 w-18' aria-label={t('每页行数')} disabled={disabled}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent side='top'>
@@ -745,14 +780,13 @@ export function TablePager({
             </Select>
           </div>
         ) : null}
-        <span className='min-w-24 text-center'>
-          <LocalizedText text={"\n          第 "} />{page} <LocalizedText text={" 页，共 "} />{pages} <LocalizedText text={" 页\n        "} /></span>
+        <span className='min-w-24 text-center' aria-live='polite'>{pageSummary}</span>
         <div className='flex items-center gap-1'>
           <Button
             variant='outline'
             size='icon'
             className='size-8'
-            aria-label='跳到第一页'
+            aria-label={t('跳到第一页')}
             disabled={disabled || page <= 1}
             onClick={() => onPageChange(1)}
           >
@@ -762,7 +796,7 @@ export function TablePager({
             variant='outline'
             size='icon'
             className='size-8'
-            aria-label='上一页'
+            aria-label={t('上一页')}
             disabled={disabled || page <= 1}
             onClick={() => onPageChange(page - 1)}
           >
@@ -772,7 +806,7 @@ export function TablePager({
             variant='outline'
             size='icon'
             className='size-8'
-            aria-label='下一页'
+            aria-label={t('下一页')}
             disabled={disabled || page >= pages}
             onClick={() => onPageChange(page + 1)}
           >
@@ -782,7 +816,7 @@ export function TablePager({
             variant='outline'
             size='icon'
             className='size-8'
-            aria-label='跳到最后一页'
+            aria-label={t('跳到最后一页')}
             disabled={disabled || page >= pages}
             onClick={() => onPageChange(pages)}
           >
@@ -814,6 +848,7 @@ export function TenantColumnOptions({
   isAdmin: boolean
   disabled?: boolean
 }) {
+  const t = useLocaleText()
   const [open, setOpen] = useState(false)
   const [wasDisabled, setWasDisabled] = useState(disabled)
   if (disabled !== wasDisabled) {
@@ -850,7 +885,7 @@ export function TenantColumnOptions({
                 onChange(next)
               }}
             >
-              {column.label}
+              {t(column.label)}
             </DropdownMenuCheckboxItem>
           ))}
       </DropdownMenuContent>
