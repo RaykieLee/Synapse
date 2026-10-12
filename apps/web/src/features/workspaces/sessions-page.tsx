@@ -109,7 +109,7 @@ function WorkspaceSessionsContent({ workspace, actorId }: { workspace: Workspace
     queryKey: sessionListKey,
     queryFn: () => api<SessionList>(`${aiPath}/sessions/?agent_id=${encodeURIComponent(agentId)}`, { headers: headers(workspace) }),
     enabled: Boolean(agentId),
-    refetchInterval: (query) => query.state.data?.sessions.some((entry) => entry.status === 'running') ? 3000 : false,
+    refetchInterval: (query) => query.state.data?.sessions.some((entry) => entry.status === 'running') ? 3000 : sessionId ? 3000 : false,
   })
   const entries = sessions.data?.sessions ?? emptySessions
   const selected = entries.find((entry) => entry.session.id === sessionId) ?? null
@@ -309,6 +309,7 @@ type StreamEvent = {
   id?: string
   sequence?: number
   seq?: number
+  payload?: string | StreamEvent
   type?: string
   reply_id?: string
   block_id?: string
@@ -751,7 +752,14 @@ function SessionMessagesPanel({
     const consumeEvent = (payload: string) => {
       if (controller.signal.aborted || generation !== streamGeneration.current) return
       let event: StreamEvent
-      try { event = JSON.parse(payload) as StreamEvent } catch { return }
+      try {
+        const parsed = JSON.parse(payload) as StreamEvent
+        if (parsed && typeof parsed === 'object' && 'payload' in parsed && parsed.payload) {
+          event = typeof parsed.payload === 'string' ? JSON.parse(parsed.payload) as StreamEvent : parsed.payload
+        } else {
+          event = parsed
+        }
+      } catch { return }
       if (!event || typeof event.type !== 'string') return
       const eventKey = event.id
         ? `id:${event.id}`
@@ -766,6 +774,9 @@ function SessionMessagesPanel({
           const oldest = seenEventIds.current.values().next().value
           if (oldest) seenEventIds.current.delete(oldest)
         }
+      }
+      if (event.type === 'REPLY_START') {
+        void client.refetchQueries({ queryKey: sessionListKey, type: 'active' })
       }
       if (event.type === 'CUSTOM' && event.name === 'subagent_require_user_confirm') {
         const projected = event.value?.event
@@ -1175,13 +1186,21 @@ function SessionMessagesPanel({
     if (request.status !== 'pending' || externalInFlight.current.has(request.key) || accessDenied) return
     const output = cancel ? '外部任务已由用户取消。' : redactToolText(request.output.trim()).slice(0, MAX_EXTERNAL_RESULT_CHARS)
     if (!cancel && !output) {
-      setExternalRequests((current) => current.map((item) => item.key === request.key ? { ...item, error: '请填写外部任务结果。' } : item))
+      setExternalRequests((current) => {
+        const existing = current.find((item) => item.key === request.key)
+        if (existing) return current.map((item) => item.key === request.key ? { ...item, error: '请填写外部任务结果。' } : item)
+        return [...current, { ...request, error: '请填写外部任务结果。' }]
+      })
       return
     }
     externalInFlight.current.add(request.key)
     const controller = new AbortController()
     externalControllers.current.set(request.key, controller)
-    setExternalRequests((current) => current.map((item) => item.key === request.key ? { ...item, status: 'submitting', error: undefined } : item))
+    setExternalRequests((current) => {
+      const existing = current.find((item) => item.key === request.key)
+      if (existing) return current.map((item) => item.key === request.key ? { ...item, status: 'submitting', error: undefined } : item)
+      return [...current, { ...request, status: 'submitting', error: undefined }]
+    })
     setSendError('')
     try {
       await api<{ status: string; session_id: string }>(`${aiPath}/chat/`, {
@@ -1211,11 +1230,17 @@ function SessionMessagesPanel({
       void client.invalidateQueries({ queryKey: sessionListKey })
     } catch (error) {
       const expired = error instanceof ApiProblem && [404, 409].includes(error.status)
-      setExternalRequests((current) => current.map((item) => item.key === request.key ? {
-        ...item,
-        status: expired ? 'stale' : 'pending',
-        error: expired ? '外部任务请求已过期或已被处理，正在刷新当前状态。' : formatError(error),
-      } : item))
+      setExternalRequests((current) => {
+        const existing = current.find((item) => item.key === request.key)
+        const next = {
+          ...(existing ?? request),
+          status: expired ? 'stale' as const : 'pending' as const,
+          error: expired ? '外部任务请求已过期或已被处理，正在刷新当前状态。' : formatError(error),
+        }
+        return existing
+          ? current.map((item) => item.key === request.key ? next : item)
+          : [...current, next]
+      })
       if (error instanceof ApiProblem && [401, 403].includes(error.status)) {
         if (error.status === 401) useAuthStore.getState().auth.reset()
         setAccessDenied(true)
@@ -1322,7 +1347,11 @@ function SessionMessagesPanel({
             return <article key={request.key} className='space-y-3 rounded-md border bg-background p-3'>
               <div className='flex flex-wrap items-center justify-between gap-2'><span className='font-medium'>{request.toolCall.name}</span><span className='text-xs text-muted-foreground'>{request.status === 'stale' ? <LocalizedText text={"请求已失效"} /> : busy ? <LocalizedText text={"正在提交…"} /> : <LocalizedText text={"等待外部结果"} />}</span></div>
               <details><summary className='cursor-pointer text-xs text-muted-foreground'><LocalizedText text={"查看脱敏任务参数摘要"} /></summary><pre className='mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 p-2 text-xs'>{summarizeToolArguments(request.toolCall.input)}</pre></details>
-              {request.status !== 'stale' && <div className='space-y-2'><Label htmlFor={`external-result-${request.key}`}><LocalizedText text={"外部任务说明 / 结果"} /></Label><Textarea id={`external-result-${request.key}`} maxLength={MAX_EXTERNAL_RESULT_CHARS} className='min-h-24 resize-y' value={request.output} disabled={disabled} placeholder='填写外部执行器返回的文本结果…' onChange={(event) => setExternalRequests((current) => current.map((item) => item.key === request.key ? { ...item, output: event.target.value, error: undefined } : item))} /><p className='text-xs text-muted-foreground'><LocalizedText text={"最多 "} />{MAX_EXTERNAL_RESULT_CHARS} <LocalizedText text={" 个字符。常见凭据格式会在发送前脱敏。"} /></p></div>}
+              {request.status !== 'stale' && <div className='space-y-2'><Label htmlFor={`external-result-${request.key}`}><LocalizedText text={"外部任务说明 / 结果"} /></Label><Textarea id={`external-result-${request.key}`} maxLength={MAX_EXTERNAL_RESULT_CHARS} className='min-h-24 resize-y' value={request.output} disabled={disabled} placeholder='填写外部执行器返回的文本结果…' onChange={(event) => setExternalRequests((current) => {
+                const existing = current.find((item) => item.key === request.key)
+                if (existing) return current.map((item) => item.key === request.key ? { ...item, output: event.target.value, error: undefined } : item)
+                return [...current, { ...request, output: event.target.value, error: undefined }]
+              })} /><p className='text-xs text-muted-foreground'><LocalizedText text={"最多 "} />{MAX_EXTERNAL_RESULT_CHARS} <LocalizedText text={" 个字符。常见凭据格式会在发送前脱敏。"} /></p></div>}
               {request.error && <p role='alert' className={`text-sm ${request.status === 'stale' ? 'text-muted-foreground' : 'text-destructive'}`}>{request.error}</p>}
               <div className='flex justify-end gap-2'>{request.status === 'stale' ? <Button type='button' size='sm' variant='outline' onClick={() => { resolvedExternalKeys.current.add(request.key); setExternalRequests((current) => current.filter((item) => item.key !== request.key)) }}><LocalizedText text={"关闭"} /></Button> : <><Button type='button' size='sm' variant='outline' disabled={disabled} onClick={() => void submitExternalResult(request, true)}><LocalizedText text={"取消外部任务"} /></Button><Button type='button' size='sm' disabled={disabled || !request.output.trim()} onClick={() => void submitExternalResult(request)}>{busy ? <Loader2 className='mr-2 size-3.5 animate-spin' /> : null}<LocalizedText text={"提交结果"} /></Button></>}</div>
             </article>

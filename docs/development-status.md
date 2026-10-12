@@ -10,6 +10,8 @@
 
 > 2026-10-12 F25a SSE 文本增量完成当前工作树独立复验：使用现有 Docker Redis `127.0.0.1:16381`、临时 SQLite（Alembic `0016_tenant_validity`）、真实 FastAPI/AgentScope/Vite/Chromium，`pnpm build` 与完整 F25a runner 均通过，输出 `F25a SSE text frontend verification passed`，退出码 `0`。验收覆盖文本增量、断线 replay、去重、会话/Workspace 切换隔离、历史消息保留、临时 503 重试、删除会话后的 404 清理和撤权后的 403 清理。runner 已补充 Windows `pnpm`/子进程兼容及按名称精确清理 F25a Agent/Session/event fixture；结束后 Redis DB7/DB8 均为 `0` keys。真实模型提供商推理、工具调用和人工确认仍未验证，详见 [F25a SSE 文本验收](verification/F25a-sse-text-frontend.md)。
 
+> 2026-10-13 F25b1/F25b2/F26a/F26b/F27a 完成本轮独立验收与修复后复验：F25b1 中断、F25b2 工具事件、F26a 工具权限确认、F26b 外部结果人工介入、F27a 团队任务只读面板的真实 FastAPI/AgentScope/临时 Redis/Vite/Chromium runner 均退出码 `0`。F26b 首次发现历史 external-result textarea 受控状态缺陷，F27a 首次发现团队任务事件刷新缺口，均已修复并重新通过。所有报告仍明确排除真实模型 provider、真实工具/外部执行器、真实子智能体编排 worker 的覆盖；F25b1 parked 状态为前端投影，F26a HITL resume 使用受控响应与真实 fixture。另发现 AgentScope `WakeupDispatcher` 的后台 resume 可能丢失 `WorkspaceContext`，F26b UI 通过不等于后台恢复通过，已列后续后端任务。详见各项 [F25b1](verification/f25b1-interrupt.md)、[F25b2](verification/f25b2-tool-events.md)、[F26a](verification/f26a-tool-permission.md)、[F26b](verification/F26b-external-result-frontend.md)、[F27a](verification/F27a-team-panel.md) 报告。
+
 ## 功能任务
 
 > 2026-10-12 F17 附件域已完成渐进式 service 化与前端 API 收口：新增 `AttachmentService`、附件 schema 和 `src/api/attachments.ts`，保持现有 wire contract、权限矩阵、个人附件 404 隐私语义和文件补偿行为；F17a 定向 API、默认 API、compileall、build、ESLint 及 F17b 真实 Redis/Vite/Chromium 均通过。验收中修复了中文 locale 反向翻译和 Windows Vite 子进程清理；证据见 [F17 附件 Service 化方案](verification/F17-attachment-service-refactor.md)、[F17a 附件验收](verification/F17a-attachments-api.md) 和 [F17b 附件前端验收](verification/F17b-attachments-frontend.md)。
@@ -126,11 +128,11 @@
 | F24c | 会话状态agent_id一致性 | 通过 | verify_tenant_backend | verification/F24c-session-status-agent-binding.md：真实Redis网关错配/跨scope 404且不探测run-lock |
 | F24b | 基础聊天消息前端融合 | 独立验收通过（真实模型推理除外） | agent_embedding_design | verification/F24b-chat-messages-frontend.md：独立真实 API/Redis/Playwright 验收确认错配 `agent_id` 返回 404 且无消息正文；消息分页、附件、失败保留草稿/重试、Workspace/会话切换与撤权流程通过；真实模型推理未配置凭据，工具/SSE 重连不属于本项 |
 | F25a | SSE文本增量展示 | 独立验收通过（真实模型推理除外） | agent_embedding_design | verification/F25a-sse-text-frontend.md：真实 API/Redis/Vite/Chromium 覆盖增量、replay 去重、会话/Workspace 隔离、403/404 清理；`pnpm build` 通过，真实模型推理待验 |
-| F25b1 | 聊天生成中断 | 待独立验收 | agent_embedding_design | 当前scope会话interrupt与状态刷新完成；待独立浏览器验证 |
-| F25b2 | 工具执行事件展示 | 待独立验收 | agent_embedding_design | SSE/历史工具时间线、脱敏摘要与结果折叠完成；待独立浏览器验证 |
-| F26a | 工具权限确认前端 | 待独立验收 | agent_embedding_design | 真实awaiting tool call允许/拒绝、过期/撤权反馈完成；待独立浏览器验证 |
-| F26b | 外部结果人工介入前端 | 待独立验收 | agent_embedding_design | 真实外部执行结果/取消UI及scope清理完成；待独立浏览器验证 |
-| F27a | 子智能体团队与任务只读面板 | 待独立验收 | agent_team_frontend | 基于真实session.team/tasks_context的只读概览完成；待独立浏览器验证 |
+| F25b1 | 聊天生成中断 | 独立验收通过（真实模型/worker停驻除外） | agent_embedding_design | verification/f25b1-interrupt.md：真实 API/Redis/Chromium 覆盖 202 中断、重复点击、状态收敛、错误 agent/session；parked 状态为前端投影 |
+| F25b2 | 工具执行事件展示 | 独立验收通过（真实工具/模型执行除外） | agent_embedding_design | verification/f25b2-tool-events.md：真实 FastAPI/Redis SSE/Vite/Chromium 覆盖历史与实时工具时间线、增量、错误、脱敏、二进制降级 |
+| F26a | 工具权限确认前端 | 独立验收通过（真实 worker/model resume 除外） | agent_embedding_design | verification/f26a-tool-permission.md：真实 fixture/SSE 覆盖 asking 展示、重复去重、允许/拒绝、409反馈、刷新恢复；真实 HITL resume 未覆盖 |
+| F26b | 外部结果人工介入前端 | 独立验收通过（UI；后台 resume 待修复） | agent_embedding_design | verification/F26b-external-result-frontend.md：初次 textarea 状态缺陷已修复；复验覆盖首次输入、成功提交、409/503、取消、隔离和撤权；WakeupDispatcher scope context 后端风险另列 |
+| F27a | 子智能体团队与任务只读面板 | 独立验收通过（真实模型/编排 worker 除外） | agent_team_frontend | verification/F27a-team-panel.md：初次事件刷新缺口已修复；复验覆盖 1/3→2/3 进度、团队/空态、跨 Workspace、第二 actor 和撤权 |
 | F27b | 子智能体团队编排与执行控制 | 待开始 | — | — |
 | F28 | 知识库管理融合 | 待开始 | — | — |
 | F29 | 知识库文档、索引与检索融合 | 待开始 | — | — |
