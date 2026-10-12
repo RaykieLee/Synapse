@@ -9,7 +9,17 @@ const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext()
 const page = await context.newPage()
 page.setDefaultTimeout(20000)
+const messageResponses = []
 page.on('pageerror', (error) => console.error('Browser page error:', error.message))
+page.on('response', async (response) => {
+  if (!new URL(response.url()).pathname.includes('/messages')) return
+  const entry = { status: response.status(), url: response.url() }
+  if (response.status() >= 400) {
+    try { entry.body = (await response.text()).slice(0, 500) } catch {}
+  }
+  messageResponses.push(entry)
+  console.log('F24b message API response:', JSON.stringify(entry))
+})
 const setToken = async (token) => {
   await context.clearCookies()
   await context.addCookies([{ name: 'synapse_access_token', value: token, url: seed.web }])
@@ -24,6 +34,11 @@ try {
   await setToken(seed.actor_token)
   await page.goto(sessionsPath(seed.alpha_one))
   await page.getByRole('heading', { name: '会话管理', exact: true }).waitFor()
+  await page.waitForFunction(() => ['zh-CN', 'en'].includes(document.documentElement.lang))
+  console.log('F24b browser locale:', JSON.stringify(await page.evaluate(() => ({
+    documentLang: document.documentElement.lang,
+    storedLocale: localStorage.getItem('synapse-locale'),
+  }))))
   await page.getByLabel('智能体').selectOption(seed.alpha_agent_id)
   const primaryRow = page.getByRole('button', { name: /F24b Primary Session/ })
   await primaryRow.waitFor()
@@ -42,7 +57,9 @@ try {
   const foreignSession = await fetchApi(`/api/v1/ai/sessions/${encodeURIComponent(seed.beta_session_id)}/messages?agent_id=${encodeURIComponent(seed.beta_agent_id)}&limit=50`, seed.alpha_one)
   assert.equal(foreignSession.status, 404, foreignSession.text)
   const wrongAgent = await fetchApi(`/api/v1/ai/sessions/${encodeURIComponent(seed.alpha_session_id)}/messages?agent_id=${encodeURIComponent(seed.beta_agent_id)}&limit=50`, seed.alpha_one)
-  if (wrongAgent.status !== 404) console.error(`F24b defect: mismatched foreign agent_id returned ${wrongAgent.status} for Alpha session; body: ${wrongAgent.text.slice(0, 500)}`)
+  assert.equal(wrongAgent.status, 404, `mismatched agent_id must not expose Alpha messages: ${wrongAgent.text.slice(0, 500)}`)
+  assert.ok(!wrongAgent.text.includes('F24b history 60 user'), 'mismatched agent_id response must not contain Alpha message content')
+  assert.ok(!wrongAgent.text.includes('F24b history 61 assistant'), 'mismatched agent_id response must not contain Alpha message content')
 
   // Switch session and verify its distinct history does not reuse the first session's query data.
   await page.getByRole('button', { name: /F24b Second Session/ }).click()
@@ -54,7 +71,34 @@ try {
   await page.getByText('F24b history 61 assistant', { exact: true }).waitFor()
 
   // First send is deliberately rejected at the network edge. Draft and selected attachment must remain.
-  const composer = page.getByLabel('输入消息')
+  const composerLabel = await page.locator('textarea[data-slot="textarea"][aria-label]').getAttribute('aria-label')
+  assert.ok(['输入消息', 'Type a message'].includes(composerLabel), `unexpected composer accessible name: ${composerLabel}`)
+  const composer = page.getByRole('textbox', { name: composerLabel, exact: true })
+  try {
+    await page.waitForFunction((label) => {
+      const input = [...document.querySelectorAll('textarea[data-slot="textarea"]')]
+        .find((element) => element.getAttribute('aria-label') === label)
+      return input instanceof HTMLTextAreaElement && !input.disabled && input.getClientRects().length > 0
+    }, composerLabel, { timeout: 15000 })
+  } catch (error) {
+    const snapshot = await page.evaluate(() => ({
+      url: location.href,
+      documentLang: document.documentElement.lang,
+      storedLocale: localStorage.getItem('synapse-locale'),
+      textareas: [...document.querySelectorAll('textarea')].map((input) => ({
+        ariaLabel: input.getAttribute('aria-label'),
+        placeholder: input.placeholder,
+        disabled: input.disabled,
+        visible: input.getClientRects().length > 0,
+      })),
+      alerts: [...document.querySelectorAll('[role="alert"]')].map((item) => item.textContent),
+      bodyText: document.body.innerText.slice(-2500),
+    }))
+    console.error('F24b composer was not enabled; DOM snapshot:', JSON.stringify(snapshot))
+    console.error('F24b message API responses:', JSON.stringify(messageResponses))
+    throw error
+  }
+  assert.equal(await composer.isEnabled(), true, 'message composer should be enabled before filling')
   await composer.fill('F24b retry message text')
   await page.getByText('引用 Workspace 附件', { exact: false }).click()
   const attachmentLabel = page.locator('label').filter({ hasText: 'f24b-reference.txt' })
@@ -76,7 +120,11 @@ try {
   assert.equal(await attachmentLabel.locator('input[type="checkbox"]').isChecked(), true)
 
   await page.getByRole('button', { name: '发送', exact: true }).click()
-  await page.waitForFunction(() => document.querySelector('textarea[aria-label="输入消息"]')?.value === '')
+  await page.waitForFunction((label) => {
+    const input = [...document.querySelectorAll('textarea[data-slot="textarea"]')]
+      .find((element) => element.getAttribute('aria-label') === label)
+    return input instanceof HTMLTextAreaElement && input.value === ''
+  }, composerLabel)
   assert.equal(failedOnce, true)
   assert.equal(capturedAcceptedBody?.session_id, seed.alpha_session_id)
   assert.equal(capturedAcceptedBody?.input?.content?.[0]?.text, 'F24b retry message text')

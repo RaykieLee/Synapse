@@ -1,22 +1,28 @@
 # F24b Workspace 会话消息前端独立验收
 
-## 结论
+## 当前状态
+
+2026-10-12 本机真实 API + Playwright 复验通过：错误 `agent_id` 查询现在返回 404，不再返回 Alpha 消息；全套 F24b 浏览器流程通过。按仓库协作约定，仍需不同子智能体独立复验后，才能将本项标记为独立验收通过。
+
+本次页面 `document.lang` 为 `zh-CN`、`localStorage['synapse-locale']` 未设置，但消息输入框实际 accessible name 为 `Type a message`。验收脚本按渲染出的 accessible name 定位输入框；本次没有修改产品 UI。该中英文标签不一致留作 UX/i18n 差距。
+
+## 原验收结论
 
 **未通过。** 消息页面的历史展示、分页、附件引用、发送失败保留草稿、重试成功、切换会话/Workspace 和成员撤权后清除页面内容均在浏览器中得到验证；但当前 `pnpm build` 被 TypeScript 错误阻断，且真实 API 存在跨 Workspace `agent_id` 不匹配仍返回 Alpha 会话消息的越权结果。
 
 真实模型推理未验证：环境没有配置模型凭据。成功发送证据仅表示 `/ai/chat/` 接受了请求，不代表 AgentScope 产生了真实助手回复。
 
-## 构建门槛
+## 原构建门槛（已解除）
 
-在 `apps/web` 执行 `pnpm build` 失败：
+原验收时在 `apps/web` 执行 `pnpm build` 失败：
 
 ```text
 src/features/workspaces/sessions-page.tsx(1075,11): error TS2304: Cannot find name 'controller'.
 ```
 
-报错处位于工具确认提交的 `catch` 分支。该错误与本验收脚本无关；没有修改产品文件。后续浏览器流程通过显式 `F24B_SKIP_BUILD=1` 绕过构建门槛运行，不能视为构建通过。
+报错处位于工具确认提交的 `catch` 分支。该错误之后已修复；本次完整验收脚本先运行 `pnpm build` 并通过，没有设置 `F24B_SKIP_BUILD`。
 
-## 运行环境
+## 原验收运行环境
 
 - 临时 SQLite 数据库，Alembic 从空库迁移至 head `0015_tenant_scheduled_task_runs`。
 - 真实 FastAPI、AgentScope RedisStorage、Redis session/message bus、Vite 和 headless Playwright。
@@ -24,7 +30,7 @@ src/features/workspaces/sessions-page.tsx(1075,11): error TS2304: Cannot find na
 - 主会话通过 AgentScope RedisStorage 写入 62 条混合 user/assistant 消息，包含附件 data block。附件通过真实 Workspace 附件 API 上传，文件保存于临时目录。
 - 每次运行结束停止服务并清理带 `F24b` 前缀的 AgentScope fixture；SQLite 和附件目录随临时目录删除。
 
-## 浏览器与 API 证据
+## 原验收浏览器与 API 证据
 
 - 会话主页面显示历史中最新 user 和 assistant 消息；初始 50 条历史没有 oldest sentinel，点击“加载更早消息”后 sentinel 出现，分页确由真实 API 游标返回。
 - 页面展示真实附件记录上传后返回的 `f24b-reference.txt`，历史 data block 也显示附件名。
@@ -37,22 +43,56 @@ src/features/workspaces/sessions-page.tsx(1075,11): error TS2304: Cannot find na
 
 ## 可复跑
 
-正常运行会先执行 build；当前会在已记录的 TypeScript 错误处停止：
+正常运行会先执行 `pnpm build`，再运行真实 API 和 Playwright 流程。Windows 示例：
 
-```bash
-apps/api/.venv/bin/python apps/api/tests/verification/run_f24b_chat_messages_frontend.py
+```powershell
+docker run --rm -d --name synapse-f24b-redis-20261012 -p 127.0.0.1:16381:6379 redis:7-alpine
+Set-Location apps/api
+$env:F24B_REDIS_HOST = '127.0.0.1'
+$env:F24B_REDIS_PORT = '16381'
+.\.venv\Scripts\python.exe tests\verification\run_f24b_chat_messages_frontend.py
 ```
 
-在确认并记录 build 失败后，单独运行 Vite/真实 API/Playwright 流程：
+Linux/macOS 可使用项目 venv 的 POSIX 路径：
 
-```bash
-F24B_SKIP_BUILD=1 apps/api/.venv/bin/python apps/api/tests/verification/run_f24b_chat_messages_frontend.py
+```sh
+cd apps/api
+F24B_REDIS_HOST=127.0.0.1 F24B_REDIS_PORT=16381 \
+  .venv/bin/python tests/verification/run_f24b_chat_messages_frontend.py
 ```
 
-要求 Redis 在 `127.0.0.1:6380` 可用；使用 `F24B_REDIS_HOST`、`F24B_REDIS_PORT` 可更改连接。绕过 build 的命令只收集浏览器证据，不改变 build 的失败结论。
+Redis 默认地址为 `127.0.0.1:6380`；可用 `F24B_REDIS_HOST`、`F24B_REDIS_PORT` 覆盖。`F24B_SKIP_BUILD=1` 只用于单独调试浏览器流程，不能作为 build 通过证据。
 
 ## 未验证边界
 
 - 未配置模型提供方凭据；未验证真实助手推理、回复生成或模型流式内容。
 - 本验收的“发送失败”是受控网络 503 fixture；真实服务端成功发送只验证了接受 API 请求。
 - 未覆盖工具确认、工具调用、外部任务和 SSE 重连，这些不属于本项基础消息覆盖。
+
+## 2026-10-12 本机复验记录
+
+复验代码起点为 `1aa25f7`（产品文件未变），并包含本报告所记的 F24b 验收脚本修复。
+
+### 运行命令与环境
+
+使用一次性 Redis 7 容器（映射到 `127.0.0.1:16381`）、临时 SQLite、真实 FastAPI、AgentScope Redis storage/message bus、Vite 和 Playwright。Windows 命令：
+
+```powershell
+docker run --rm -d --name synapse-f24b-redis-20261012 -p 127.0.0.1:16381:6379 redis:7-alpine
+Set-Location apps/api
+$env:F24B_REDIS_HOST = '127.0.0.1'
+$env:F24B_REDIS_PORT = '16381'
+.\.venv\Scripts\python.exe tests\verification\run_f24b_chat_messages_frontend.py
+```
+
+结果：`pnpm build` 通过，迁移到 `0016_tenant_validity` 完成，脚本输出 `F24b chat messages frontend verification passed`，退出码为 0。
+
+### 绑定修复与浏览器覆盖
+
+- 真实请求以 Alpha session ID 搭配 Beta Workspace 的 `agent_id` 查询消息返回 HTTP 404；响应为 `REQUEST_ERROR` / “Session not found”，不含被测 Alpha 消息正文。验收脚本现明确断言 404，并断言已知消息 sentinel 不出现在响应体中。
+- 外来 Beta session、跨 Workspace session 请求均返回 404；成员被移除后，其消息请求返回 403，页面不再显示该成员的历史 sentinel。
+- 历史消息分页、附件名称呈现、切换 session/Workspace、受控 503 后保留草稿和附件选择、重试请求携带附件数据均通过。
+- 模型调用结果未断言；成功仅代表 API 接受聊天请求，不代表模型生成回复。
+- 修正了 Windows 子进程无法找到 `pnpm` 的 runner 问题，并让验收选择当前实际 accessible name、等待可见且启用的 textbox。测试退出时释放 SQLite engine，避免 Windows 删除临时数据库时发生文件占用。
+
+本记录是本机执行证据，不替代独立子智能体验收。Redis 容器需在独立复验完成后停止。

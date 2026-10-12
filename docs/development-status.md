@@ -8,7 +8,7 @@
 
 ## 功能任务
 
-> 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已提交（`51a6c61`）；构建/类型检查不代表这些增量已独立验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本次增量状态为**代码已写，待独立验收**。国际化为**代码已写，待完整覆盖与独立验收**。F24b 的 agent/session 绑定校验修复**代码已写，待独立验收**；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
+> 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已提交（`51a6c61`）；构建/类型检查不代表这些增量已独立验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本次增量状态为**代码已写，待独立验收**。国际化为**代码已写，待完整覆盖与独立验收**。F24b 的 agent/session 绑定修复已完成本机真实 API/Playwright 复验，仍待独立子智能体验收；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
 
 > 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停与正式导航方案已记入上述差距清单；F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)。这三项的代码已写且当前 TypeScript 编译通过，均**待独立验收**；设计与编译结论不能替代功能验收。
 
@@ -90,7 +90,7 @@
 | F21c | AgentScope SSE流鉴权上下文 | 通过（模型推理待验） | agent_embedding_design | verification/F21c-sse-auth-context.md：真实Redis SSE事件、上下文、断连与越权拒绝1 passed；无provider推理 |
 | F24a | 会话管理前端融合 | 通过 | agent_embedding_design | verification/F24a-session-management-frontend.md：build、真实API/Redis浏览器CRUD、跨空间和只读状态通过 |
 | F24c | 会话状态agent_id一致性 | 通过 | verify_tenant_backend | verification/F24c-session-status-agent-binding.md：真实Redis网关错配/跨scope 404且不探测run-lock |
-| F24b | 基础聊天消息前端融合 | 隔离修复代码已写、静态检查待核，待独立复验 | agent_embedding_design | verification/F24b-chat-messages-frontend.md：原验收发现跨 Workspace 的 agent_id 查询泄漏；适配器 `get_session` 已加入 agent 绑定校验，不能以代码审查代替真实请求复验 |
+| F24b | 基础聊天消息前端融合 | agent/session 隔离修复已写；本机真实 API/Playwright 复验通过；待独立子智能体验收 | agent_embedding_design | verification/F24b-chat-messages-frontend.md：错配 `agent_id` 实际请求返回 404 且无消息正文；浏览器消息/分页/附件/切换/撤权流程通过；真实模型推理及独立复验未完成 |
 | F25a | SSE文本增量展示 | 验收未通过，待修复 | agent_embedding_design | verification/F25a-sse-text-frontend.md：真实SSE浏览器流程通过；前端构建被未定义controller阻断，真实模型推理待验 |
 | F25b1 | 聊天生成中断 | 待独立验收 | agent_embedding_design | 当前scope会话interrupt与状态刷新完成；待独立浏览器验证 |
 | F25b2 | 工具执行事件展示 | 待独立验收 | agent_embedding_design | SSE/历史工具时间线、脱敏摘要与结果折叠完成；待独立浏览器验证 |
