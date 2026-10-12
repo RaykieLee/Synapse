@@ -22,6 +22,8 @@
 
 > 2026-10-12 F13c 租户角色-菜单授权完成渐进式 service 化：新增 schema/service，保留原有权限、租户隔离、历史失效关联读取、幂等版本递增、并发替换和复合外键行为；定向回归、默认 API 套件、compileall、build、ESLint 及 router/service 边界扫描通过。使用独立 Docker Redis `redis:7-alpine`（本机 `16381`）复跑 F24b 真实 API/Vite/Chromium 流程，结果通过；F13c 本身不依赖 Redis。证据见 [F13c service 化验收](verification/F13c-tenant-role-menu-service-refactor.md)。
 
+> 2026-10-12 F14a 租户部门完成渐进式 service 化：新增部门 schema/service，保留原有租户隔离、部门树递归、祖先刷新、父节点状态、循环检测、重排和软删除行为；F14a 定向 API、F14b 真实 API/Vite/Chromium、默认 API 套件、compileall、build、ESLint 和 router/service 边界扫描通过。F14b Windows runner 的 pnpm/路径/子进程/SQLite 清理修复已单独提交 `21a38a1`；证据见 [F14a service 化验收](verification/F14a-tenant-department-service-refactor.md)。
+
 > 2026-10-12 新增 UX 门槛：每个后续功能点先由独立 UX 子智能体审查主流程、失败/权限/窄屏/可访问性，再由实现子智能体开发，最后另行独立验收。租户批量启停方案已记入上述差距清单并完成 F09b 独立验收；正式导航仍需后续范围清理。F19c2 方案见 [手工触发 UX 与契约检查](ux/F19c2-manual-task-trigger.md)，其代码已写且当前 TypeScript 编译通过，仍待独立验收；设计与编译结论不能替代功能验收。
 
 > 2026-10-12 F11/F11a 增量复核：UX 与 API/服务子智能体审查完成，差距与待决策见 [全局用户管理复核](ux/F11a-global-users-review.md)。`%`/`_` 搜索匹配、用户页确认、结构化字段错误和双语反馈的代码已写，TypeScript 编译通过，待独立验收。软删身份复用、最后平台管理员保护和筛选范围仍待产品决定；历史验收不能覆盖本次增量。
@@ -70,8 +72,8 @@
 | F13e | 菜单与角色授权前端 | 通过 | agent_embedding_design | verification/F13e-role-menu-frontend.md：build、真实API浏览器授权保存/历史项/权限/租户缓存通过 |
 | F13d1 | 当前成员可见菜单树后端 | 通过 | agent_embedding_design | verification/F13d1-visible-menu-tree.md：1 passed；角色授权、父级过滤、撤权和no-store通过 |
 | F13d2 | 租户动态侧栏导航前端 | 通过 | agent_embedding_design | verification/F13d2-dynamic-sidebar.md：build、跨租户/空间/角色/撤权/晚到请求真实API浏览器验收通过 |
-| F14a | 部门管理后端迁移 | 通过 | agent_embedding_design | verification/F14a-tenant-department-api.md：1 passed；树CRUD、隔离、祖先刷新与复合FK通过 |
-| F14b | 部门管理前端迁移 | 通过 | agent_embedding_design | verification/F14b-tenant-department-frontend.md：build、真实API浏览器树CRUD/移动/排序/隔离通过 |
+| F14a | 部门管理后端迁移 | 通过（service 化独立验收通过） | agent_embedding_design | verification/F14a-tenant-department-api.md 与 verification/F14a-tenant-department-service-refactor.md：树CRUD、隔离、祖先刷新、复合FK及 router/service 事务边界通过 |
+| F14b | 部门管理前端迁移 | 通过（当前 service 化后复验通过） | agent_embedding_design | verification/F14b-tenant-department-frontend.md 与 verification/F14a-tenant-department-service-refactor.md：真实 API/Vite/Chromium 树CRUD/移动/排序/隔离通过 |
 | F15a | 字典管理后端迁移 | 通过 | verify_tenant_backend | verification/F15a-tenant-dictionary-api.md：1 passed；迁移、租户隔离、CRUD、权限和复合FK通过 |
 | F15b | 字典管理前端迁移 | 通过 | verify_tenant_backend | verification/F15b-tenant-dictionary-frontend.md：build、真实API浏览器CRUD/筛选/排序/隔离通过 |
 | F16a | 参数配置后端迁移 | 通过 | agent_embedding_design | verification/F16a-tenant-config-api.md：1 passed；迁移、租户隔离、权限及敏感值边界独立复验通过 |
