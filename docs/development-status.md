@@ -8,6 +8,8 @@
 
 > 2026-10-12 当前 HEAD `bb4351b` 基线与 P0 复验：工作区干净；API 默认套件 `24 passed, 26 deselected, 38 warnings`、`compileall app`、`pnpm build` 均通过；ESLint `0 errors, 24 warnings`。使用现有 Docker Redis `127.0.0.1:16381` 由主线程重跑 F24b 真实 FastAPI/AgentScope/Vite/Chromium 流程，输出 `F24b chat messages frontend verification passed`，退出码 `0`。验证后只清理本轮生成的 1 个 F24b Redis event key，DB4/DB5 恢复为 `6/0`；真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证，详见 [F24b 聊天消息验收](verification/F24b-chat-messages-frontend.md) 与 [基线复验报告](verification/baseline-2026-10-12.md)。
 
+> 2026-10-12 F25a SSE 文本增量完成当前工作树独立复验：使用现有 Docker Redis `127.0.0.1:16381`、临时 SQLite（Alembic `0016_tenant_validity`）、真实 FastAPI/AgentScope/Vite/Chromium，`pnpm build` 与完整 F25a runner 均通过，输出 `F25a SSE text frontend verification passed`，退出码 `0`。验收覆盖文本增量、断线 replay、去重、会话/Workspace 切换隔离、历史消息保留、临时 503 重试、删除会话后的 404 清理和撤权后的 403 清理。runner 已补充 Windows `pnpm`/子进程兼容及按名称精确清理 F25a Agent/Session/event fixture；结束后 Redis DB7/DB8 均为 `0` keys。真实模型提供商推理、工具调用和人工确认仍未验证，详见 [F25a SSE 文本验收](verification/F25a-sse-text-frontend.md)。
+
 ## 功能任务
 
 > 2026-10-12 F17 附件域已完成渐进式 service 化与前端 API 收口：新增 `AttachmentService`、附件 schema 和 `src/api/attachments.ts`，保持现有 wire contract、权限矩阵、个人附件 404 隐私语义和文件补偿行为；F17a 定向 API、默认 API、compileall、build、ESLint 及 F17b 真实 Redis/Vite/Chromium 均通过。验收中修复了中文 locale 反向翻译和 Windows Vite 子进程清理；证据见 [F17 附件 Service 化方案](verification/F17-attachment-service-refactor.md)、[F17a 附件验收](verification/F17a-attachments-api.md) 和 [F17b 附件前端验收](verification/F17b-attachments-frontend.md)。
@@ -16,7 +18,7 @@
 
 > 2026-10-12 基线修复：实际当前树 `896b66a` 首次默认 API 复跑暴露 F17a Windows 瞬态 unlink 竞态（`22 passed, 1 failed, 25 deselected`）。已在附件删除路径加入有限重试，并增加确定性 FastAPI 回归；F17a 定向、F16a→F17a 连续 8 轮、默认 API、compileall、build 和 ESLint 均通过。该修复的 Redis、浏览器、多副本共享存储仍待独立验收，证据见 [F17a 附件验收](verification/F17a-attachments-api.md) 和 [基线复验报告](verification/baseline-2026-10-12.md)。
 
-> 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已实现；本轮增量已完成独立真实 API/Chromium 验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本轮 F09 增量现为**独立验收通过**，加载态仍未做人为延迟下的独立时序断言。F24b 的 agent/session 绑定修复已完成本机真实 API/Playwright 复验，F24b 独立验收已在 `b069adf` 记录；F25a 原 TypeScript 构建故障已由当前编译通过替代，但 SSE 功能仍待独立验收。
+> 2026-10-12 当前版本补充：租户列表筛选、owner 选择、表格交互、邀请过期事务结果与前端国际化已实现；本轮增量已完成独立真实 API/Chromium 验收。近期差距和优先级见 [租户优化原则与差距清单](tenant-optimization-principles-and-gap-review.md)。F05/F05a/F09 历史“通过”仅适用于原报告所验版本；本轮 F09 增量现为**独立验收通过**，加载态仍未做人为延迟下的独立时序断言。F24b 的 agent/session 绑定修复已完成本机真实 API/Playwright 复验，F24b 独立验收已在 `b069adf` 记录；F25a 当前工作树已完成完整构建与真实 API/Redis/Playwright 独立验收，真实模型推理仍待后续验证。
 
 > 2026-10-12 租户优化独立验收：筛选/计数、UTC 边界、权限隔离、owner API 落库、邀请过期 `410` 与持久化 5 项真实 API 检查通过；独立 Chromium 复验确认中英文标题/说明/状态/角色/日期/分页、错误重试、超范围页码、筛选空态、成员空态、列显隐、可访问名称和 390px 窄屏均通过。平台管理员零租户空态仍为拦截模拟，加载态未做人为延迟下的独立时序断言；详见[租户优化验收记录](verification/tenant-optimization-acceptance-2026-10-12.md)。
 
@@ -123,7 +125,7 @@
 | F24a | 会话管理前端融合 | 通过 | agent_embedding_design | verification/F24a-session-management-frontend.md：build、真实API/Redis浏览器CRUD、跨空间和只读状态通过 |
 | F24c | 会话状态agent_id一致性 | 通过 | verify_tenant_backend | verification/F24c-session-status-agent-binding.md：真实Redis网关错配/跨scope 404且不探测run-lock |
 | F24b | 基础聊天消息前端融合 | 独立验收通过（真实模型推理除外） | agent_embedding_design | verification/F24b-chat-messages-frontend.md：独立真实 API/Redis/Playwright 验收确认错配 `agent_id` 返回 404 且无消息正文；消息分页、附件、失败保留草稿/重试、Workspace/会话切换与撤权流程通过；真实模型推理未配置凭据，工具/SSE 重连不属于本项 |
-| F25a | SSE文本增量展示 | 验收未通过，待修复 | agent_embedding_design | verification/F25a-sse-text-frontend.md：真实SSE浏览器流程通过；前端构建被未定义controller阻断，真实模型推理待验 |
+| F25a | SSE文本增量展示 | 独立验收通过（真实模型推理除外） | agent_embedding_design | verification/F25a-sse-text-frontend.md：真实 API/Redis/Vite/Chromium 覆盖增量、replay 去重、会话/Workspace 隔离、403/404 清理；`pnpm build` 通过，真实模型推理待验 |
 | F25b1 | 聊天生成中断 | 待独立验收 | agent_embedding_design | 当前scope会话interrupt与状态刷新完成；待独立浏览器验证 |
 | F25b2 | 工具执行事件展示 | 待独立验收 | agent_embedding_design | SSE/历史工具时间线、脱敏摘要与结果折叠完成；待独立浏览器验证 |
 | F26a | 工具权限确认前端 | 待独立验收 | agent_embedding_design | 真实awaiting tool call允许/拒绝、过期/撤权反馈完成；待独立浏览器验证 |
@@ -169,4 +171,4 @@
 
 按用户截图实现双栏登录页、生成的人物插画、中文表单、响应式布局和减少动态效果支持。前端构建与登录相关 ESLint 通过；独立浏览器验收覆盖桌面/手机、标签关联、空提交、显隐、记住账号、错误/加载反馈及说明对话框。模拟登录验证请求字段、存储和导航，未重验真实后端登录。证据见 [登录页验收](verification/login-redesign.md)，素材来源与提示词见 [设计实现说明](login-design.md)。
 
-同时修复聊天确认提交中 controller 未定义的构建阻断，当前 pnpm build 通过；聊天确认取消行为和 F24b 的消息接口参数边界仍需各自独立验收，不因此将 F24b/F25a 全部改为通过。
+同时修复聊天确认提交中 controller 未定义的构建阻断，当前 pnpm build 通过；聊天确认取消行为和 F24b 的消息接口参数边界仍需各自独立验收。F25a 已完成独立真实 API/Redis/Playwright 验收，但真实模型推理仍不在本次证据范围内。

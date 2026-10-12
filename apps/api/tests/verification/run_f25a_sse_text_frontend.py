@@ -1,9 +1,11 @@
 """F25a real FastAPI/AgentScope/Redis/Vite/Playwright SSE text acceptance."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -22,12 +24,30 @@ ROOT = Path(__file__).resolve().parents[4]
 API = ROOT / "apps" / "api"
 WEB = ROOT / "apps" / "web"
 PLAYWRIGHT = Path(__file__).with_name("f25a_sse_text_frontend.mjs")
+PNPM = shutil.which("pnpm") or ("pnpm.cmd" if os.name == "nt" else "pnpm")
 
 
 def free_port():
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+def terminate_process_tree(process):
+    """Terminate pnpm's child Vite process as well as the command wrapper."""
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+            )
+        else:
+            process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
 
 
 def wait_url(url, process, timeout=50):
@@ -186,6 +206,10 @@ def create_proxy_handler(state, session_factory):
                 self.send_header("Content-Length", str(len(response.content)))
                 self.end_headers()
                 self.wfile.write(response.content)
+            except (BrokenPipeError, ConnectionAbortedError):
+                # The browser intentionally closes the proxy connection after
+                # exercising SSE retry/cleanup behavior.
+                return
             except Exception as exc:
                 self.send_json(502, {"detail": f"test proxy failed: {type(exc).__name__}"})
 
@@ -202,16 +226,34 @@ def main():
     if os.environ.get("F25A_SKIP_BUILD") == "1":
         print("F25A_SKIP_BUILD=1: the build failure was recorded separately; browser evidence does not count as a build pass.")
     else:
-        build = subprocess.run(["pnpm", "build"], cwd=WEB, text=True)
+        build = subprocess.run([PNPM, "build"], cwd=WEB, text=True)
         if build.returncode:
             return build.returncode
 
     import redis
+    from agentscope.app.storage import RedisStorage
     redis_host = os.environ.get("F25A_REDIS_HOST", "127.0.0.1")
     redis_port = int(os.environ.get("F25A_REDIS_PORT", "6380"))
     storage_db, bus_db = 7, 8
     bus_redis = redis.Redis(host=redis_host, port=redis_port, db=bus_db)
     redis.Redis(host=redis_host, port=redis_port, db=storage_db, socket_connect_timeout=1).ping()
+
+    async def clean_old_fixture_records():
+        async with RedisStorage(host=redis_host, port=redis_port, db=storage_db) as raw:
+            for user_id in ("1", "2", "3"):
+                for row in await raw.list_agents(user_id):
+                    name = row.data.name or ""
+                    if not name.casefold().startswith(("f25a ", "f25a-")):
+                        continue
+                    for session in await raw.list_sessions(user_id, row.id):
+                        bus_redis.delete(
+                            f"agentscope:session:lock:{session.id}",
+                            f"agentscope:session:events:{session.id}",
+                        )
+                        await raw.delete_session(user_id, row.id, session.id)
+                    await raw.delete_agent(user_id, row.id)
+
+    asyncio.run(clean_old_fixture_records())
 
     with tempfile.TemporaryDirectory(prefix="synapse-f25a-") as temp:
         temp_path = Path(temp)
@@ -286,7 +328,7 @@ def main():
             proxy.state = proxy_state
             proxy_thread = threading.Thread(target=proxy.serve_forever, daemon=True); proxy_thread.start()
             env["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{proxy_port}"
-            web = subprocess.Popen(["pnpm", "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
+            web = subprocess.Popen([PNPM, "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
             seed.update({"web": f"http://127.0.0.1:{web_port}", "api": api_base, "proxy": f"http://127.0.0.1:{proxy_port}"})
             wait_url(seed["web"], web)
 
@@ -305,8 +347,6 @@ def main():
                 response = client.post(api_base + "/ai/sessions/", headers=headers_two, json={"agent_id": seed["agent_two"], "name": "F25a Workspace Two Session"}); response.raise_for_status()
                 seed["session_two"] = response.json()["session_id"]
 
-            import asyncio
-            from agentscope.app.storage import RedisStorage
             from agentscope.message import Msg
             from app.integrations.agentscope_session_scope import WorkspaceSessionStorage, bind_agentscope_context, reset_agentscope_context
             from app.tenancy.context import WorkspaceContext
@@ -350,11 +390,18 @@ def main():
             for name in ("web",):
                 proc = locals().get(name)
                 if proc:
-                    proc.terminate(); proc.wait(timeout=10)
+                    terminate_process_tree(proc)
             proxy_obj = locals().get("proxy")
             if proxy_obj:
                 proxy_obj.shutdown(); proxy_obj.server_close()
             api.terminate(); api.wait(timeout=10)
+            seed_data = locals().get("seed") or {}
+            if seed_data.get("session_one"):
+                bus_redis.delete(f"agentscope:session:events:{seed_data['session_one']}")
+            asyncio.run(clean_old_fixture_records())
+            get_engine().dispose()
+            get_session_factory.cache_clear()
+            get_engine.cache_clear()
             api_log.close(); web_log.close()
 
 
