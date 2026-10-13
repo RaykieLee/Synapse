@@ -28,8 +28,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  DataTableSkeletonRows,
+  SortableTableHead,
+  sortRows,
+  type TableSortState,
+} from '@/components/data-table'
 import { formatDateTime, tenantText } from '../types'
-import { EmptyState, TableSkeleton } from './shared'
+import { EmptyState } from './shared'
 import { LocalizedText } from '@/components/localized-text'
 import { useLocaleText } from '@/lib/i18n'
 
@@ -76,6 +82,21 @@ export function MemberTable({
   renderCustomRole: (member: Member) => React.ReactNode
 }) {
   const columnCount = canManage ? 6 : 5
+  const [sorting, setSorting] = React.useState<TableSortState>(null)
+  const sortedMembers = sortRows(members, sorting, (member, key) => {
+    switch (key) {
+      case 'member':
+        return member.nick_name || member.user_name
+      case 'role':
+        return member.tenant_role
+      case 'status':
+        return member.status
+      case 'joined':
+        return member.joined_at
+      default:
+        return ''
+    }
+  })
   const [roleTarget, setRoleTarget] = React.useState<{
     member: Member
     role: MemberRole
@@ -91,11 +112,11 @@ export function MemberTable({
       <Table>
         <TableHeader>
           <TableRow className='bg-muted/35 hover:bg-muted/35'>
-            <TableHead className='h-11 ps-4'><LocalizedText text={"成员"} /></TableHead>
-            <TableHead><LocalizedText text={"角色"} /></TableHead>
+            <SortableTableHead label={<LocalizedText text='成员' />} sortKey='member' sorting={sorting} onSortingChange={setSorting} className='ps-4' />
+            <SortableTableHead label={<LocalizedText text='角色' />} sortKey='role' sorting={sorting} onSortingChange={setSorting} />
             <TableHead><LocalizedText text={"自定义角色"} /></TableHead>
-            <TableHead><LocalizedText text={"状态"} /></TableHead>
-            <TableHead className='hidden xl:table-cell'><LocalizedText text={"加入时间"} /></TableHead>
+            <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={sorting} onSortingChange={setSorting} />
+            <SortableTableHead label={<LocalizedText text='加入时间' />} sortKey='joined' sorting={sorting} onSortingChange={setSorting} className='hidden xl:table-cell' />
             {canManage ? (
               <TableHead className='w-20 pe-4 text-end'><LocalizedText text={"管理"} /></TableHead>
             ) : null}
@@ -103,13 +124,9 @@ export function MemberTable({
         </TableHeader>
         <TableBody>
           {loading ? (
-            <TableRow>
-              <TableCell colSpan={columnCount} className='p-0'>
-                <TableSkeleton columns={5} />
-              </TableCell>
-            </TableRow>
-          ) : members.length ? (
-            members.map((member) => (
+            <DataTableSkeletonRows columnCount={columnCount} />
+          ) : sortedMembers.length ? (
+            sortedMembers.map((member) => (
               <TableRow key={member.user_id} className='group'>
                 <TableCell className='max-w-64 ps-4'>
                   <div className='space-y-0.5'>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { getLocale, useLocale } from '@/lib/i18n'
 import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -23,8 +24,22 @@ import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
 import { FormDialog } from '@/components/form-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import {
+  DataTableSkeletonRows,
+  SortableTableHead,
+  sortRows,
+  type TableSortState,
+} from '@/components/data-table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 type TaskDraft = {
   task_id?: string; task_name: string; description: string; execution_target: string; schedule_type: 'cron' | 'interval'
@@ -62,6 +77,7 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
   const [scheduleFilter, setScheduleFilter] = useState('')
   const [enabledFilter, setEnabledFilter] = useState('')
   const [page, setPage] = useState(1)
+  const [sorting, setSorting] = useState<TableSortState>(null)
   const tenantKey = ['synapse', actorId, tenantId, 'personal', 'tenant'] as const
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
   const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
@@ -83,6 +99,28 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
       enabled: params.has('enabled') ? params.get('enabled') === 'true' : undefined,
     }),
   })
+  const sortedTasks = sortRows(
+    tasks.data?.items ?? [],
+    sorting,
+    (task, key) => {
+      switch (key) {
+        case 'task':
+          return task.task_name
+        case 'target':
+          return task.execution_target
+        case 'schedule':
+          return task.schedule_type === 'cron'
+            ? task.cron_expression
+            : `${task.interval_value} ${task.interval_unit}`
+        case 'timezone':
+          return task.timezone
+        case 'status':
+          return task.enabled
+        default:
+          return ''
+      }
+    }
+  )
   const targetKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'targets'] as const
   const targets = useQuery({
     queryKey: targetKey,
@@ -164,16 +202,65 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
         <LocalizedNativeSelect aria-label="按计划类型筛选" className={`${input} max-w-40`} value={scheduleFilter} onChange={(event) => { setScheduleFilter(event.target.value); setPage(1) }}><option value=""><LocalizedText text={"全部计划"} /></option><option value="cron"><LocalizedText text={"Cron"} /></option><option value="interval"><LocalizedText text={"间隔"} /></option></LocalizedNativeSelect>
         <LocalizedNativeSelect aria-label="按启用状态筛选" className={`${input} max-w-40`} value={enabledFilter} onChange={(event) => { setEnabledFilter(event.target.value); setPage(1) }}><option value=""><LocalizedText text={"全部状态"} /></option><option value="true"><LocalizedText text={"启用"} /></option><option value="false"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect>
       </div>
-      {tasks.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载任务…"} /></p> : tasks.isError ? <ErrorBox message={errorText(tasks.error)} /> : tasks.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"任务"} /></th><th className="p-3"><LocalizedText text={"执行目标"} /></th><th className="p-3"><LocalizedText text={"计划"} /></th><th className="p-3"><LocalizedText text={"时区"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{tasks.data.items.map((task) => {
-        const target = targets.data?.items.find((item) => item.target_id === task.execution_target)
-        return <tr className="border-b align-top last:border-0" key={`${task.tenant_id}:${task.task_id}`}>
-          <td className="p-3"><span className="font-medium">{task.task_name}</span>{task.description && <span className="mt-1 block max-w-sm text-xs text-muted-foreground">{task.description}</span>}</td>
-          <td className="p-3"><code>{task.execution_target}</code>{target && <span className="mt-1 block text-xs text-muted-foreground">{target.name}</span>}</td>
-          <td className="p-3">{task.schedule_type === 'cron' ? <><span className="font-mono">{task.cron_expression}</span><span className="block text-xs text-muted-foreground"><LocalizedText text={"Cron"} /></span></> : <>{task.interval_value} {unitLabels[task.interval_unit ?? 'minutes']}<span className="block text-xs text-muted-foreground"><LocalizedText text={"间隔"} /></span></>}</td>
-          <td className="p-3">{task.timezone}</td><td className="p-3">{task.enabled ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td>
-          <td className="space-x-3 whitespace-nowrap p-3"><button className="underline" onClick={() => setHistoryTask(task)}><LocalizedText text={"执行记录"} /></button><button className="underline" disabled={!active || !task.enabled || pending || Boolean(manualRunPendingId)} onClick={() => { setManualRunError(''); setRunConfirmation(task) }}><LocalizedText text={"立即运行"} /></button><button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => { setError(''); setDraft(toDraft(task)) }}><LocalizedText text={"编辑"} /></button><button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => toggle.mutate(task)}>{task.enabled ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => setDeleteTarget(task)}><LocalizedText text={"删除"} /></button></td>
-        </tr>
-      })}</tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无任务定义"} /></p>}
+      <div className="overflow-hidden rounded-md border">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[66rem]">
+            <TableHeader>
+              <TableRow className="bg-muted/35 hover:bg-muted/35">
+                <SortableTableHead label={<LocalizedText text='任务' />} sortKey='task' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='执行目标' />} sortKey='target' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='计划' />} sortKey='schedule' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='时区' />} sortKey='timezone' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={sorting} onSortingChange={setSorting} />
+                <TableHead><LocalizedText text='操作' /></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tasks.isLoading ? (
+                <DataTableSkeletonRows columnCount={6} />
+              ) : tasks.isError ? (
+                <TableRow><TableCell colSpan={6}><ErrorBox message={errorText(tasks.error)} /></TableCell></TableRow>
+              ) : sortedTasks.length ? (
+                sortedTasks.map((task) => {
+                  const target = targets.data?.items.find((item) => item.target_id === task.execution_target)
+                  return (
+                    <TableRow key={`${task.tenant_id}:${task.task_id}`}>
+                      <TableCell className="whitespace-normal">
+                        <span className="font-medium">{task.task_name}</span>
+                        {task.description && <span className="mt-1 block max-w-sm text-xs text-muted-foreground">{task.description}</span>}
+                      </TableCell>
+                      <TableCell className="whitespace-normal">
+                        <code>{task.execution_target}</code>
+                        {target && <span className="mt-1 block text-xs text-muted-foreground">{target.name}</span>}
+                      </TableCell>
+                      <TableCell>
+                        {task.schedule_type === 'cron' ? (
+                          <><span className="font-mono">{task.cron_expression}</span><span className="block text-xs text-muted-foreground"><LocalizedText text='Cron' /></span></>
+                        ) : (
+                          <>{task.interval_value} {unitLabels[task.interval_unit ?? 'minutes']}<span className="block text-xs text-muted-foreground"><LocalizedText text='间隔' /></span></>
+                        )}
+                      </TableCell>
+                      <TableCell>{task.timezone}</TableCell>
+                      <TableCell>{task.enabled ? <LocalizedText text='启用' /> : <LocalizedText text='停用' />}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 whitespace-nowrap">
+                          <button className="underline" onClick={() => setHistoryTask(task)}><LocalizedText text='执行记录' /></button>
+                          <button className="underline" disabled={!active || !task.enabled || pending || Boolean(manualRunPendingId)} onClick={() => { setManualRunError(''); setRunConfirmation(task) }}><LocalizedText text='立即运行' /></button>
+                          <button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => { setError(''); setDraft(toDraft(task)) }}><LocalizedText text='编辑' /></button>
+                          <button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => toggle.mutate(task)}>{task.enabled ? <LocalizedText text='停用' /> : <LocalizedText text='启用' />}</button>
+                          <button className="text-destructive underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => setDeleteTarget(task)}><LocalizedText text='删除' /></button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              ) : (
+                <TableRow><TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground"><LocalizedText text='暂无任务定义' /></TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
       <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground"><LocalizedText text={"共 "} />{tasks.data?.total ?? 0} <LocalizedText text={" 项"} /></span><div className="flex gap-2"><button className={button} disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><LocalizedText text={"上一页"} /></button><span className="px-2 py-2 text-sm"><LocalizedText text={"第 "} />{page} <LocalizedText text={" 页"} /></span><button className={button} disabled={page * 20 >= (tasks.data?.total ?? 0)} onClick={() => setPage((value) => value + 1)}><LocalizedText text={"下一页"} /></button></div></div>
     </section>
     {historyTask && <TaskRunsPanel key={`${tenantId}:${historyTask.task_id}:${manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''}`} tenantId={tenantId} actorId={actorId} task={historyTask} initialSelectedRunId={manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''} onClose={() => setHistoryTask(null)} />}
@@ -219,6 +306,7 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
   const [startedFrom, setStartedFrom] = useState('')
   const [startedTo, setStartedTo] = useState('')
   const [page, setPage] = useState(1)
+  const [sorting, setSorting] = useState<TableSortState>(null)
   const [selectedRunId, setSelectedRunId] = useState(initialSelectedRunId ?? '')
   const params = new URLSearchParams({ page: String(page), page_size: '20' })
   if (status) params.set('status', status)
@@ -234,6 +322,26 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
       startedTo: params.get('started_to') ?? undefined,
     }),
   })
+  const sortedRuns = sortRows(
+    runs.data?.items ?? [],
+    sorting,
+    (run, key) => {
+      switch (key) {
+        case 'run_id':
+          return run.run_id
+        case 'slot':
+          return run.slot_at
+        case 'started':
+          return run.started_at
+        case 'finished':
+          return run.finished_at
+        case 'status':
+          return run.status
+        default:
+          return ''
+      }
+    }
+  )
   const detailKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'run', task.task_id, selectedRunId] as const
   const detail = useQuery({
     queryKey: detailKey,
@@ -254,7 +362,48 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
       <label className="space-y-1 text-sm"><span><LocalizedText text={"到"} /></span><Input className={input} type="datetime-local" value={startedTo} onChange={(event) => { setStartedTo(event.target.value); setPage(1); setSelectedRunId('') }} /></label>
     </div>
     {invalidRange && <ErrorBox message="开始时间范围无效：起始时间不能晚于结束时间。" />}
-    {!invalidRange && (runs.isLoading ? <p className="py-5 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载执行记录…"} /></p> : runs.isError ? <ErrorBox message={errorText(runs.error)} /> : runs.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"运行 ID"} /></th><th className="p-3"><LocalizedText text={"计划槽"} /></th><th className="p-3"><LocalizedText text={"开始"} /></th><th className="p-3"><LocalizedText text={"结束"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"详情"} /></th></tr></thead><tbody>{runs.data.items.map((run) => <tr className="border-b last:border-0" key={`${run.tenant_id}:${run.task_id}:${run.run_id}`}><td className="p-3">{run.run_id}</td><td className="p-3">{formatTime(run.slot_at)}</td><td className="p-3">{formatTime(run.started_at)}</td><td className="p-3">{run.finished_at ? formatTime(run.finished_at) : <LocalizedText text={"—"} />}</td><td className="p-3">{runStatus[run.status]}</td><td className="p-3"><button className="underline" onClick={() => setSelectedRunId(run.run_id)}>{selectedRunId === run.run_id ? <LocalizedText text={"已选择"} /> : <LocalizedText text={"查看"} />}</button></td></tr>)}</tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"没有匹配的执行记录"} /></p>)}
+    {!invalidRange && (
+      <div className="overflow-hidden rounded-md border">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[58rem]">
+            <TableHeader>
+              <TableRow className="bg-muted/35 hover:bg-muted/35">
+                <SortableTableHead label={<LocalizedText text='运行 ID' />} sortKey='run_id' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='计划槽' />} sortKey='slot' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='开始' />} sortKey='started' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='结束' />} sortKey='finished' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={sorting} onSortingChange={setSorting} />
+                <TableHead><LocalizedText text='详情' /></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {runs.isLoading ? (
+                <DataTableSkeletonRows columnCount={6} />
+              ) : runs.isError ? (
+                <TableRow><TableCell colSpan={6}><ErrorBox message={errorText(runs.error)} /></TableCell></TableRow>
+              ) : sortedRuns.length ? (
+                sortedRuns.map((run) => (
+                  <TableRow key={`${run.tenant_id}:${run.task_id}:${run.run_id}`}>
+                    <TableCell>{run.run_id}</TableCell>
+                    <TableCell>{formatTime(run.slot_at)}</TableCell>
+                    <TableCell>{formatTime(run.started_at)}</TableCell>
+                    <TableCell>{run.finished_at ? formatTime(run.finished_at) : '—'}</TableCell>
+                    <TableCell>{runStatus[run.status]}</TableCell>
+                    <TableCell>
+                      <button className="underline" onClick={() => setSelectedRunId(run.run_id)}>
+                        {selectedRunId === run.run_id ? <LocalizedText text='已选择' /> : <LocalizedText text='查看' />}
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow><TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground"><LocalizedText text='没有匹配的执行记录' /></TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    )}
     <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground"><LocalizedText text={"共 "} />{runs.data?.total ?? 0} <LocalizedText text={" 条"} /></span><div className="flex gap-2"><button className={button} disabled={page <= 1} onClick={() => { setPage((value) => value - 1); setSelectedRunId('') }}><LocalizedText text={"上一页"} /></button><span className="px-2 py-2 text-sm"><LocalizedText text={"第 "} />{page} <LocalizedText text={" 页"} /></span><button className={button} disabled={page * 20 >= (runs.data?.total ?? 0)} onClick={() => { setPage((value) => value + 1); setSelectedRunId('') }}><LocalizedText text={"下一页"} /></button></div></div>
     </DialogContent>
     </Dialog>
@@ -300,7 +449,7 @@ function TaskEditor({ draft, targets, pending, error, onChange, onCancel, onSave
       <label className="space-y-1 text-sm"><span><LocalizedText text={"IANA 时区"} /></span><Input className={input} required maxLength={64} value={draft.timezone} placeholder="UTC 或 Asia/Shanghai" onChange={(event) => set('timezone', event.target.value)} /></label>
       {draft.schedule_type === 'cron' ? <label className="space-y-1 text-sm sm:col-span-2"><span><LocalizedText text={"五字段 Cron 表达式"} /></span><Input className={`${input} font-mono`} required maxLength={120} value={draft.cron_expression} placeholder="例如：0 2 * * *" onChange={(event) => set('cron_expression', event.target.value)} /><span className="block text-xs text-muted-foreground"><LocalizedText text={"按所选 IANA 时区计算；服务端会校验表达式。"} /></span></label> : <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2"><label className="space-y-1 text-sm"><span><LocalizedText text={"间隔数值"} /></span><Input className={input} required type="number" min={1} max={31536000} step={1} value={draft.interval_value} onChange={(event) => set('interval_value', event.target.value)} /></label><label className="space-y-1 text-sm"><span><LocalizedText text={"间隔单位"} /></span><LocalizedNativeSelect className={input} value={draft.interval_unit} onChange={(event) => set('interval_unit', event.target.value as TaskDraft['interval_unit'])}>{intervalUnits.map((unit) => <option key={unit} value={unit}>{unitLabels[unit]}</option>)}</LocalizedNativeSelect><span className="block text-xs text-muted-foreground"><LocalizedText text={"有效范围为 10 秒至 365 天。"} /></span></label></div>}
       <label className="space-y-1 text-sm sm:col-span-2"><span><LocalizedText text={"说明（可选）"} /></span><textarea className="min-h-20 w-full rounded-md border bg-background p-3 text-sm" maxLength={1000} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
-      {!draft.task_id && <label className="flex items-center gap-2 text-sm"><Input type="checkbox" checked={draft.enabled} onChange={(event) => set('enabled', event.target.checked)} /><LocalizedText text={"创建后启用"} /></label>}
+      {!draft.task_id && <label className="flex items-center gap-2 text-sm"><Checkbox checked={draft.enabled} onCheckedChange={(value) => set('enabled', value === true)} /><LocalizedText text={"创建后启用"} /></label>}
     </div>
   </FormDialog>
 }

@@ -17,6 +17,20 @@ import {
 } from '@/api/users'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  DataTableSkeletonRows,
+  SortableTableHead,
+  sortRows,
+  type TableSortState,
+} from '@/components/data-table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ApiProblem } from '@/lib/api'
@@ -86,6 +100,7 @@ export function Users() {
   const [confirming, setConfirming] = React.useState<{ user: GlobalUser; action: 'disable' | 'enable' | 'delete' } | null>(null)
   const [notice, setNotice] = React.useState('')
   const [actionError, setActionError] = React.useState<unknown>('')
+  const [sorting, setSorting] = React.useState<TableSortState>(null)
 
   if (search !== lastSearch) {
     setLastSearch(search)
@@ -142,6 +157,11 @@ export function Users() {
   }
 
   const items = users.data?.items ?? []
+  const sortedItems = sortRows(
+    items,
+    sorting,
+    (user, key) => user[key as keyof GlobalUser]
+  )
   const total = users.data?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const changePage = (next: number) => void navigate({ search: (old) => ({ ...old, page: next }) })
@@ -158,11 +178,81 @@ export function Users() {
       {notice && <div role='status' className='rounded-md border border-emerald-600/30 bg-emerald-600/5 px-3 py-2 text-sm'>{localizedNotice(notice)}<button className='float-end underline' onClick={() => setNotice('')}><LocalizedText text={"关闭"} /></button></div>}
       {Boolean(actionError) && <div role='alert' className='rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive'>{errorMessage(actionError)}<button className='float-end underline' onClick={() => setActionError('')}><LocalizedText text={"关闭"} /></button></div>}
       <section className='overflow-hidden rounded-md border'>
-        {users.isLoading ? <p className='p-8 text-center text-sm text-muted-foreground'><LocalizedText text={"正在加载用户…"} /></p>
-          : users.isError ? <div className='space-y-3 p-8 text-center'><p role='alert' className='text-sm text-destructive'>{errorMessage(users.error)}</p><Button variant='outline' onClick={() => void users.refetch()}><LocalizedText text={"重试"} /></Button></div>
-            : items.length ? <div className='overflow-x-auto'><table className='w-full text-left text-sm'><thead><tr className='border-b bg-muted/40 text-muted-foreground'><th className='p-3'><LocalizedText text={"用户名"} /></th><th className='p-3'><LocalizedText text={"昵称"} /></th><th className='p-3'><LocalizedText text={"邮箱"} /></th><th className='p-3'><LocalizedText text={"电话"} /></th><th className='p-3'><LocalizedText text={"状态"} /></th><th className='p-3'><LocalizedText text={"创建时间"} /></th><th className='p-3'><LocalizedText text={"操作"} /></th></tr></thead><tbody>
-      {items.map((user) => <tr key={user.user_id} className='border-b last:border-0'><td className='p-3'><span className='font-medium'>{user.user_name}</span><DetailDialog trigger={<LocalizedText text={"技术信息"} />} title={<LocalizedText text={"用户技术信息"} />} description={user.user_name} triggerClassName='mt-1 h-auto px-0 py-0 text-xs text-muted-foreground underline'><div className='space-y-1 text-sm'><p><LocalizedText text={"账号 ID："} /><code className='break-all'>{user.user_id}</code></p><p><LocalizedText text={"平台角色："} />{user.platform_role}</p></div></DetailDialog></td><td className='p-3'>{user.nick_name || '—'}</td><td className='p-3'>{user.email || '—'}</td><td className='p-3'>{user.phonenumber || '—'}</td><td className='p-3'><span className={`rounded-full px-2 py-1 text-xs ${user.status === 'active' ? 'bg-emerald-600/10 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>{user.status === 'active' ? <LocalizedText text={"正常"} /> : <LocalizedText text={"已停用"} />}</span></td><td className='p-3 whitespace-nowrap'>{user.created_at ? new Intl.DateTimeFormat(locale === 'en' ? 'en' : 'zh-CN').format(new Date(user.created_at)) : <LocalizedText text={"—"} />}</td><td className='p-3'><div className='flex flex-wrap gap-x-3 gap-y-1 whitespace-nowrap'><button className='underline underline-offset-4' onClick={() => { setActionError(''); setEditing(user) }}><LocalizedText text={"编辑"} /></button><button className='underline underline-offset-4' onClick={() => { setActionError(''); setResetting(user) }}><LocalizedText text={"重置密码"} /></button><button className='underline underline-offset-4' disabled={status.isPending} onClick={() => beginConfirmation(user, user.status === 'active' ? 'disable' : 'enable')}>{user.status === 'active' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className='text-destructive underline underline-offset-4' disabled={remove.isPending} onClick={() => beginConfirmation(user, 'delete')}><LocalizedText text={"删除"} /></button></div></td></tr>)}
-            </tbody></table></div> : <p className='p-8 text-center text-sm text-muted-foreground'>{search ? <LocalizedText text={"没有匹配的用户。"} /> : <LocalizedText text={"暂无用户。"} />}</p>}
+        <Table>
+          <TableHeader>
+            <TableRow className='bg-muted/40 hover:bg-muted/40'>
+              <SortableTableHead label={<LocalizedText text='用户名' />} sortKey='user_name' sorting={sorting} onSortingChange={setSorting} />
+              <SortableTableHead label={<LocalizedText text='昵称' />} sortKey='nick_name' sorting={sorting} onSortingChange={setSorting} />
+              <SortableTableHead label={<LocalizedText text='邮箱' />} sortKey='email' sorting={sorting} onSortingChange={setSorting} />
+              <SortableTableHead label={<LocalizedText text='电话' />} sortKey='phonenumber' sorting={sorting} onSortingChange={setSorting} />
+              <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={sorting} onSortingChange={setSorting} />
+              <SortableTableHead label={<LocalizedText text='创建时间' />} sortKey='created_at' sorting={sorting} onSortingChange={setSorting} />
+              <TableHead><LocalizedText text='操作' /></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.isLoading ? (
+              <DataTableSkeletonRows columnCount={7} />
+            ) : users.isError ? (
+              <TableRow>
+                <TableCell colSpan={7} className='py-6 text-center'>
+                  <div className='space-y-3'>
+                    <p role='alert' className='text-sm text-destructive'>
+                      {errorMessage(users.error)}
+                    </p>
+                    <Button variant='outline' size='sm' onClick={() => void users.refetch()}>
+                      <LocalizedText text='重试' />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : sortedItems.length ? (
+              sortedItems.map((user) => (
+                <TableRow key={user.user_id}>
+                  <TableCell>
+                    <span className='font-medium'>{user.user_name}</span>
+                    <DetailDialog
+                      trigger={<LocalizedText text='技术信息' />}
+                      title={<LocalizedText text='用户技术信息' />}
+                      description={user.user_name}
+                      triggerClassName='mt-1 h-auto px-0 py-0 text-xs text-muted-foreground underline'
+                    >
+                      <div className='space-y-1 text-sm'>
+                        <p><LocalizedText text='账号 ID：' /><code className='break-all'>{user.user_id}</code></p>
+                        <p><LocalizedText text='平台角色：' />{user.platform_role}</p>
+                      </div>
+                    </DetailDialog>
+                  </TableCell>
+                  <TableCell>{user.nick_name || '—'}</TableCell>
+                  <TableCell>{user.email || '—'}</TableCell>
+                  <TableCell>{user.phonenumber || '—'}</TableCell>
+                  <TableCell>
+                    <span className={`rounded-full px-2 py-1 text-xs ${user.status === 'active' ? 'bg-emerald-600/10 text-emerald-700 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}>
+                      {user.status === 'active' ? <LocalizedText text='正常' /> : <LocalizedText text='已停用' />}
+                    </span>
+                  </TableCell>
+                  <TableCell className='whitespace-nowrap'>
+                    {user.created_at ? new Intl.DateTimeFormat(locale === 'en' ? 'en' : 'zh-CN').format(new Date(user.created_at)) : '—'}
+                  </TableCell>
+                  <TableCell>
+                    <div className='flex flex-wrap gap-x-3 gap-y-1 whitespace-nowrap'>
+                      <button className='underline underline-offset-4' onClick={() => { setActionError(''); setEditing(user) }}><LocalizedText text='编辑' /></button>
+                      <button className='underline underline-offset-4' onClick={() => { setActionError(''); setResetting(user) }}><LocalizedText text='重置密码' /></button>
+                      <button className='underline underline-offset-4' disabled={status.isPending} onClick={() => beginConfirmation(user, user.status === 'active' ? 'disable' : 'enable')}>{user.status === 'active' ? <LocalizedText text='停用' /> : <LocalizedText text='启用' />}</button>
+                      <button className='text-destructive underline underline-offset-4' disabled={remove.isPending} onClick={() => beginConfirmation(user, 'delete')}><LocalizedText text='删除' /></button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7} className='h-24 text-center text-muted-foreground'>
+                  {search ? <LocalizedText text='没有匹配的用户。' /> : <LocalizedText text='暂无用户。' />}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </section>
       <div className='flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground'><span><LocalizedText text={"共 "} />{total} <LocalizedText text={" 个账号 · 第 "} />{Math.min(page, pageCount)} <LocalizedText text={" / "} />{pageCount} <LocalizedText text={" 页"} /></span><div className='flex gap-2'><Button variant='outline' size='sm' disabled={page <= 1 || users.isFetching} onClick={() => changePage(page - 1)}><LocalizedText text={"上一页"} /></Button><Button variant='outline' size='sm' disabled={page >= pageCount || users.isFetching} onClick={() => changePage(page + 1)}><LocalizedText text={"下一页"} /></Button></div></div>
     </Main>

@@ -10,6 +10,20 @@ import { LocalizedText } from '@/components/localized-text'
 import { FormDialog } from '@/components/form-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  DataTableSkeletonRows,
+  SortableTableHead,
+  sortRows,
+  type TableSortState,
+} from '@/components/data-table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 type DictType = { dict_type_id: string; tenant_id: string; dict_name: string; dict_type: string; order_num: number; status: '0' | '1'; remark: string | null }
 type DictEntry = { dict_data_id: string; tenant_id: string; dict_type_id: string; dict_type: string; dict_sort: number; dict_label: string; dict_value: string; css_class: string | null; list_class: string | null; is_default: 'Y' | 'N'; status: '0' | '1'; remark: string | null }
@@ -30,9 +44,11 @@ export function TenantDictionariesPage() {
   const [typeSearchField, setTypeSearchField] = useState<'dict_name' | 'dict_type'>('dict_name')
   const [typeStatus, setTypeStatus] = useState('')
   const [typePage, setTypePage] = useState(1)
+  const [typeSorting, setTypeSorting] = useState<TableSortState>(null)
   const [entrySearch, setEntrySearch] = useState('')
   const [entryStatus, setEntryStatus] = useState('')
   const [entryPage, setEntryPage] = useState(1)
+  const [entrySorting, setEntrySorting] = useState<TableSortState>(null)
   const [selectedTypeId, setSelectedTypeId] = useState('')
   const [typeDraft, setTypeDraft] = useState<TypeDraft | null>(null)
   const [entryDraft, setEntryDraft] = useState<EntryDraft | null>(null)
@@ -152,6 +168,46 @@ export function TenantDictionariesPage() {
   if (!tenantActive) return <main className="space-y-4 p-6"><ErrorBox message="租户未启用，无法管理字典。" /></main>
 
   const typesItems = types.data?.items ?? []
+  const sortedTypes = sortRows(typesItems, typeSorting, (row, key) => {
+    switch (key) {
+      case 'name':
+        return row.dict_name
+      case 'type':
+        return row.dict_type
+      case 'order':
+        return row.order_num
+      case 'status':
+        return row.status
+      default:
+        return ''
+    }
+  })
+  const sortedEntries = sortRows(
+    entries.data?.items ?? [],
+    entrySorting,
+    (row, key) => {
+      switch (key) {
+        case 'label':
+          return row.dict_label
+        case 'value':
+          return row.dict_value
+        case 'order':
+          return row.dict_sort
+        case 'default':
+          return row.is_default
+        case 'status':
+          return row.status
+        default:
+          return ''
+      }
+    }
+  )
+  const canReorderTypes =
+    !typeSorting ||
+    (typeSorting.key === 'order' && typeSorting.direction === 'asc')
+  const canReorderEntries =
+    !entrySorting ||
+    (entrySorting.key === 'order' && entrySorting.direction === 'asc')
   const typeBusy = saveType.isPending || deleteType.isPending || reorderType.isPending
   const entryBusy = saveEntry.isPending || deleteEntry.isPending || reorderEntry.isPending
   return <main className="space-y-5 p-6">
@@ -161,7 +217,49 @@ export function TenantDictionariesPage() {
     {typeDraft && <TypeEditor draft={typeDraft} pending={saveType.isPending} error={typeError} onChange={setTypeDraft} onCancel={() => { setTypeDraft(null); setTypeError('') }} onSave={() => saveType.mutate(typeDraft)} />}
     <section className={`${panel} space-y-4`}>
       <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-semibold"><LocalizedText text={"字典类型"} /></h2><p className="text-sm text-muted-foreground"><LocalizedText text={"可按名称或标识筛选；上移/下移会重排当前租户全部类型。"} /></p></div><div className="flex flex-wrap gap-2"><LocalizedNativeSelect aria-label="类型搜索字段" className={`${input} max-w-36`} value={typeSearchField} onChange={(event) => { setTypeSearchField(event.target.value as 'dict_name' | 'dict_type'); setTypePage(1) }}><option value="dict_name"><LocalizedText text={"名称"} /></option><option value="dict_type"><LocalizedText text={"标识"} /></option></LocalizedNativeSelect><Input aria-label="搜索字典类型" className={`${input} max-w-64`} value={typeSearch} placeholder={typeSearchField === 'dict_name' ? "按名称筛选" : "按标识筛选"} onChange={(event) => { setTypeSearch(event.target.value); setTypePage(1) }} /><LocalizedNativeSelect aria-label="类型状态筛选" className={`${input} max-w-40`} value={typeStatus} onChange={(event) => { setTypeStatus(event.target.value); setTypePage(1) }}><option value=""><LocalizedText text={"全部状态"} /></option><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></div></div>
-      {types.isLoading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在加载字典类型…"} /></p> : types.isError ? <ErrorBox message={errorText(types.error)} /> : typesItems.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"名称"} /></th><th className="p-3"><LocalizedText text={"类型标识"} /></th><th className="p-3"><LocalizedText text={"排序"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{typesItems.map((row) => <tr className={`border-b last:border-0 ${selectedTypeId === row.dict_type_id ? 'bg-muted/40' : ''}`} key={row.dict_type_id}><td className="p-3 font-medium">{row.dict_name}</td><td className="p-3"><code>{row.dict_type}</code></td><td className="p-3">{row.order_num}</td><td className="p-3">{row.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td><td className="space-x-3 p-3"><button className="underline" onClick={() => { setSelectedTypeId(row.dict_type_id); setEntryPage(1); setEntrySearch(''); setEntryStatus(''); setEntryDraft(null); setError('') }}><LocalizedText text={"管理条目"} /></button><button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => reorderType.mutate({ id: row.dict_type_id, delta: -1 })}><LocalizedText text={"上移"} /></button><button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => reorderType.mutate({ id: row.dict_type_id, delta: 1 })}><LocalizedText text={"下移"} /></button><button className="underline" onClick={() => { setError(''); setTypeDraft(toTypeDraft(row)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => saveType.mutate({ ...toTypeDraft(row), status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={typeBusy} onClick={() => setDeleteTarget({ kind: 'type', row })}><LocalizedText text={"删除"} /></button></td></tr>)}</tbody></table></div> : <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无字典类型"} /></p>}
+      <div className="overflow-hidden rounded-md border">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[50rem]">
+            <TableHeader>
+              <TableRow className="bg-muted/35 hover:bg-muted/35">
+                <SortableTableHead label={<LocalizedText text='名称' />} sortKey='name' sorting={typeSorting} onSortingChange={setTypeSorting} />
+                <SortableTableHead label={<LocalizedText text='类型标识' />} sortKey='type' sorting={typeSorting} onSortingChange={setTypeSorting} />
+                <SortableTableHead label={<LocalizedText text='排序' />} sortKey='order' sorting={typeSorting} onSortingChange={setTypeSorting} />
+                <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={typeSorting} onSortingChange={setTypeSorting} />
+                <TableHead><LocalizedText text='操作' /></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {types.isLoading ? (
+                <DataTableSkeletonRows columnCount={5} />
+              ) : types.isError ? (
+                <TableRow><TableCell colSpan={5}><ErrorBox message={errorText(types.error)} /></TableCell></TableRow>
+              ) : sortedTypes.length ? (
+                sortedTypes.map((row) => (
+                  <TableRow key={row.dict_type_id} data-state={selectedTypeId === row.dict_type_id ? 'selected' : undefined}>
+                    <TableCell className="font-medium">{row.dict_name}</TableCell>
+                    <TableCell><code>{row.dict_type}</code></TableCell>
+                    <TableCell>{row.order_num}</TableCell>
+                    <TableCell>{row.status === '0' ? <LocalizedText text='启用' /> : <LocalizedText text='停用' />}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 whitespace-nowrap">
+                        <button className="underline" onClick={() => { setSelectedTypeId(row.dict_type_id); setEntryPage(1); setEntrySearch(''); setEntryStatus(''); setEntryDraft(null); setError('') }}><LocalizedText text='管理条目' /></button>
+                        <button className="underline disabled:opacity-50" disabled={typeBusy || !canReorderTypes} onClick={() => reorderType.mutate({ id: row.dict_type_id, delta: -1 })}><LocalizedText text='上移' /></button>
+                        <button className="underline disabled:opacity-50" disabled={typeBusy || !canReorderTypes} onClick={() => reorderType.mutate({ id: row.dict_type_id, delta: 1 })}><LocalizedText text='下移' /></button>
+                        <button className="underline" onClick={() => { setError(''); setTypeDraft(toTypeDraft(row)) }}><LocalizedText text='编辑' /></button>
+                        <button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => saveType.mutate({ ...toTypeDraft(row), status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text='停用' /> : <LocalizedText text='启用' />}</button>
+                        <button className="text-destructive underline disabled:opacity-50" disabled={typeBusy} onClick={() => setDeleteTarget({ kind: 'type', row })}><LocalizedText text='删除' /></button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow><TableCell colSpan={5} className="h-24 text-center text-sm text-muted-foreground"><LocalizedText text='暂无字典类型' /></TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
       <Pager page={typePage} size={20} total={types.data?.total ?? 0} setPage={setTypePage} />
     </section>
     <Dialog open={Boolean(selectedTypeId)} onOpenChange={(open) => { if (!open) { setSelectedTypeId(''); setEntryDraft(null) } }}>
@@ -177,7 +275,50 @@ export function TenantDictionariesPage() {
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-muted-foreground"><LocalizedText text={"可在此新增、编辑、排序和启停字典条目。"} /></p></div><button className={primary} onClick={() => { setError(''); setEntryError(''); setEntryDraft(emptyEntryDraft()) }}><LocalizedText text={"创建条目"} /></button></div>
             {entryDraft && <EntryEditor draft={entryDraft} pending={saveEntry.isPending} error={entryError} onChange={setEntryDraft} onCancel={() => { setEntryDraft(null); setEntryError('') }} onSave={() => saveEntry.mutate(entryDraft)} />}
             <div className="flex flex-wrap gap-2"><Input aria-label="搜索字典条目" className={`${input} max-w-64`} value={entrySearch} placeholder="按标签搜索" onChange={(event) => { setEntrySearch(event.target.value); setEntryPage(1) }} /><LocalizedNativeSelect aria-label="条目状态筛选" className={`${input} max-w-40`} value={entryStatus} onChange={(event) => { setEntryStatus(event.target.value); setEntryPage(1) }}><option value=""><LocalizedText text={"全部状态"} /></option><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></div>
-            {entries.isLoading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在加载条目…"} /></p> : entries.isError ? <ErrorBox message={errorText(entries.error)} /> : entries.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"标签"} /></th><th className="p-3"><LocalizedText text={"键值"} /></th><th className="p-3"><LocalizedText text={"排序"} /></th><th className="p-3"><LocalizedText text={"默认"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{entries.data.items.map((row) => <tr key={row.dict_data_id} className="border-b last:border-0"><td className="p-3">{row.dict_label}</td><td className="p-3"><code>{row.dict_value}</code></td><td className="p-3">{row.dict_sort}</td><td className="p-3">{row.is_default === 'Y' ? <LocalizedText text={"是"} /> : <LocalizedText text={"否"} />}</td><td className="p-3">{row.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td><td className="space-x-3 p-3"><button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => reorderEntry.mutate({ id: row.dict_data_id, delta: -1 })}><LocalizedText text={"上移"} /></button><button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => reorderEntry.mutate({ id: row.dict_data_id, delta: 1 })}><LocalizedText text={"下移"} /></button><button className="underline" onClick={() => { setError(''); setEntryDraft(toEntryDraft(row)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => saveEntry.mutate({ ...toEntryDraft(row), status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={entryBusy} onClick={() => setDeleteTarget({ kind: 'entry', row })}><LocalizedText text={"删除"} /></button></td></tr>)}</tbody></table></div> : <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无字典条目"} /></p>}
+            <div className="overflow-hidden rounded-md border">
+              <div className="overflow-x-auto">
+                <Table className="min-w-[58rem]">
+                  <TableHeader>
+                    <TableRow className="bg-muted/35 hover:bg-muted/35">
+                      <SortableTableHead label={<LocalizedText text='标签' />} sortKey='label' sorting={entrySorting} onSortingChange={setEntrySorting} />
+                      <SortableTableHead label={<LocalizedText text='键值' />} sortKey='value' sorting={entrySorting} onSortingChange={setEntrySorting} />
+                      <SortableTableHead label={<LocalizedText text='排序' />} sortKey='order' sorting={entrySorting} onSortingChange={setEntrySorting} />
+                      <SortableTableHead label={<LocalizedText text='默认' />} sortKey='default' sorting={entrySorting} onSortingChange={setEntrySorting} />
+                      <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={entrySorting} onSortingChange={setEntrySorting} />
+                      <TableHead><LocalizedText text='操作' /></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {entries.isLoading ? (
+                      <DataTableSkeletonRows columnCount={6} />
+                    ) : entries.isError ? (
+                      <TableRow><TableCell colSpan={6}><ErrorBox message={errorText(entries.error)} /></TableCell></TableRow>
+                    ) : sortedEntries.length ? (
+                      sortedEntries.map((row) => (
+                        <TableRow key={row.dict_data_id}>
+                          <TableCell>{row.dict_label}</TableCell>
+                          <TableCell><code>{row.dict_value}</code></TableCell>
+                          <TableCell>{row.dict_sort}</TableCell>
+                          <TableCell>{row.is_default === 'Y' ? <LocalizedText text='是' /> : <LocalizedText text='否' />}</TableCell>
+                          <TableCell>{row.status === '0' ? <LocalizedText text='启用' /> : <LocalizedText text='停用' />}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-x-3 gap-y-1 whitespace-nowrap">
+                              <button className="underline disabled:opacity-50" disabled={entryBusy || !canReorderEntries} onClick={() => reorderEntry.mutate({ id: row.dict_data_id, delta: -1 })}><LocalizedText text='上移' /></button>
+                              <button className="underline disabled:opacity-50" disabled={entryBusy || !canReorderEntries} onClick={() => reorderEntry.mutate({ id: row.dict_data_id, delta: 1 })}><LocalizedText text='下移' /></button>
+                              <button className="underline" onClick={() => { setError(''); setEntryDraft(toEntryDraft(row)) }}><LocalizedText text='编辑' /></button>
+                              <button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => saveEntry.mutate({ ...toEntryDraft(row), status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text='停用' /> : <LocalizedText text='启用' />}</button>
+                              <button className="text-destructive underline disabled:opacity-50" disabled={entryBusy} onClick={() => setDeleteTarget({ kind: 'entry', row })}><LocalizedText text='删除' /></button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow><TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground"><LocalizedText text='暂无字典条目' /></TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
             <Pager page={entryPage} size={20} total={entries.data?.total ?? 0} setPage={setEntryPage} />
           </>}
         </div>

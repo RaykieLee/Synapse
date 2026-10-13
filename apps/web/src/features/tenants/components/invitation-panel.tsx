@@ -40,12 +40,18 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
+  DataTableSkeletonRows,
+  SortableTableHead,
+  sortRows,
+  type TableSortState,
+} from '@/components/data-table'
+import {
   formatDateTime,
   tenantText,
   type CreatedTenantInvitation,
   type TenantInvitation,
 } from '../types'
-import { EmptyState, TableSkeleton } from './shared'
+import { EmptyState } from './shared'
 import { LocalizedText } from '@/components/localized-text'
 
 export function InvitationPanel({
@@ -74,8 +80,27 @@ export function InvitationPanel({
   const [createOpen, setCreateOpen] = useState(false)
   const [dismissedInvitationId, setDismissedInvitationId] = useState('')
   const [copyMessage, setCopyMessage] = useState('')
+  const [sorting, setSorting] = useState<TableSortState>(null)
   const [revokeTarget, setRevokeTarget] = useState<TenantInvitation | null>(
     null
+  )
+  const sortedInvitations = sortRows(
+    invitations,
+    sorting,
+    (invitation, key) => {
+      switch (key) {
+        case 'target':
+          return invitation.email || invitation.target_user_id
+        case 'role':
+          return invitation.tenant_role
+        case 'expires':
+          return invitation.expires_at
+        case 'status':
+          return invitation.expired ? 'expired' : 'pending'
+        default:
+          return ''
+      }
+    }
   )
 
   return (
@@ -178,22 +203,18 @@ export function InvitationPanel({
         <Table>
           <TableHeader>
             <TableRow className='bg-muted/35 hover:bg-muted/35'>
-              <TableHead className='h-11 ps-4'><LocalizedText text={"邀请对象"} /></TableHead>
-              <TableHead><LocalizedText text={"角色"} /></TableHead>
-              <TableHead><LocalizedText text={"到期时间"} /></TableHead>
-              <TableHead><LocalizedText text={"状态"} /></TableHead>
+              <SortableTableHead label={<LocalizedText text='邀请对象' />} sortKey='target' sorting={sorting} onSortingChange={setSorting} className='ps-4' />
+              <SortableTableHead label={<LocalizedText text='角色' />} sortKey='role' sorting={sorting} onSortingChange={setSorting} />
+              <SortableTableHead label={<LocalizedText text='到期时间' />} sortKey='expires' sorting={sorting} onSortingChange={setSorting} />
+              <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={sorting} onSortingChange={setSorting} />
               <TableHead className='w-28 pe-4 text-end'><LocalizedText text={"操作"} /></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} className='p-0'>
-                  <TableSkeleton columns={4} />
-                </TableCell>
-              </TableRow>
-            ) : invitations.length ? (
-              invitations.map((invitation) => (
+              <DataTableSkeletonRows columnCount={5} />
+            ) : sortedInvitations.length ? (
+              sortedInvitations.map((invitation) => (
                 <TableRow key={invitation.invitation_id}>
                   <TableCell className='ps-4'>
                     {invitation.email || (

@@ -28,7 +28,6 @@ export const tasksColumns: ColumnDef<Task>[] = [
         className='translate-y-0.5'
       />
     ),
-    enableSorting: false,
     enableHiding: false,
   },
   {
@@ -37,7 +36,6 @@ export const tasksColumns: ColumnDef<Task>[] = [
       <DataTableColumnHeader column={column} title='Task' />
     ),
     cell: ({ row }) => <div className='w-20'>{row.getValue('id')}</div>,
-    enableSorting: false,
     enableHiding: false,
   },
   {

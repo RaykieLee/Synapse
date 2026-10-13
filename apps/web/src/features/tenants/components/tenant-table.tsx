@@ -67,11 +67,17 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
+  DataTableSkeletonRows,
+  SortableTableHead,
+  sortRows,
+  type TableSortState,
+} from '@/components/data-table'
+import {
   formatDateRange,
   formatDateTime,
   localizedTenantText,
 } from '../types'
-import { EmptyState, TableSkeleton } from './shared'
+import { EmptyState } from './shared'
 import { LocalizedText } from '@/components/localized-text'
 import { useLocale, useLocaleText } from '@/lib/i18n'
 
@@ -493,6 +499,25 @@ export function TenantTable({
   const locale = useLocale()
   const t = useLocaleText()
   const [detailTenant, setDetailTenant] = useState<Tenant | null>(null)
+  const [sorting, setSorting] = useState<TableSortState>(null)
+  const sortedTenants = sortRows(tenants, sorting, (tenant, key) => {
+    switch (key) {
+      case 'name':
+        return tenant.name
+      case 'slug':
+        return tenant.slug
+      case 'status':
+        return tenant.status
+      case 'validity':
+        return tenant.valid_until ?? tenant.valid_from
+      case 'role':
+        return tenant.tenant_role
+      case 'created':
+        return tenant.created_at
+      default:
+        return ''
+    }
+  })
   const columns = tenantColumns.filter(
     (column) => column.key !== 'role' || !isAdmin
   )
@@ -534,33 +559,26 @@ export function TenantTable({
                 />
               </TableHead>
             ) : null}
-            <TableHead className='h-11 ps-4'><LocalizedText text={"租户"} /></TableHead>
-            {visibleColumns.has('slug') ? <TableHead><LocalizedText text={"标识"} /></TableHead> : null}
-            {visibleColumns.has('status') ? <TableHead><LocalizedText text={"状态"} /></TableHead> : null}
+            <SortableTableHead label={<LocalizedText text='租户' />} sortKey='name' sorting={sorting} onSortingChange={setSorting} className='ps-4' />
+            {visibleColumns.has('slug') ? <SortableTableHead label={<LocalizedText text='标识' />} sortKey='slug' sorting={sorting} onSortingChange={setSorting} /> : null}
+            {visibleColumns.has('status') ? <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={sorting} onSortingChange={setSorting} /> : null}
             {visibleColumns.has('validity') ? (
-              <TableHead><LocalizedText text={"有效期"} /></TableHead>
+              <SortableTableHead label={<LocalizedText text='有效期' />} sortKey='validity' sorting={sorting} onSortingChange={setSorting} />
             ) : null}
             {!isAdmin && visibleColumns.has('role') ? (
-              <TableHead><LocalizedText text={"我的角色"} /></TableHead>
+              <SortableTableHead label={<LocalizedText text='我的角色' />} sortKey='role' sorting={sorting} onSortingChange={setSorting} />
             ) : null}
             {visibleColumns.has('created') ? (
-              <TableHead><LocalizedText text={"创建时间"} /></TableHead>
+              <SortableTableHead label={<LocalizedText text='创建时间' />} sortKey='created' sorting={sorting} onSortingChange={setSorting} />
             ) : null}
             <TableHead className='w-20 pe-4 text-end'><LocalizedText text={"操作"} /></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
-            <TableRow>
-              <TableCell colSpan={columnCount} className='p-0'>
-                <div role='status' aria-live='polite' aria-busy='true'>
-                  <span className='sr-only'>{t('正在加载租户列表…')}</span>
-                  <TableSkeleton columns={columnCount} />
-                </div>
-              </TableCell>
-            </TableRow>
-          ) : tenants.length ? (
-            tenants.map((tenant) => (
+            <DataTableSkeletonRows columnCount={columnCount} />
+          ) : sortedTenants.length ? (
+            sortedTenants.map((tenant) => (
               <TableRow
                 key={tenant.tenant_id}
                 className='group'

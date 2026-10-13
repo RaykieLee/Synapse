@@ -25,6 +25,20 @@ import { LocalizedText } from '@/components/localized-text'
 import { FormDialog } from '@/components/form-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  DataTableSkeletonRows,
+  SortableTableHead,
+  sortRows,
+  type TableSortState,
+} from '@/components/data-table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 const panel = 'rounded-xl border bg-card p-5'
 const scopedKey = (actorId: string, workspace: Workspace, resource: string) =>
@@ -268,6 +282,7 @@ export function WorkspaceMembers() {
   const { workspace, actorId } = useWorkspace()
   const client = useQueryClient()
   const [page, setPage] = React.useState(1)
+  const [sorting, setSorting] = React.useState<TableSortState>(null)
   const [targetId, setTargetId] = React.useState('')
   const [targetRole, setTargetRole] = React.useState<WorkspaceRole>('member')
   const [newOwnerId, setNewOwnerId] = React.useState('')
@@ -292,6 +307,24 @@ export function WorkspaceMembers() {
       listWorkspaceMembers(workspace.workspace_id, { page, pageSize: 20 }),
     enabled: workspace.status === 'active' || canManage,
   })
+  const sortedMembers = sortRows(
+    members.data?.items ?? [],
+    sorting,
+    (member, key) => {
+      switch (key) {
+        case 'member':
+          return member.nick_name || member.user_name
+        case 'user_id':
+          return member.user_id
+        case 'role':
+          return member.workspace_role
+        case 'status':
+          return member.status
+        default:
+          return ''
+      }
+    }
+  )
   const refresh = async () => {
     await client.invalidateQueries({
       queryKey: scopedKey(actorId, workspace, 'workspace-members'),
@@ -399,119 +432,120 @@ export function WorkspaceMembers() {
       )}
       <section className={panel}>
         <h2 className='font-semibold'><LocalizedText text={"成员列表"} /></h2>
-        {members.isLoading ? (
-          <p className='py-5 text-sm text-muted-foreground'><LocalizedText text={"正在加载…"} /></p>
-        ) : members.isError ? (
-          <p role='alert' className='py-5 text-sm text-destructive'>
-            {members.error.message}
-          </p>
-        ) : members.data?.items.length ? (
-          <div className='mt-3 overflow-x-auto'>
-            <table className='w-full text-left text-sm'>
-              <thead>
-                <tr className='border-b text-muted-foreground'>
-                  <th className='p-3'><LocalizedText text={"成员"} /></th>
-                  <th className='p-3'><LocalizedText text={"用户 ID"} /></th>
-                  <th className='p-3'><LocalizedText text={"角色"} /></th>
-                  <th className='p-3'><LocalizedText text={"状态"} /></th>
-                  {canManage && <th className='p-3'><LocalizedText text={"操作"} /></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {members.data.items.map((member) => {
-                  const isTargetOwner = member.workspace_role === 'owner'
-                  const protectedOwner = isTargetOwner && !isOwner
-                  return (
-                    <tr key={member.user_id} className='border-b last:border-0'>
-                      <td className='p-3'>
-                        {member.nick_name || member.user_name}
-                        {member.email && (
-                          <span className='block text-muted-foreground'>
-                            {member.email}
-                          </span>
-                        )}
-                      </td>
-                      <td className='p-3'>{member.user_id}</td>
-                      <td className='p-3'>
-                        {canEdit &&
-                        !protectedOwner &&
-                        member.status === 'active' ? (
-                          <Button
-                            variant='ghost'
-                            size='sm'
-                            onClick={() => setRoleTarget({ member, role: member.workspace_role })}
-                          >
-                            {roleLabel[member.workspace_role]}
-                          </Button>
-                        ) : (
-                          roleLabel[member.workspace_role]
-                        )}
-                      </td>
-                      <td className='p-3'>
-                        {member.status === 'active' ? <LocalizedText text={"有效"} /> : member.status === 'removed' ? <LocalizedText text={"已移除"} /> : member.status}
-                      </td>
-                      {canManage && (
-                        <td className='space-x-3 p-3'>
-                          {workspace.status === 'archived' ? (
-                            '归档空间只读'
-                          ) : protectedOwner ? (
-                            '管理员不能操作所有者'
-                          ) : member.status === 'active' ? (
-                            <button
-                              className='underline'
-                              onClick={() => { setError(''); setActionTarget({ kind: 'remove', member }) }}
-                            >
-                              <LocalizedText text={"\n                              移除\n                            "} /></button>
-                          ) : (
-                            workspace.status === 'active' && (
-                              <button
-                                className='underline'
-                                onClick={() => { setError(''); setActionTarget({ kind: 'rejoin', member }) }}
-                              >
-                                <LocalizedText text={"\n                                重新加入\n                              "} /></button>
-                            )
+        <div className='mt-3 overflow-hidden rounded-md border'>
+          <div className='overflow-x-auto'>
+            <Table className='min-w-[42rem]'>
+              <TableHeader>
+                <TableRow className='bg-muted/35 hover:bg-muted/35'>
+                  <SortableTableHead label={<LocalizedText text='成员' />} sortKey='member' sorting={sorting} onSortingChange={setSorting} />
+                  <SortableTableHead label={<LocalizedText text='用户 ID' />} sortKey='user_id' sorting={sorting} onSortingChange={setSorting} />
+                  <SortableTableHead label={<LocalizedText text='角色' />} sortKey='role' sorting={sorting} onSortingChange={setSorting} />
+                  <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={sorting} onSortingChange={setSorting} />
+                  {canManage && <TableHead><LocalizedText text='操作' /></TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {members.isLoading ? (
+                  <DataTableSkeletonRows columnCount={canManage ? 5 : 4} />
+                ) : members.isError ? (
+                  <TableRow>
+                    <TableCell colSpan={canManage ? 5 : 4} className='py-5 text-center text-sm text-destructive'>
+                      <span role='alert'>{members.error.message}</span>
+                    </TableCell>
+                  </TableRow>
+                ) : sortedMembers.length ? (
+                  sortedMembers.map((member) => {
+                    const isTargetOwner = member.workspace_role === 'owner'
+                    const protectedOwner = isTargetOwner && !isOwner
+                    return (
+                      <TableRow key={member.user_id}>
+                        <TableCell>
+                          {member.nick_name || member.user_name}
+                          {member.email && (
+                            <span className='block text-muted-foreground'>
+                              {member.email}
+                            </span>
                           )}
-                          {isOwner &&
-                            member.status === 'active' &&
-                            !isTargetOwner &&
-                            workspace.status === 'active' && (
-                              <button
-                                className='ml-3 underline'
-                                onClick={() => { setError(''); setTransferTarget(member); setNewOwnerId(member.user_id); setTransferOpen(true) }}
-                              >
-                                <LocalizedText text={"\n                                转移所有权\n                              "} /></button>
-                            )}
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <div className='mt-4 flex items-center justify-between text-sm'>
-              <span><LocalizedText text={"共 "} />{members.data.total} <LocalizedText text={" 人"} /></span>
+                        </TableCell>
+                        <TableCell>{member.user_id}</TableCell>
+                        <TableCell>
+                          {canEdit && !protectedOwner && member.status === 'active' ? (
+                            <Button
+                              variant='ghost'
+                              size='sm'
+                              onClick={() => setRoleTarget({ member, role: member.workspace_role })}
+                            >
+                              {roleLabel[member.workspace_role]}
+                            </Button>
+                          ) : (
+                            roleLabel[member.workspace_role]
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {member.status === 'active' ? <LocalizedText text='有效' /> : member.status === 'removed' ? <LocalizedText text='已移除' /> : member.status}
+                        </TableCell>
+                        {canManage && (
+                          <TableCell>
+                            <div className='flex flex-wrap gap-x-3 gap-y-1'>
+                              {workspace.status === 'archived' ? (
+                                <LocalizedText text='归档空间只读' />
+                              ) : protectedOwner ? (
+                                <LocalizedText text='管理员不能操作所有者' />
+                              ) : member.status === 'active' ? (
+                                <button
+                                  className='underline'
+                                  onClick={() => { setError(''); setActionTarget({ kind: 'remove', member }) }}
+                                >
+                                  <LocalizedText text='移除' />
+                                </button>
+                              ) : (
+                                workspace.status === 'active' && (
+                                  <button
+                                    className='underline'
+                                    onClick={() => { setError(''); setActionTarget({ kind: 'rejoin', member }) }}
+                                  >
+                                    <LocalizedText text='重新加入' />
+                                  </button>
+                                )
+                              )}
+                              {isOwner && member.status === 'active' && !isTargetOwner && workspace.status === 'active' && (
+                                <button
+                                  className='underline'
+                                  onClick={() => { setError(''); setTransferTarget(member); setNewOwnerId(member.user_id); setTransferOpen(true) }}
+                                >
+                                  <LocalizedText text='转移所有权' />
+                                </button>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    )
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={canManage ? 5 : 4} className='h-24 text-center text-sm text-muted-foreground'>
+                      <LocalizedText text='暂无成员' />
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          {members.data && (
+            <div className='flex items-center justify-between border-t px-3 py-2 text-sm'>
+              <span><LocalizedText text='共 ' />{members.data.total}<LocalizedText text=' 人' /></span>
               <div className='flex gap-2'>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  disabled={page <= 1}
-                  onClick={() => setPage((value) => value - 1)}
-                >
-                  <LocalizedText text={"\n                  上一页\n                "} /></Button>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  disabled={page * 20 >= members.data.total}
-                  onClick={() => setPage((value) => value + 1)}
-                >
-                  <LocalizedText text={"\n                  下一页\n                "} /></Button>
+                <Button size='sm' variant='outline' disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+                  <LocalizedText text='上一页' />
+                </Button>
+                <Button size='sm' variant='outline' disabled={page * 20 >= members.data.total} onClick={() => setPage((value) => value + 1)}>
+                  <LocalizedText text='下一页' />
+                </Button>
               </div>
             </div>
-          </div>
-        ) : (
-          <p className='py-5 text-center text-sm text-muted-foreground'>
-            <LocalizedText text={"\n            暂无成员\n          "} /></p>
-        )}
+          )}
+        </div>
       </section>
       {isOwner && workspace.status === 'active' && (
         <section className={`${panel} max-w-xl space-y-3`}>

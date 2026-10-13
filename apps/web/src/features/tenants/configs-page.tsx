@@ -1,6 +1,21 @@
 import { useRef, useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  DataTableSkeletonRows,
+  SortableTableHead,
+  sortRows,
+  type TableSortState,
+} from '@/components/data-table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
@@ -53,6 +68,7 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
   const [groupFilter, setGroupFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sensitiveFilter, setSensitiveFilter] = useState('')
+  const [sorting, setSorting] = useState<TableSortState>(null)
   const [draft, setDraft] = useState<ConfigDraft | null>(null)
   const [draftTenantId, setDraftTenantId] = useState<string | null>(null)
   const [removeTarget, setRemoveTarget] = useState<TenantConfig | null>(null)
@@ -130,6 +146,22 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
   if (!tenantActive) return <main className="space-y-4 p-6"><ErrorBox message="租户未启用，无法管理参数配置。" /></main>
 
   const rows = configs.data?.items ?? []
+  const sortedRows = sortRows(rows, sorting, (row, key) => {
+    switch (key) {
+      case 'config':
+        return row.config_name
+      case 'group':
+        return row.group_name
+      case 'value':
+        return row.is_sensitive || row.value_redacted ? null : row.config_value
+      case 'public':
+        return row.is_frontend && !row.is_sensitive
+      case 'updated':
+        return row.updated_at
+      default:
+        return ''
+    }
+  })
   const busy = save.isPending || remove.isPending || toggle.isPending
   const setFilter = (setter: (value: string) => void) => (value: string) => { setter(value); setPage(1) }
   return <main className="space-y-5 p-6">
@@ -156,16 +188,61 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
         <LocalizedNativeSelect aria-label="按状态筛选" className={input} value={statusFilter} onChange={(event) => setFilter(setStatusFilter)(event.target.value)}><option value=""><LocalizedText text={"全部状态"} /></option><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect>
         <LocalizedNativeSelect aria-label="按敏感级别筛选" className={input} value={sensitiveFilter} onChange={(event) => setFilter(setSensitiveFilter)(event.target.value)}><option value=""><LocalizedText text={"全部级别"} /></option><option value="false"><LocalizedText text={"普通"} /></option><option value="true"><LocalizedText text={"敏感"} /></option></LocalizedNativeSelect>
       </div>
-      {configs.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载参数…"} /></p> : configs.isError ? <ErrorBox message={errorText(configs.error)} /> : rows.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"配置"} /></th><th className="p-3"><LocalizedText text={"分组 / 状态"} /></th><th className="p-3"><LocalizedText text={"值"} /></th><th className="p-3"><LocalizedText text={"公开"} /></th><th className="p-3"><LocalizedText text={"更新"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>
-        {rows.map((row) => <tr key={`${row.tenant_id}:${row.config_id}`} className="border-b align-top last:border-0">
-          <td className="p-3"><span className="font-medium">{row.config_name}</span><code className="mt-1 block text-xs text-muted-foreground">{row.config_key}</code>{row.is_sensitive && <span className="mt-1 inline-block rounded bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700"><LocalizedText text={"敏感"} /></span>}</td>
-          <td className="p-3">{row.group_name || '—'}<span className="block text-muted-foreground">{row.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</span></td>
-          <td className="max-w-sm p-3">{row.is_sensitive || row.value_redacted ? <span className="text-muted-foreground"><LocalizedText text={"机密值（未加载）"} /></span> : <code className="line-clamp-3 whitespace-pre-wrap break-all">{row.config_value ?? ''}</code>}</td>
-          <td className="p-3">{row.is_frontend && !row.is_sensitive ? <LocalizedText text={"租户成员可读"} /> : <LocalizedText text={"仅管理员"} />}</td>
-          <td className="whitespace-nowrap p-3 text-xs text-muted-foreground">{new Date(row.updated_at).toLocaleString('zh-CN')}<span className="block"><LocalizedText text={"用户 "} />{row.updated_by}</span></td>
-          <td className="space-x-3 whitespace-nowrap p-3">{row.is_sensitive && <button className="underline" disabled={reveal.loading} onClick={() => void revealValue(row)}><LocalizedText text={"查看敏感值"} /></button>}<button className="underline" onClick={() => { setError(''); setSaveError(''); setDraftTenantId(tenantId); setDraft(toDraft(row)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={busy} onClick={() => toggle.mutate({ id: row.config_id, status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={busy} onClick={() => setRemoveTarget(row)}><LocalizedText text={"删除"} /></button></td>
-        </tr>)}
-      </tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无参数配置"} /></p>}
+      <div className="overflow-hidden rounded-md border">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[58rem]">
+            <TableHeader>
+              <TableRow className="bg-muted/35 hover:bg-muted/35">
+                <SortableTableHead label={<LocalizedText text='配置' />} sortKey='config' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='分组 / 状态' />} sortKey='group' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='值' />} sortKey='value' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='公开' />} sortKey='public' sorting={sorting} onSortingChange={setSorting} />
+                <SortableTableHead label={<LocalizedText text='更新' />} sortKey='updated' sorting={sorting} onSortingChange={setSorting} />
+                <TableHead><LocalizedText text='操作' /></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {configs.isLoading ? (
+                <DataTableSkeletonRows columnCount={6} />
+              ) : configs.isError ? (
+                <TableRow><TableCell colSpan={6}><ErrorBox message={errorText(configs.error)} /></TableCell></TableRow>
+              ) : sortedRows.length ? (
+                sortedRows.map((row) => (
+                  <TableRow key={`${row.tenant_id}:${row.config_id}`}>
+                    <TableCell className="whitespace-normal">
+                      <span className="font-medium">{row.config_name}</span>
+                      <code className="mt-1 block text-xs text-muted-foreground">{row.config_key}</code>
+                      {row.is_sensitive && <span className="mt-1 inline-block rounded bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700"><LocalizedText text='敏感' /></span>}
+                    </TableCell>
+                    <TableCell className="whitespace-normal">
+                      {row.group_name || '—'}
+                      <span className="block text-muted-foreground">{row.status === '0' ? <LocalizedText text='启用' /> : <LocalizedText text='停用' />}</span>
+                    </TableCell>
+                    <TableCell className="max-w-sm whitespace-normal">
+                      {row.is_sensitive || row.value_redacted ? <span className="text-muted-foreground"><LocalizedText text='机密值（未加载）' /></span> : <code className="line-clamp-3 break-all">{row.config_value ?? ''}</code>}
+                    </TableCell>
+                    <TableCell>{row.is_frontend && !row.is_sensitive ? <LocalizedText text='租户成员可读' /> : <LocalizedText text='仅管理员' />}</TableCell>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {new Date(row.updated_at).toLocaleString('zh-CN')}
+                      <span className="block"><LocalizedText text='用户 ' />{row.updated_by}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 whitespace-nowrap">
+                        {row.is_sensitive && <button className="underline" disabled={reveal.loading} onClick={() => void revealValue(row)}><LocalizedText text='查看敏感值' /></button>}
+                        <button className="underline" onClick={() => { setError(''); setSaveError(''); setDraftTenantId(tenantId); setDraft(toDraft(row)) }}><LocalizedText text='编辑' /></button>
+                        <button className="underline disabled:opacity-50" disabled={busy} onClick={() => toggle.mutate({ id: row.config_id, status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text='停用' /> : <LocalizedText text='启用' />}</button>
+                        <button className="text-destructive underline disabled:opacity-50" disabled={busy} onClick={() => setRemoveTarget(row)}><LocalizedText text='删除' /></button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow><TableCell colSpan={6} className="h-24 text-center text-sm text-muted-foreground"><LocalizedText text='暂无参数配置' /></TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
       <Pager page={page} size={20} total={configs.data?.total ?? 0} setPage={setPage} />
     </section>
     <ConfirmDialog
@@ -212,10 +289,10 @@ function ConfigEditor({ draft, pending, error, onChange, onCancel, onSave }: {
       <label className="space-y-1 text-sm"><span><LocalizedText text={"配置键名"} /></span><Input required maxLength={100} pattern="[A-Za-z][A-Za-z0-9_.-]*" className={input} value={draft.config_key} onChange={(event) => set('config_key', event.target.value)} /></label>
       <label className="space-y-1 text-sm"><span><LocalizedText text={"分组"} /></span><Input maxLength={100} className={input} value={draft.group_name} onChange={(event) => set('group_name', event.target.value)} /></label>
       <label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={input} value={draft.status} onChange={(event) => set('status', event.target.value as '0' | '1')}><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label>
-      <label className="flex items-center gap-2 text-sm"><Input type="checkbox" checked={draft.is_sensitive} onChange={(event) => onChange({ ...draft, is_sensitive: event.target.checked, is_frontend: event.target.checked ? false : draft.is_frontend, replaceSensitiveValue: event.target.checked ? draft.replaceSensitiveValue : false })} /><span><LocalizedText text={"敏感配置"} /></span></label>
-      <label className="flex items-center gap-2 text-sm"><Input type="checkbox" checked={draft.is_frontend} disabled={draft.is_sensitive} onChange={(event) => set('is_frontend', event.target.checked)} /><span><LocalizedText text={"向租户成员公开读取"} /></span></label>
+      <label className="flex items-center gap-2 text-sm"><Checkbox checked={draft.is_sensitive} onCheckedChange={(value) => onChange({ ...draft, is_sensitive: value === true, is_frontend: value === true ? false : draft.is_frontend, replaceSensitiveValue: value === true ? draft.replaceSensitiveValue : false })} /><span><LocalizedText text={"敏感配置"} /></span></label>
+      <label className="flex items-center gap-2 text-sm"><Checkbox checked={draft.is_frontend} disabled={draft.is_sensitive} onCheckedChange={(value) => set('is_frontend', value === true)} /><span><LocalizedText text={"向租户成员公开读取"} /></span></label>
     </div>
-    {updateSensitive && <label className="flex items-center gap-2 text-sm"><Input type="checkbox" checked={draft.replaceSensitiveValue} onChange={(event) => set('replaceSensitiveValue', event.target.checked)} /><span><LocalizedText text={"替换敏感值"} /></span></label>}
+    {updateSensitive && <label className="flex items-center gap-2 text-sm"><Checkbox checked={draft.replaceSensitiveValue} onCheckedChange={(value) => set('replaceSensitiveValue', value === true)} /><span><LocalizedText text={"替换敏感值"} /></span></label>}
     <label className="block space-y-1 text-sm"><span><LocalizedText text={"配置值"} />{updateSensitive && !draft.replaceSensitiveValue ? <LocalizedText text={"（保留现值）"} /> : <LocalizedText text={""} />}</span><textarea
       rows={4}
       maxLength={10000}

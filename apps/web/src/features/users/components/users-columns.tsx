@@ -33,7 +33,6 @@ export const usersColumns: ColumnDef<User>[] = [
         className='translate-y-0.5'
       />
     ),
-    enableSorting: false,
     enableHiding: false,
   },
   {
@@ -79,7 +78,6 @@ export const usersColumns: ColumnDef<User>[] = [
       <DataTableColumnHeader column={column} title='Phone Number' />
     ),
     cell: ({ row }) => <div>{row.getValue('phoneNumber')}</div>,
-    enableSorting: false,
   },
   {
     accessorKey: 'status',
@@ -101,7 +99,6 @@ export const usersColumns: ColumnDef<User>[] = [
       return value.includes(row.getValue(id))
     },
     enableHiding: false,
-    enableSorting: false,
   },
   {
     accessorKey: 'role',
@@ -128,7 +125,6 @@ export const usersColumns: ColumnDef<User>[] = [
     filterFn: (row, id, value) => {
       return value.includes(row.getValue(id))
     },
-    enableSorting: false,
     enableHiding: false,
   },
   {

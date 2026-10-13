@@ -6,6 +6,7 @@ import { Bot, Loader2, MessageSquare, Paperclip, Plus, Send, Settings2, Square, 
 import { Link } from '@tanstack/react-router'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { DetailDialog } from '@/components/detail-dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -1405,7 +1406,7 @@ function SessionMessagesPanel({
                   contentClassName='sm:max-w-xl'
                 >
                   <div className='max-h-64 space-y-1 overflow-y-auto rounded border p-2'>
-                    {attachments.isLoading ? <p className='text-xs text-muted-foreground'><LocalizedText text={"正在加载附件…"} /></p> : attachments.data?.items.length ? attachments.data.items.map((attachment) => <label key={attachment.attachment_id} className='flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent'><Input type='checkbox' checked={selectedAttachments.includes(attachment.attachment_id)} disabled={sending || submitting || (!selectedAttachments.includes(attachment.attachment_id) && pickedBytes + attachment.size_bytes > MAX_CHAT_ATTACHMENT_BYTES)} onChange={() => toggleAttachment(attachment.attachment_id)} /><span className='min-w-0 flex-1 truncate'>{attachment.filename}</span><span className='shrink-0 text-muted-foreground'>{formatBytes(attachment.size_bytes)}</span></label>) : !attachments.isError && <p className='text-xs text-muted-foreground'><LocalizedText text={"当前 Workspace 没有可引用的附件。"} /></p>}
+                    {attachments.isLoading ? <p className='text-xs text-muted-foreground'><LocalizedText text={"正在加载附件…"} /></p> : attachments.data?.items.length ? attachments.data.items.map((attachment) => <label key={attachment.attachment_id} className='flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-accent'><Checkbox checked={selectedAttachments.includes(attachment.attachment_id)} disabled={sending || submitting || (!selectedAttachments.includes(attachment.attachment_id) && pickedBytes + attachment.size_bytes > MAX_CHAT_ATTACHMENT_BYTES)} onCheckedChange={() => toggleAttachment(attachment.attachment_id)} /><span className='min-w-0 flex-1 truncate'>{attachment.filename}</span><span className='shrink-0 text-muted-foreground'>{formatBytes(attachment.size_bytes)}</span></label>) : !attachments.isError && <p className='text-xs text-muted-foreground'><LocalizedText text={"当前 Workspace 没有可引用的附件。"} /></p>}
                   </div>
                 </DetailDialog>
                 {pickedBytes > MAX_CHAT_ATTACHMENT_BYTES && <p role='alert' className='mt-1 text-xs text-destructive'><LocalizedText text={"附件总大小超过 5 MiB。"} /></p>}

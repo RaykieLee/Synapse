@@ -1,20 +1,7 @@
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  CaretSortIcon,
-  EyeNoneIcon,
-} from '@radix-ui/react-icons'
+import { ArrowDownIcon, ArrowUpIcon, CaretSortIcon } from '@radix-ui/react-icons'
 import { type Column } from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { LocalizedText } from '@/components/localized-text'
 
 type DataTableColumnHeaderProps<TData, TValue> =
   React.HTMLAttributes<HTMLDivElement> & {
@@ -33,40 +20,23 @@ export function DataTableColumnHeader<TData, TValue>({
 
   return (
     <div className={cn('flex items-center space-x-2', className)}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant='ghost'
-            size='sm'
-            className='h-8 data-[state=open]:bg-accent'
-          >
-            <span>{title}</span>
-            {column.getIsSorted() === 'desc' ? (
-              <ArrowDownIcon className='ms-2 h-4 w-4' />
-            ) : column.getIsSorted() === 'asc' ? (
-              <ArrowUpIcon className='ms-2 h-4 w-4' />
-            ) : (
-              <CaretSortIcon className='ms-2 h-4 w-4' />
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align='start'>
-          <DropdownMenuItem onClick={() => column.toggleSorting(false)}>
-            <ArrowUpIcon className='size-3.5 text-muted-foreground/70' />
-            <LocalizedText text={"\n            Asc\n          "} /></DropdownMenuItem>
-          <DropdownMenuItem onClick={() => column.toggleSorting(true)}>
-            <ArrowDownIcon className='size-3.5 text-muted-foreground/70' />
-            <LocalizedText text={"\n            Desc\n          "} /></DropdownMenuItem>
-          {column.getCanHide() && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => column.toggleVisibility(false)}>
-                <EyeNoneIcon className='size-3.5 text-muted-foreground/70' />
-                <LocalizedText text={"\n                Hide\n              "} /></DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button
+        type='button'
+        variant='ghost'
+        size='sm'
+        className='-ml-2 h-8 gap-1.5 px-2'
+        onClick={column.getToggleSortingHandler()}
+        aria-label={`${title}, sort`}
+      >
+        <span>{title}</span>
+        {column.getIsSorted() === 'desc' ? (
+          <ArrowDownIcon className='size-3.5' />
+        ) : column.getIsSorted() === 'asc' ? (
+          <ArrowUpIcon className='size-3.5' />
+        ) : (
+          <CaretSortIcon className='size-3.5 text-muted-foreground/70' />
+        )}
+      </Button>
     </div>
   )
 }

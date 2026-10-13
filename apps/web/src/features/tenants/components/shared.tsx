@@ -35,7 +35,6 @@ export function PageHeader({
     </header>
   )
 }
-
 export function ErrorBox({ message }: { message: string }) {
   return (
     <div
@@ -67,23 +66,6 @@ export function EmptyState({
       {description ? (
         <p className='text-xs text-muted-foreground'><LocalizedText text={description} /></p>
       ) : null}
-    </div>
-  )
-}
-
-export function TableSkeleton({ columns }: { columns: number }) {
-  return (
-    <div className='space-y-2 p-3'>
-      {Array.from({ length: 4 }).map((_, rowIndex) => (
-        <div key={rowIndex} className='flex gap-3'>
-          {Array.from({ length: columns }).map((_, columnIndex) => (
-            <div
-              key={columnIndex}
-              className='h-9 flex-1 animate-pulse rounded-md bg-muted'
-            />
-          ))}
-        </div>
-      ))}
     </div>
   )
 }
