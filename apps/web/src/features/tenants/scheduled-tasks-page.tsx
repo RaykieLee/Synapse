@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
 import { formatMessage, getLocale, useLocale } from '@/lib/i18n'
-import { Link, useParams } from '@tanstack/react-router'
+import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import {
@@ -140,12 +140,11 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
   }
 
   if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
-  if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message={errorText(tenant.error)} /></main>
-  if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message="仅租户所有者或管理员可以管理系统任务定义。" /></main>
+  if (tenant.isError) return <main className="space-y-4 p-6"><ErrorBox message={errorText(tenant.error)} /></main>
+  if (!canManage) return <main className="space-y-4 p-6"><ErrorBox message="仅租户所有者或管理员可以管理系统任务定义。" /></main>
 
   const pending = save.isPending || toggle.isPending || remove.isPending
   return <main className="space-y-5 p-6">
-    <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"← 返回 "} />{tenant.data?.name}</Link>
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-2xl font-semibold"><LocalizedText text={"系统任务定义"} /></h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground"><LocalizedText text={"配置当前租户的 cron 或间隔任务。执行目标来自平台 allowlist；编辑计划会由服务端校验完整定义。"} /></p></div>
       <button className={primary} disabled={!active || targets.isError} onClick={() => { setError(''); setDraft(emptyDraft(targets.data?.items[0]?.target_id ?? '')) }}><LocalizedText text={"创建任务"} /></button>

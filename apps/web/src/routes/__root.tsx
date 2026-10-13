@@ -8,7 +8,6 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { Toaster } from '@/components/ui/sonner'
 import { NavigationProgress } from '@/components/navigation-progress'
-import { LanguageSwitch } from '@/components/language-switch'
 import { GeneralError } from '@/features/errors/general-error'
 import { NotFoundError } from '@/features/errors/not-found-error'
 
@@ -27,9 +26,6 @@ function RootLayout() {
   return (
     <>
       <NavigationProgress />
-      <div className='fixed right-3 top-3 z-[100]'>
-        <LanguageSwitch />
-      </div>
       <Outlet />
       <Toaster duration={5000} />
       {import.meta.env.MODE === 'development' && !isLoginPage && (

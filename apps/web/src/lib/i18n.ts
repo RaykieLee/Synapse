@@ -1,4 +1,8 @@
 import { useSyncExternalStore } from 'react'
+import { teamMessages } from '@/features/workspaces/team-messages'
+import { modelProviderMessages } from '@/features/workspaces/model-provider-messages'
+import { sidebarMessages } from '@/components/layout/sidebar-messages'
+import { headerMessages } from '@/components/layout/header-messages'
 
 export type Locale = 'zh-CN' | 'en'
 const STORAGE_KEY = 'synapse-locale'
@@ -31,6 +35,10 @@ export function useLocaleText() {
 // Transitional catalog used by the existing UI while pages are migrated to keyed messages.
 // Exact phrases are preferred; common terms below cover labels embedded in dynamic text.
 const zhToEn: Record<string, string> = {
+  ...teamMessages,
+  ...modelProviderMessages,
+  ...sidebarMessages,
+  ...headerMessages,
   '正在加载租户…': 'Loading tenant…', '正在加载角色…': 'Loading roles…', '正在加载菜单授权…': 'Loading menu permissions…',
   '仅租户所有者或管理员可以管理租户角色。': 'Only tenant owners or admins can manage tenant roles.',
   '管理自定义角色的租户权限和菜单授权。内置租户身份及 Workspace 角色保持独立；此页不分配角色给成员，也不改变动态导航。': 'Manage tenant permissions and menu grants for custom roles. Built-in tenant identities and Workspace roles remain separate. This page does not assign roles to members or change dynamic navigation.',

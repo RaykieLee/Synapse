@@ -81,6 +81,12 @@ export function WorkspaceHome() {
             <Button variant='outline'><LocalizedText text={"会话管理"} /></Button>
           </Link>
           <Link
+            to='/w/$workspaceId/teams'
+            params={{ workspaceId: workspace.workspace_id }}
+          >
+            <Button variant='outline'><LocalizedText text={"子智能体团队"} /></Button>
+          </Link>
+          <Link
             to='/w/$workspaceId/attachments'
             params={{ workspaceId: workspace.workspace_id }}
           >
@@ -159,12 +165,6 @@ export function WorkspaceSettings() {
   return (
     <main className='space-y-6 p-6'>
       <header>
-        <Link
-          className='text-sm underline underline-offset-4'
-          to='/w/$workspaceId'
-          params={{ workspaceId: workspace.workspace_id }}
-        >
-          <LocalizedText text={"\n          ← 返回空间\n        "} /></Link>
         <p className='mt-3 text-sm text-muted-foreground'><LocalizedText text={"Workspace 设置"} /></p>
         <h1 className='text-2xl font-semibold'>{workspace.name}</h1>
       </header>
@@ -325,12 +325,6 @@ export function WorkspaceMembers() {
   return (
     <main className='space-y-6 p-6'>
       <header>
-        <Link
-          className='text-sm underline underline-offset-4'
-          to='/w/$workspaceId'
-          params={{ workspaceId: workspace.workspace_id }}
-        >
-          <LocalizedText text={"\n          ← 返回空间\n        "} /></Link>
         <p className='mt-3 text-sm text-muted-foreground'>
           <LocalizedText text={"\n          Workspace · "} />{workspace.name}
         </p>

@@ -1,0 +1,17 @@
+export const headerMessages: Record<string, string> = {
+  '面包屑': 'Breadcrumb',
+  '返回': 'Back',
+  '工作台': 'Workspace',
+  '应用': 'Apps',
+  '聊天': 'Chats',
+  '帮助中心': 'Help center',
+  '任务': 'Tasks',
+  '个人资料': 'Profile',
+  '账号': 'Account',
+  '外观': 'Appearance',
+  '通知': 'Notifications',
+  '显示': 'Display',
+  '成员': 'Members',
+  '子智能体团队': 'Agent teams',
+  '错误页面': 'Error page',
+}

@@ -1,8 +1,7 @@
 import * as React from 'react'
 import { formatMessage } from '@/lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Bot, Pencil, Plus, Trash2 } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
+import { Bot, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -164,7 +163,6 @@ function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; 
     <main className='space-y-6 p-6'>
       <header className='flex flex-wrap items-start justify-between gap-4'>
         <div>
-          <Link className='inline-flex items-center gap-1 text-sm underline underline-offset-4' to='/w/$workspaceId' params={{ workspaceId: workspace.workspace_id }}><ArrowLeft className='size-3.5' /><LocalizedText text={"返回空间"} /></Link>
           <p className='mt-3 text-sm text-muted-foreground'><LocalizedText text={"Workspace · "} />{workspace.name}</p>
           <h1 className='mt-1 text-2xl font-semibold'><LocalizedText text={"智能体"} /></h1>
           <p className='mt-1 text-sm text-muted-foreground'><LocalizedText text={"管理当前空间中的智能体定义。模型凭据和聊天会话在各自页面管理。"} /></p>

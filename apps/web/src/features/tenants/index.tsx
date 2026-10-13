@@ -750,8 +750,6 @@ export function TenantDetail() {
   if (tenant.isError) {
     return (
       <main className='space-y-4 p-6'>
-        <Link to='/tenants' className='text-sm underline'>
-          <LocalizedText text={"\n          返回租户列表\n        "} /></Link>
         <ErrorBox message={errorText(tenant.error)} />
       </main>
     )
@@ -769,11 +767,6 @@ export function TenantDetail() {
   return (
     <main className='space-y-5 p-6'>
       <div className='flex flex-wrap items-center justify-between gap-3'>
-        <Link
-          to='/tenants'
-          className='text-sm text-muted-foreground hover:text-foreground'
-        >
-          <LocalizedText text={"\n          ← 返回租户列表\n        "} /></Link>
         <div className='flex flex-wrap items-center gap-2'>
           {canManage || platformAdmin ? (
             <EditTenantNameDialog

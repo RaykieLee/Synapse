@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
-import { getRouteApi, Link, useParams } from '@tanstack/react-router'
+import { getRouteApi, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
@@ -134,11 +134,10 @@ export function TenantRolesPage() {
   }, [page, roles.data, setRoleFilters, totalPages])
 
   if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
-  if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message={errorText(tenant.error)} /></main>
-  if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message="仅租户所有者或管理员可以管理租户角色。" /></main>
+  if (tenant.isError) return <main className="space-y-4 p-6"><ErrorBox message={errorText(tenant.error)} /></main>
+  if (!canManage) return <main className="space-y-4 p-6"><ErrorBox message="仅租户所有者或管理员可以管理租户角色。" /></main>
 
   return <main className="space-y-5 p-6">
-    <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"← 返回 "} />{tenant.data?.name}</Link>
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户角色"} /></h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground"><LocalizedText text={"管理自定义角色的租户权限和菜单授权。内置租户身份及 Workspace 角色保持独立；此页不分配角色给成员，也不改变动态导航。"} /></p></div>
       <button className={primary} onClick={() => { setError(''); setDraft(emptyDraft()) }}><LocalizedText text={"创建角色"} /></button>

@@ -4,6 +4,8 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Bell,
   Building2,
+  BookOpen,
+  CalendarClock,
   FileText,
   Folder,
   FolderTree,
@@ -90,6 +92,7 @@ function workspaceSystemGroups(
       title: '系统',
       items: [
         { title: '附件', url: `/w/${workspaceId}/attachments`, icon: FileText },
+        { title: '模型与凭据', url: `/w/${workspaceId}/models`, icon: Wrench },
         { title: '租户管理', url: '/tenants', icon: Building2 },
         ...(isPlatformAdmin
           ? [{ title: '全局用户', url: '/users', icon: Users }]
@@ -117,6 +120,55 @@ function workspaceSystemGroups(
 
 function workspaceIdFromPath(pathname: string) {
   return pathname.match(/^\/w\/([^/]+)/)?.[1]
+}
+
+function tenantIdFromPath(pathname: string) {
+  return pathname.match(/^\/tenants\/([^/]+)/)?.[1]
+}
+
+function tenantManagementGroup(
+  tenantId: string,
+  tenantRole: 'owner' | 'admin' | 'member' | null
+): NavGroupType | null {
+  if (!tenantRole) return null
+
+  const overview = {
+    title: '成员与邀请',
+    url: `/tenants/${tenantId}`,
+    icon: Users,
+  }
+  if (tenantRole === 'member') {
+    return { title: '当前租户配置', items: [overview] }
+  }
+
+  return {
+    title: '当前租户配置',
+    items: [
+      overview,
+      { title: '角色管理', url: `/tenants/${tenantId}/roles`, icon: UserCog },
+      { title: '菜单管理', url: `/tenants/${tenantId}/menus`, icon: FileText },
+      {
+        title: '部门管理',
+        url: `/tenants/${tenantId}/departments`,
+        icon: FolderTree,
+      },
+      {
+        title: '字典管理',
+        url: `/tenants/${tenantId}/dictionaries`,
+        icon: BookOpen,
+      },
+      {
+        title: '参数配置',
+        url: `/tenants/${tenantId}/configs`,
+        icon: Settings,
+      },
+      {
+        title: '系统任务',
+        url: `/tenants/${tenantId}/scheduled-tasks`,
+        icon: CalendarClock,
+      },
+    ],
+  }
 }
 
 function menuIcon(name: string): LucideIcon {
@@ -150,6 +202,7 @@ export function AppSidebar() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const routeTenantId = tenantIdFromPath(pathname)
   const activeWorkspaceId = workspaceIdFromPath(pathname)
   const workspace = activeWorkspaceId
     ? directory.workspaces.find(
@@ -184,6 +237,13 @@ export function AppSidebar() {
     detail.data.tenant_id === workspace.tenant_id
   )
   const current = contextReady ? detail.data : undefined
+  const activeTenantId = routeTenantId ?? current?.tenant_id
+  const activeTenant = activeTenantId
+    ? directory.tenantById.get(activeTenantId)
+    : undefined
+  const tenantGroup = activeTenant
+    ? tenantManagementGroup(activeTenant.tenant_id, activeTenant.tenant_role)
+    : null
   const navigationKey = current
     ? ([
         'synapse',
@@ -244,6 +304,9 @@ export function AppSidebar() {
   const inWorkspaceRoute = Boolean(activeWorkspaceId)
   const navGroups = inWorkspaceRoute
     ? [
+        ...(tenantGroup
+          ? [localizeStaticGroup(tenantGroup, locale)]
+          : []),
         ...(dynamicItems.length
           ? [{ title: '工作空间', items: dynamicItems }]
           : []),
@@ -252,15 +315,18 @@ export function AppSidebar() {
           authUser?.platform_role === 'platform_admin'
         ).map((group) => localizeStaticGroup(group, locale)),
       ]
-    : sidebarData.navGroups.map((group) => ({
-        ...group,
-        title: translate(group.title, locale),
-        items: group.items.filter(
-          (item) =>
-            item.title !== '全局用户' ||
-            authUser?.platform_role === 'platform_admin'
-        ).map((item) => localizeStaticItem(item, locale)),
-      }))
+    : [
+        ...(tenantGroup ? [localizeStaticGroup(tenantGroup, locale)] : []),
+        ...sidebarData.navGroups.map((group) => ({
+          ...group,
+          title: translate(group.title, locale),
+          items: group.items.filter(
+            (item) =>
+              item.title !== '全局用户' ||
+              authUser?.platform_role === 'platform_admin'
+          ).map((item) => localizeStaticItem(item, locale)),
+        })),
+      ]
 
   return (
     <Sidebar collapsible={collapsible} variant={variant}>

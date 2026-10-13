@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
 import { formatMessage } from '@/lib/i18n'
-import { Link, useParams } from '@tanstack/react-router'
+import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
@@ -83,8 +83,8 @@ export function TenantMenusPage() {
   })
 
   if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
-  if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message={errorText(tenant.error)} /></main>
-  if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message="仅租户所有者或管理员可以管理租户菜单。" /></main>
+  if (tenant.isError) return <main className="space-y-4 p-6"><ErrorBox message={errorText(tenant.error)} /></main>
+  if (!canManage) return <main className="space-y-4 p-6"><ErrorBox message="仅租户所有者或管理员可以管理租户菜单。" /></main>
 
   const menus = tree.data?.items ?? []
   const allMenus = flatten(menus)
@@ -96,7 +96,6 @@ export function TenantMenusPage() {
     reorder.mutate(reordered.map((menu, order) => ({ menu_id: menu.menu_id, parent_id: menu.parent_id, order_num: (order + 1) * 10 })))
   }
   return <main className="space-y-5 p-6">
-    <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"← 返回 "} />{tenant.data?.name}</Link>
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户菜单"} /></h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的目录、页面和操作元数据。此处不会修改系统内置导航或角色菜单授权。"} /></p></div><button className={primary} onClick={() => { setError(''); setDraft(emptyDraft()) }}><LocalizedText text={"创建菜单"} /></button></header>
     {error && <ErrorBox message={error} />}
     {draft && <MenuEditor draft={draft} menus={allMenus} pending={save.isPending} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => save.mutate(draft)} />}

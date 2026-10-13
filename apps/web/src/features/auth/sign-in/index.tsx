@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import teammates from './assets/digital-teammates.png'
 import { UserAuthForm } from './components/user-auth-form'
+import { LanguageSwitch } from '@/components/language-switch'
 import './sign-in.css'
 import { LocalizedText } from '@/components/localized-text'
 
@@ -48,9 +49,12 @@ export function SignIn() {
           <i aria-hidden='true' />
           <span className='login-brand-caption'><LocalizedText text={"AGENT WORKSPACE"} /></span>
         </a>
-        <button className='login-help-link' onClick={() => setInfo('help')}>
-          <LocalizedText text={"\n          帮助中心 "} /><ArrowUpRight size={17} aria-hidden='true' />
-        </button>
+        <div className='login-header-actions'>
+          <LanguageSwitch />
+          <button className='login-help-link' onClick={() => setInfo('help')}>
+            <LocalizedText text={"\n          帮助中心 "} /><ArrowUpRight size={17} aria-hidden='true' />
+          </button>
+        </div>
       </header>
       <main className='login-main'>
         <section className='login-story' aria-labelledby='login-story-title'>

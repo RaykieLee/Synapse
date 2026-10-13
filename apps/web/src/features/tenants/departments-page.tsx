@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
 import { formatMessage } from '@/lib/i18n'
-import { Link, useParams } from '@tanstack/react-router'
+import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
@@ -78,8 +78,8 @@ export function TenantDepartmentsPage() {
   })
 
   if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
-  if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message={errorText(tenant.error)} /></main>
-  if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message="仅租户所有者或管理员可以管理部门。" /></main>
+  if (tenant.isError) return <main className="space-y-4 p-6"><ErrorBox message={errorText(tenant.error)} /></main>
+  if (!canManage) return <main className="space-y-4 p-6"><ErrorBox message="仅租户所有者或管理员可以管理部门。" /></main>
 
   const departments = tree.data?.items ?? []
   const flat = flatten(departments)
@@ -92,7 +92,6 @@ export function TenantDepartmentsPage() {
   }
 
   return <main className="space-y-5 p-6">
-    <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"← 返回 "} />{tenant.data?.name}</Link>
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户部门"} /></h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的部门层级、排序和状态。部门不会自动关联租户成员。"} /></p></div><button className={primary} onClick={() => { setError(''); setDraft(emptyDraft()) }}><LocalizedText text={"创建部门"} /></button></header>
     {error && <ErrorBox message={error} />}
     {draft && <DepartmentEditor draft={draft} departments={flat} pending={save.isPending} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => save.mutate(draft)} />}

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
 import { formatMessage, useLocaleText } from '@/lib/i18n'
-import { Link, useParams } from '@tanstack/react-router'
+import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import {
@@ -122,15 +122,14 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
   }
 
   if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
-  if (tenant.isError) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants"><LocalizedText text={"返回租户列表"} /></Link><ErrorBox message={errorText(tenant.error)} /></main>
-  if (!canManage) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message="仅租户所有者或管理员可以管理参数配置。" /></main>
-  if (!tenantActive) return <main className="space-y-4 p-6"><Link className="underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"返回租户"} /></Link><ErrorBox message="租户未启用，无法管理参数配置。" /></main>
+  if (tenant.isError) return <main className="space-y-4 p-6"><ErrorBox message={errorText(tenant.error)} /></main>
+  if (!canManage) return <main className="space-y-4 p-6"><ErrorBox message="仅租户所有者或管理员可以管理参数配置。" /></main>
+  if (!tenantActive) return <main className="space-y-4 p-6"><ErrorBox message="租户未启用，无法管理参数配置。" /></main>
 
   const rows = configs.data?.items ?? []
   const busy = save.isPending || remove.isPending || toggle.isPending
   const setFilter = (setter: (value: string) => void) => (value: string) => { setter(value); setPage(1) }
   return <main className="space-y-5 p-6">
-    <Link className="text-sm underline" to="/tenants/$tenantId" params={{ tenantId }}><LocalizedText text={"← 返回 "} />{tenant.data?.name}</Link>
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户参数配置"} /></h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的运行参数。敏感值不会显示在列表或写入响应中，只会在你主动查看时单独请求。"} /></p></div><button className={primary} onClick={() => { setError(''); setDraftTenantId(tenantId); setDraft(emptyDraft()) }}><LocalizedText text={"创建参数"} /></button></header>
     {error && <ErrorBox message={error} />}
     {draft && draftTenantId === tenantId && <ConfigEditor draft={draft} pending={save.isPending} onChange={setDraft} onCancel={() => { setDraft(null); setDraftTenantId(null) }} onSave={() => save.mutate(draft)} />}

@@ -3,12 +3,7 @@ import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { getLocale, useLocale } from '@/lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
-import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { ConfigDrawer } from '@/components/config-drawer'
 import {
   createUser,
   deleteUser,
@@ -156,7 +151,6 @@ export function Users() {
   }, [navigate, page, pageCount, users.data])
 
   return <>
-    <Header fixed><Search className='me-auto' /><ThemeSwitch /><ConfigDrawer /><ProfileDropdown /></Header>
     <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
       <div className='flex flex-wrap items-end justify-between gap-3'><div><h1 className='text-2xl font-bold tracking-tight'><LocalizedText text={"全局用户"} /></h1><p className='mt-1 text-sm text-muted-foreground'><LocalizedText text={"管理平台账号。租户与 Workspace 成员资格由各自管理页面维护。"} /></p></div><Button onClick={() => { setActionError(''); setCreateOpen(true) }}><LocalizedText text={"创建用户"} /></Button></div>
       <div className='flex flex-wrap items-end justify-between gap-3'><div className='w-full max-w-sm space-y-1.5'><Label htmlFor='global-user-search'><LocalizedText text={"搜索用户"} /></Label><Input id='global-user-search' value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder='用户名、昵称、邮箱或电话号码' /></div><label className='flex items-center gap-2 text-sm text-muted-foreground'><LocalizedText text={"每页"} /><LocalizedNativeSelect className='h-9 rounded-md border bg-background px-2 text-foreground' value={pageSize} onChange={(event) => void navigate({ search: (old) => ({ ...old, pageSize: Number(event.target.value), page: 1 }) })}>{pageSizes.map((size) => <option key={size} value={size}>{size}</option>)}</LocalizedNativeSelect></label></div>

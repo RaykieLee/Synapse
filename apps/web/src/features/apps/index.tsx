@@ -11,12 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { ConfigDrawer } from '@/components/config-drawer'
-import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
 import { apps } from './data/apps'
 import { LocalizedText } from '@/components/localized-text'
 
@@ -84,14 +79,6 @@ export function Apps() {
 
   return (
     <>
-      {/* ===== Top Heading ===== */}
-      <Header>
-        <Search className='me-auto' />
-        <ThemeSwitch />
-        <ConfigDrawer />
-        <ProfileDropdown />
-      </Header>
-
       {/* ===== Content ===== */}
       <Main fixed>
         <div>

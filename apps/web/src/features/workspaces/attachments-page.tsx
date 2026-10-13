@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { getRouteApi, Link } from '@tanstack/react-router'
+import { getRouteApi } from '@tanstack/react-router'
 import {
   keepPreviousData,
   useMutation,
@@ -281,13 +281,6 @@ function WorkspaceAttachmentsContent({
   return (
     <main className='space-y-6 p-6'>
       <header>
-        <Link
-          className='text-sm underline underline-offset-4'
-          to='/w/$workspaceId'
-          params={{ workspaceId: workspace.workspace_id }}
-        >
-          <LocalizedText text={'← 返回空间'} />
-        </Link>
         <p className='mt-3 text-sm text-muted-foreground'>
           <LocalizedText text={'Workspace · '} />
           {workspace.name}
