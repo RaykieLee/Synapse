@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect, select
 from sqlalchemy.exc import IntegrityError
@@ -77,7 +78,9 @@ def test_f15a_tenant_dictionary_api_and_migration(tmp_path, monkeypatch):
     engine = get_engine()
     with engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        assert revision == "0016_tenant_validity"
+        script = ScriptDirectory.from_config(alembic)
+        assert script.get_heads() == [script.get_current_head()]
+        assert revision == script.get_current_head()
         inspector = inspect(connection)
         assert {"tenant_dict_types", "tenant_dict_data"}.issubset(set(inspector.get_table_names()))
         type_unique = inspector.get_unique_constraints("tenant_dict_types")

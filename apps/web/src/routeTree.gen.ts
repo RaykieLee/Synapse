@@ -44,8 +44,10 @@ import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_auth
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedWWorkspaceIdRouteRouteImport } from './routes/_authenticated/w/$workspaceId/route'
 import { Route as AuthenticatedWWorkspaceIdIndexRouteImport } from './routes/_authenticated/w/$workspaceId/index'
+import { Route as AuthenticatedWWorkspaceIdTeamsRouteImport } from './routes/_authenticated/w/$workspaceId/teams'
 import { Route as AuthenticatedWWorkspaceIdSettingsRouteImport } from './routes/_authenticated/w/$workspaceId/settings'
 import { Route as AuthenticatedWWorkspaceIdSessionsRouteImport } from './routes/_authenticated/w/$workspaceId/sessions'
+import { Route as AuthenticatedWWorkspaceIdModelsRouteImport } from './routes/_authenticated/w/$workspaceId/models'
 import { Route as AuthenticatedWWorkspaceIdMembersRouteImport } from './routes/_authenticated/w/$workspaceId/members'
 import { Route as AuthenticatedWWorkspaceIdAttachmentsRouteImport } from './routes/_authenticated/w/$workspaceId/attachments'
 import { Route as AuthenticatedWWorkspaceIdAgentsRouteImport } from './routes/_authenticated/w/$workspaceId/agents'
@@ -241,6 +243,12 @@ const AuthenticatedWWorkspaceIdIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
   } as any)
+const AuthenticatedWWorkspaceIdTeamsRoute =
+  AuthenticatedWWorkspaceIdTeamsRouteImport.update({
+    id: '/teams',
+    path: '/teams',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
 const AuthenticatedWWorkspaceIdSettingsRoute =
   AuthenticatedWWorkspaceIdSettingsRouteImport.update({
     id: '/settings',
@@ -251,6 +259,12 @@ const AuthenticatedWWorkspaceIdSessionsRoute =
   AuthenticatedWWorkspaceIdSessionsRouteImport.update({
     id: '/sessions',
     path: '/sessions',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
+const AuthenticatedWWorkspaceIdModelsRoute =
+  AuthenticatedWWorkspaceIdModelsRouteImport.update({
+    id: '/models',
+    path: '/models',
     getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
   } as any)
 const AuthenticatedWWorkspaceIdMembersRoute =
@@ -349,8 +363,10 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceId/agents': typeof AuthenticatedWWorkspaceIdAgentsRoute
   '/w/$workspaceId/attachments': typeof AuthenticatedWWorkspaceIdAttachmentsRoute
   '/w/$workspaceId/members': typeof AuthenticatedWWorkspaceIdMembersRoute
+  '/w/$workspaceId/models': typeof AuthenticatedWWorkspaceIdModelsRoute
   '/w/$workspaceId/sessions': typeof AuthenticatedWWorkspaceIdSessionsRoute
   '/w/$workspaceId/settings': typeof AuthenticatedWWorkspaceIdSettingsRoute
+  '/w/$workspaceId/teams': typeof AuthenticatedWWorkspaceIdTeamsRoute
   '/w/$workspaceId/': typeof AuthenticatedWWorkspaceIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -392,8 +408,10 @@ export interface FileRoutesByTo {
   '/w/$workspaceId/agents': typeof AuthenticatedWWorkspaceIdAgentsRoute
   '/w/$workspaceId/attachments': typeof AuthenticatedWWorkspaceIdAttachmentsRoute
   '/w/$workspaceId/members': typeof AuthenticatedWWorkspaceIdMembersRoute
+  '/w/$workspaceId/models': typeof AuthenticatedWWorkspaceIdModelsRoute
   '/w/$workspaceId/sessions': typeof AuthenticatedWWorkspaceIdSessionsRoute
   '/w/$workspaceId/settings': typeof AuthenticatedWWorkspaceIdSettingsRoute
+  '/w/$workspaceId/teams': typeof AuthenticatedWWorkspaceIdTeamsRoute
   '/w/$workspaceId': typeof AuthenticatedWWorkspaceIdIndexRoute
 }
 export interface FileRoutesById {
@@ -441,8 +459,10 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceId/agents': typeof AuthenticatedWWorkspaceIdAgentsRoute
   '/_authenticated/w/$workspaceId/attachments': typeof AuthenticatedWWorkspaceIdAttachmentsRoute
   '/_authenticated/w/$workspaceId/members': typeof AuthenticatedWWorkspaceIdMembersRoute
+  '/_authenticated/w/$workspaceId/models': typeof AuthenticatedWWorkspaceIdModelsRoute
   '/_authenticated/w/$workspaceId/sessions': typeof AuthenticatedWWorkspaceIdSessionsRoute
   '/_authenticated/w/$workspaceId/settings': typeof AuthenticatedWWorkspaceIdSettingsRoute
+  '/_authenticated/w/$workspaceId/teams': typeof AuthenticatedWWorkspaceIdTeamsRoute
   '/_authenticated/w/$workspaceId/': typeof AuthenticatedWWorkspaceIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -488,8 +508,10 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/agents'
     | '/w/$workspaceId/attachments'
     | '/w/$workspaceId/members'
+    | '/w/$workspaceId/models'
     | '/w/$workspaceId/sessions'
     | '/w/$workspaceId/settings'
+    | '/w/$workspaceId/teams'
     | '/w/$workspaceId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -531,8 +553,10 @@ export interface FileRouteTypes {
     | '/w/$workspaceId/agents'
     | '/w/$workspaceId/attachments'
     | '/w/$workspaceId/members'
+    | '/w/$workspaceId/models'
     | '/w/$workspaceId/sessions'
     | '/w/$workspaceId/settings'
+    | '/w/$workspaceId/teams'
     | '/w/$workspaceId'
   id:
     | '__root__'
@@ -579,8 +603,10 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceId/agents'
     | '/_authenticated/w/$workspaceId/attachments'
     | '/_authenticated/w/$workspaceId/members'
+    | '/_authenticated/w/$workspaceId/models'
     | '/_authenticated/w/$workspaceId/sessions'
     | '/_authenticated/w/$workspaceId/settings'
+    | '/_authenticated/w/$workspaceId/teams'
     | '/_authenticated/w/$workspaceId/'
   fileRoutesById: FileRoutesById
 }
@@ -847,6 +873,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceIdIndexRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
     }
+    '/_authenticated/w/$workspaceId/teams': {
+      id: '/_authenticated/w/$workspaceId/teams'
+      path: '/teams'
+      fullPath: '/w/$workspaceId/teams'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdTeamsRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
     '/_authenticated/w/$workspaceId/settings': {
       id: '/_authenticated/w/$workspaceId/settings'
       path: '/settings'
@@ -859,6 +892,13 @@ declare module '@tanstack/react-router' {
       path: '/sessions'
       fullPath: '/w/$workspaceId/sessions'
       preLoaderRoute: typeof AuthenticatedWWorkspaceIdSessionsRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
+    '/_authenticated/w/$workspaceId/models': {
+      id: '/_authenticated/w/$workspaceId/models'
+      path: '/models'
+      fullPath: '/w/$workspaceId/models'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdModelsRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
     }
     '/_authenticated/w/$workspaceId/members': {
@@ -954,8 +994,10 @@ interface AuthenticatedWWorkspaceIdRouteRouteChildren {
   AuthenticatedWWorkspaceIdAgentsRoute: typeof AuthenticatedWWorkspaceIdAgentsRoute
   AuthenticatedWWorkspaceIdAttachmentsRoute: typeof AuthenticatedWWorkspaceIdAttachmentsRoute
   AuthenticatedWWorkspaceIdMembersRoute: typeof AuthenticatedWWorkspaceIdMembersRoute
+  AuthenticatedWWorkspaceIdModelsRoute: typeof AuthenticatedWWorkspaceIdModelsRoute
   AuthenticatedWWorkspaceIdSessionsRoute: typeof AuthenticatedWWorkspaceIdSessionsRoute
   AuthenticatedWWorkspaceIdSettingsRoute: typeof AuthenticatedWWorkspaceIdSettingsRoute
+  AuthenticatedWWorkspaceIdTeamsRoute: typeof AuthenticatedWWorkspaceIdTeamsRoute
   AuthenticatedWWorkspaceIdIndexRoute: typeof AuthenticatedWWorkspaceIdIndexRoute
 }
 
@@ -966,10 +1008,12 @@ const AuthenticatedWWorkspaceIdRouteRouteChildren: AuthenticatedWWorkspaceIdRout
       AuthenticatedWWorkspaceIdAttachmentsRoute,
     AuthenticatedWWorkspaceIdMembersRoute:
       AuthenticatedWWorkspaceIdMembersRoute,
+    AuthenticatedWWorkspaceIdModelsRoute: AuthenticatedWWorkspaceIdModelsRoute,
     AuthenticatedWWorkspaceIdSessionsRoute:
       AuthenticatedWWorkspaceIdSessionsRoute,
     AuthenticatedWWorkspaceIdSettingsRoute:
       AuthenticatedWWorkspaceIdSettingsRoute,
+    AuthenticatedWWorkspaceIdTeamsRoute: AuthenticatedWWorkspaceIdTeamsRoute,
     AuthenticatedWWorkspaceIdIndexRoute: AuthenticatedWWorkspaceIdIndexRoute,
   }
 

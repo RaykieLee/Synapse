@@ -140,9 +140,9 @@ def test_f19a_task_run_migration_api_scope_filters_and_redaction(tmp_path, monke
     engine = get_engine()
     with engine.connect() as connection:
         revision = connection.exec_driver_sql("select version_num from alembic_version").scalar_one()
-        # The current migration head includes tenant validity after the run
-        # history migration; the run table must still be preserved.
-        assert revision == "0016_tenant_validity"
+        script = ScriptDirectory.from_config(alembic)
+        assert script.get_heads() == [script.get_current_head()]
+        assert revision == script.get_current_head()
         inspector = inspect(connection)
         assert "tenant_scheduled_task_runs" in inspector.get_table_names()
         assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one() == 1

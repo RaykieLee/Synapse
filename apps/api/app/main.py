@@ -19,9 +19,12 @@ from app.api.tenant_departments import router as tenant_departments_router
 from app.api.tenant_configs import router as tenant_configs_router
 from app.api.attachments import router as attachments_router
 from app.api.tenant_scheduled_tasks import router as tenant_scheduled_tasks_router
+from app.api.model_provider import router as model_provider_router
+from app.api.team_orchestration import router as team_orchestration_router
 from app.auth.errors import install_error_handlers
 from app.core.config import get_settings
 from app.integrations.agentscope import create_agentscope_app
+from app.integrations.team_agent_authorization import AgentScopeAgentAuthorization
 from app.tasks.scheduler_runtime import make_worker_id, run_scheduler_loop
 
 
@@ -77,6 +80,10 @@ def create_app() -> FastAPI:
         debug=settings.debug,
         lifespan=lifespan,
     )
+    scoped_storage = getattr(agentscope_app.state, "synapse_scoped_storage", None)
+    application.state.team_agent_authorization = (
+        AgentScopeAgentAuthorization(scoped_storage) if scoped_storage is not None else None
+    )
     application.include_router(health_router, prefix=settings.api_prefix)
     application.include_router(auth_router, prefix=settings.api_prefix)
     application.include_router(tenants_router, prefix=settings.api_prefix)
@@ -92,6 +99,8 @@ def create_app() -> FastAPI:
     application.include_router(tenant_configs_router, prefix=settings.api_prefix)
     application.include_router(attachments_router, prefix=settings.api_prefix)
     application.include_router(tenant_scheduled_tasks_router, prefix=settings.api_prefix)
+    application.include_router(model_provider_router, prefix=settings.api_prefix)
+    application.include_router(team_orchestration_router, prefix=settings.api_prefix)
     application.mount(f"{settings.api_prefix}/ai", agentscope_app, name="agentscope")
     install_error_handlers(application)
     return application

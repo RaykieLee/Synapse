@@ -12,6 +12,8 @@
 
 > 2026-10-13 F25b1/F25b2/F26a/F26b/F27a 完成本轮独立验收与修复后复验：F25b1 中断、F25b2 工具事件、F26a 工具权限确认、F26b 外部结果人工介入、F27a 团队任务只读面板的真实 FastAPI/AgentScope/临时 Redis/Vite/Chromium runner 均退出码 `0`。F26b 首次发现历史 external-result textarea 受控状态缺陷，F27a 首次发现团队任务事件刷新缺口，均已修复并重新通过。所有报告仍明确排除真实模型 provider、真实工具/外部执行器、真实子智能体编排 worker 的覆盖；F25b1 parked 状态为前端投影，F26a HITL resume 使用受控响应与真实 fixture。另发现 AgentScope `WakeupDispatcher` 的后台 resume 可能丢失 `WorkspaceContext`，F26b UI 通过不等于后台恢复通过，已拆为 F26b-backend 未实现任务；对应安全传播设计已完成。F27b UX/API 设计已完成，但实现仍未开始。详见各项 [F25b1](verification/f25b1-interrupt.md)、[F25b2](verification/f25b2-tool-events.md)、[F26a](verification/f26a-tool-permission.md)、[F26b](verification/F26b-external-result-frontend.md)、[F27a](verification/F27a-team-panel.md) 报告。
 
+> 2026-10-13 F26b-backend、F27b-1、F32 第一阶段完成最新修复与独立复验：F26b WakeupDispatcher 增加 consuming lease 的 attempt-safe CAS 恢复、任意 spawn 失败回滚和有界 512 条启动恢复索引，聚焦测试 `12 passed`；F27b 控制面增加创建/更新授权、创建者保护、tenant/workspace 复合外键和数据库级单 active run 约束，聚焦测试 `6 passed`，全新 Alembic `0001 -> 0018` 升级通过；F32 endpoint DNS 解析失败改为 fail-closed，同时保留开发环境 localhost 放行，聚焦测试 `4 passed`。这些修复仍不等于 C 级真实 AgentScope model/tool 执行、真实团队 worker 或真实 provider connection；F27b 仍为 `durable_control_only`。当前 API 全量、compile/build/lint 结果仍以各复验报告为准，真实模型 provider、真实工具执行和登录后的双角色浏览器场景仍未宣称通过。详见 [F26b-backend 复验](verification/F26b-wakeup-workspace-context-reacceptance-20261013.md)、[F27b 复验](verification/F27b-team-orchestration-reacceptance-20261013.md)、[F32 复验](verification/F32-model-provider-custom-model-reacceptance-20261013.md)。
+
 ## 功能任务
 
 > 2026-10-12 F17 附件域已完成渐进式 service 化与前端 API 收口：新增 `AttachmentService`、附件 schema 和 `src/api/attachments.ts`，保持现有 wire contract、权限矩阵、个人附件 404 隐私语义和文件补偿行为；F17a 定向 API、默认 API、compileall、build、ESLint 及 F17b 真实 Redis/Vite/Chromium 均通过。验收中修复了中文 locale 反向翻译和 Windows Vite 子进程清理；证据见 [F17 附件 Service 化方案](verification/F17-attachment-service-refactor.md)、[F17a 附件验收](verification/F17a-attachments-api.md) 和 [F17b 附件前端验收](verification/F17b-attachments-frontend.md)。
@@ -132,15 +134,15 @@
 | F25b2 | 工具执行事件展示 | 独立验收通过（真实工具/模型执行除外） | agent_embedding_design | verification/f25b2-tool-events.md：真实 FastAPI/Redis SSE/Vite/Chromium 覆盖历史与实时工具时间线、增量、错误、脱敏、二进制降级 |
 | F26a | 工具权限确认前端 | 独立验收通过（真实 worker/model resume 除外） | agent_embedding_design | verification/f26a-tool-permission.md：真实 fixture/SSE 覆盖 asking 展示、重复去重、允许/拒绝、409反馈、刷新恢复；真实 HITL resume 未覆盖 |
 | F26b | 外部结果人工介入前端 | 独立验收通过（UI；后台 resume 待修复） | agent_embedding_design | verification/F26b-external-result-frontend.md：初次 textarea 状态缺陷已修复；复验覆盖首次输入、成功提交、409/503、取消、隔离和撤权；WakeupDispatcher scope context 后端风险另列 |
-| F26b-backend | AgentScope WakeupDispatcher WorkspaceContext 安全传播与后台恢复 | 设计完成；实现未开始 | — | [WakeupDispatcher WorkspaceContext 安全传播方案](architecture/agentscope-wakeup-workspace-context.md)：已明确 trigger scope、消费前 DB 重验、ContextVar 生命周期、幂等/retry、可观察性和后端验收矩阵；当前仍 fail-closed，HTTP `200` 不代表后台 resume 成功 |
+| F26b-backend | AgentScope WakeupDispatcher WorkspaceContext 安全传播与后台恢复 | 实现中（A/B 验收通过；C 级待实际验收） | — | [WakeupDispatcher WorkspaceContext 安全传播方案](architecture/agentscope-wakeup-workspace-context.md) 与 [F26b-backend 复验](verification/F26b-wakeup-workspace-context-reacceptance-20261013.md)：scoped trigger、消费前 DB 重验、ContextVar 生命周期、spawn 失败回滚、consuming lease CAS 恢复、bounded 512 条启动恢复索引和幂等/retry 已实现；聚焦测试 `12 passed`，A/B 级真实 Redis/SQLite/HTTP 边界通过，C 级真实 AgentScope model/tool 后台执行仍待验收 |
 | F27a | 子智能体团队与任务只读面板 | 独立验收通过（真实模型/编排 worker 除外） | agent_team_frontend | verification/F27a-team-panel.md：初次事件刷新缺口已修复；复验覆盖 1/3→2/3 进度、团队/空态、跨 Workspace、第二 actor 和撤权 |
-| F27b-design | 子智能体团队编排与执行控制 UX/API 设计 | 设计完成；实现未开始 | — | [F27b 子智能体团队编排与执行控制 UX/API 方案](ux/F27b-team-orchestration.md)：已明确首期范围、权限、API、状态机、SSE、错误恢复、可访问性和分期验收条件 |
-| F27b | 子智能体团队编排与执行控制实现 | 待开始 | — | 依赖 F26b-backend 的安全后台执行能力；首期范围见 F27b-design |
+| F27b-design | 子智能体团队编排与执行控制 UX/API 设计 | 设计完成 | — | [F27b 子智能体团队编排与执行控制 UX/API 方案](ux/F27b-team-orchestration.md)：已明确首期范围、权限、API、状态机、SSE、错误恢复、可访问性和分期验收条件 |
+| F27b | 子智能体团队编排与执行控制实现 | 控制面 Phase 1 复验通过；真实 worker/model 执行未接入 | — | [F27b 复验](verification/F27b-team-orchestration-reacceptance-20261013.md)：agent 归属校验、创建/更新授权、创建者保护、任务依赖闭包、幂等启动、`interrupt_requested` 非终态语义、tenant/workspace 复合外键和数据库级单 active run 约束通过；聚焦测试 `6 passed`，全新 Alembic `0001 -> 0018` 升级通过；当前边界为 `durable_control_only`，真实团队 worker、AgentScope session/model 执行仍待接入 |
 | F28 | 知识库管理融合 | 待开始 | — | — |
 | F29 | 知识库文档、索引与检索融合 | 待开始 | — | — |
 | F30 | MCP 资源与工作空间配置融合 | 待开始 | — | — |
 | F31 | Skills 资源与工作空间配置融合 | 待开始 | — | — |
-| F32 | 模型与凭据管理融合 | 方案完成，待开发 | model_provider_design | architecture/f32-model-provider-custom-model-plan.md：当前真实实现、OpenAI-compatible 自定义模型契约、归属/隔离、API/Web 缺口、SSRF/审计和实施顺序已梳理；未改产品代码 |
+| F32 | 模型与凭据管理融合 | Phase 1 控制面复验通过；runtime/provider 待接入 | model_provider_design | [F32 复验](verification/F32-model-provider-custom-model-reacceptance-20261013.md) 与 [模型提供商/自定义模型方案](architecture/f32-model-provider-custom-model-plan.md)：provider registry、凭据敏感字段拒绝、引用删除保护、membership-version 缓存隔离和 DNS 解析失败 fail-closed 通过；聚焦测试 `4 passed`，开发环境 localhost 仍允许；AgentScope runtime model binding 与真实 provider connection 仍待接入 |
 | F33 | AI 定时任务融合 | 待开始 | — | — |
 | F34 | 渠道配置和账号绑定融合 | 待开始 | — | — |
 | F35 | 工作空间文件交互融合 | 待开始 | — | — |

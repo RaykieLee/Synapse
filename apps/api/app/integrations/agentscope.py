@@ -7,6 +7,7 @@ from app.auth.errors import install_error_handlers
 from app.core.config import Settings
 from app.integrations.agentscope_gateway import AgentScopeWorkspaceGateway
 from app.integrations.agentscope_session_scope import WorkspaceSessionStorage
+from app.integrations.agentscope_wakeup import install_scoped_wakeup_runtime
 from app.integrations.agentscope_workspace_scope import ScopedLocalWorkspaceManager
 from app.tenancy.context import WorkspaceContext
 
@@ -46,6 +47,7 @@ def create_agentscope_app(settings: Settings) -> FastAPI:
     metadata, model credentials, and local workdirs. Other AgentScope resource
     classes remain separate work.
     """
+    install_scoped_wakeup_runtime()
     from agentscope.app import create_app as create_agent_service
     from agentscope.app._service import AgentView
     from agentscope.app.deps import get_current_user_id, get_storage
@@ -93,6 +95,9 @@ def create_agentscope_app(settings: Settings) -> FastAPI:
         ),
         title="Synapse AI",
     )
+    # The parent Synapse API uses this same scoped adapter for F27b ownership
+    # checks; no second Redis namespace or unscoped storage is created.
+    app.state.synapse_scoped_storage = scoped_storage
     # The child app resolves its own dependencies. Replace AgentScope's
     # client-controlled X-User-ID dependency with Synapse JWT/session auth.
     from agentscope.app.deps import get_current_user_id
