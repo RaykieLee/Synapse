@@ -13,6 +13,7 @@ import {
 import { api, ApiProblem } from '@/lib/api'
 import { useLocaleText } from '@/lib/i18n'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +26,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { FormDialog } from '@/components/form-dialog'
 import {
   Card,
   CardContent,
@@ -208,6 +210,7 @@ function TeamsPage({
   const [description, setDescription] = React.useState('')
   const [taskSubject, setTaskSubject] = React.useState('')
   const [agentId, setAgentId] = React.useState('')
+  const [createOpen, setCreateOpen] = React.useState(false)
   const [confirmInterrupt, setConfirmInterrupt] = React.useState(false)
   const interruptButton = React.useRef<HTMLButtonElement>(null)
   const cancelButton = React.useRef<HTMLButtonElement>(null)
@@ -301,6 +304,7 @@ function TeamsPage({
       setDescription('')
       setTaskSubject('')
       setAgentId('')
+      setCreateOpen(false)
       setSelectedId(team.team_id)
       await client.invalidateQueries({ queryKey: [...scope, 'list'] })
     },
@@ -550,155 +554,142 @@ function TeamsPage({
                   <LocalizedText text='首期只允许使用当前 Workspace 可见的智能体；保存不会启动模型。' />
                 </CardDescription>
               </CardHeader>
-              <CardContent className='space-y-3'>
-                {agents.isLoading && (
-                  <p role='status'>
-                    <LocalizedText text='正在加载智能体…' />
-                  </p>
-                )}
-                {agents.isError && (
-                  <QueryError
-                    error={agents.error}
-                    fallback='加载智能体失败。'
-                    retryLabel='重新加载智能体'
-                    pending={agents.isFetching}
-                    retry={() => {
-                      void agents.refetch()
-                    }}
-                  />
-                )}
-                {agents.isSuccess && !agents.data.agents.length && (
-                  <p>
-                    <LocalizedText text='请先在智能体管理中创建智能体。' />
-                  </p>
-                )}
-                {create.isError && (
-                  <Alert variant='destructive'>
-                    <AlertDescription>
-                      <LocalizedText
-                        text={errorLabel(
-                          create.error,
-                          '创建团队失败，请检查配置后重试。'
-                        )}
-                      />
-                    </AlertDescription>
-                  </Alert>
-                )}
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    if (
-                      !busy &&
-                      canManage &&
-                      agentId &&
-                      name.trim() &&
-                      taskSubject.trim() &&
-                      !agents.isError
-                    )
-                      create.mutate()
-                  }}
-                >
-                  <fieldset
-                    disabled={busy || !agents.isSuccess}
-                    className='grid min-w-0 gap-3 sm:grid-cols-2'
-                  >
-                    <div className='space-y-2'>
-                      <Label htmlFor='team-name'>
-                        <LocalizedText text='团队名称' />
-                      </Label>
-                      <Input
-                        id='team-name'
-                        required
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        maxLength={100}
-                      />
-                    </div>
-                    <div className='min-w-0 space-y-2'>
-                      <Label htmlFor='team-agent'>
-                        <LocalizedText text='负责人智能体' />
-                      </Label>
-                      <select
-                        id='team-agent'
-                        required
-                        className='h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm'
-                        value={agentId}
-                        onChange={(event) => setAgentId(event.target.value)}
-                      >
-                        <option value=''>
-                          <LocalizedText text='请选择' />
-                        </option>
-                        {agents.data?.agents.map((agent) => (
-                          <option key={agent.id} value={agent.id}>
-                            {agent.data.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className='space-y-2 sm:col-span-2'>
-                      <Label htmlFor='team-description'>
-                        <LocalizedText text='团队说明' />
-                      </Label>
-                      <Textarea
-                        id='team-description'
-                        value={description}
-                        onChange={(event) => setDescription(event.target.value)}
-                        maxLength={4000}
-                      />
-                    </div>
-                    <div className='space-y-2 sm:col-span-2'>
-                      <Label htmlFor='team-task'>
-                        <LocalizedText text='首个任务' />
-                      </Label>
-                      <Input
-                        id='team-task'
-                        required
-                        value={taskSubject}
-                        onChange={(event) => setTaskSubject(event.target.value)}
-                        maxLength={200}
-                        placeholder={t('例如：整理产品竞品背景')}
-                      />
-                    </div>
-                    <div className='sm:col-span-2'>
-                      <Button
-                        type='submit'
-                        className='w-full sm:w-auto'
-                        disabled={
-                          busy ||
-                          !name.trim() ||
-                          !taskSubject.trim() ||
-                          !agents.data?.agents.some(
-                            (agent) => agent.id === agentId
-                          )
-                        }
-                      >
-                        {create.isPending ? (
-                          <Loader2
-                            className='size-4 animate-spin motion-reduce:animate-none'
-                            aria-hidden
-                          />
-                        ) : (
-                          <Plus className='size-4' aria-hidden />
-                        )}
-                        <LocalizedText
-                          text={create.isPending ? '正在创建草稿…' : '创建草稿'}
-                        />
-                      </Button>
-                    </div>
-                  </fieldset>
-                </form>
+              <CardContent>
+                <Button onClick={() => setCreateOpen(true)}>
+                  <Plus className='mr-2 size-4' aria-hidden />
+                  <LocalizedText text='创建团队草稿' />
+                </Button>
               </CardContent>
             </Card>
           )}
+          <FormDialog
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            title={<LocalizedText text='创建团队草稿' />}
+            formAriaLabel='创建团队草稿'
+            description='首期只允许使用当前 Workspace 可见的智能体；保存不会启动模型。'
+            submitLabel={<LocalizedText text='创建草稿' />}
+            pending={create.isPending}
+            disabled={
+              !name.trim() ||
+              !taskSubject.trim() ||
+              !agents.data?.agents.some((agent) => agent.id === agentId)
+            }
+            onSubmit={() => create.mutate()}
+            onCancel={() => setCreateOpen(false)}
+          >
+            {agents.isLoading && (
+              <p role='status'>
+                <LocalizedText text='正在加载智能体…' />
+              </p>
+            )}
+            {agents.isError && (
+              <QueryError
+                error={agents.error}
+                fallback='加载智能体失败。'
+                retryLabel='重新加载智能体'
+                pending={agents.isFetching}
+                retry={() => {
+                  void agents.refetch()
+                }}
+              />
+            )}
+            {agents.isSuccess && !agents.data.agents.length && (
+              <p className='text-sm text-muted-foreground'>
+                <LocalizedText text='请先在智能体管理中创建智能体。' />
+              </p>
+            )}
+            {create.isError && (
+              <Alert variant='destructive'>
+                <AlertDescription>
+                  <LocalizedText
+                    text={errorLabel(
+                      create.error,
+                      '创建团队失败，请检查配置后重试。'
+                    )}
+                  />
+                </AlertDescription>
+              </Alert>
+            )}
+            <fieldset
+              disabled={create.isPending || !agents.isSuccess}
+              className='grid min-w-0 gap-3 sm:grid-cols-2'
+            >
+              <div className='space-y-2'>
+                <Label htmlFor='team-name'>
+                  <LocalizedText text='团队名称' />
+                </Label>
+                <Input
+                  id='team-name'
+                  required
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  maxLength={100}
+                />
+              </div>
+              <div className='min-w-0 space-y-2'>
+                <Label htmlFor='team-agent'>
+                  <LocalizedText text='负责人智能体' />
+                </Label>
+                <select
+                  id='team-agent'
+                  required
+                  className='h-10 w-full min-w-0 rounded-md border bg-background px-3 text-sm'
+                  value={agentId}
+                  onChange={(event) => setAgentId(event.target.value)}
+                >
+                  <option value=''>
+                    <LocalizedText text='请选择' />
+                  </option>
+                  {agents.data?.agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.data.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='space-y-2 sm:col-span-2'>
+                <Label htmlFor='team-description'>
+                  <LocalizedText text='团队说明' />
+                </Label>
+                <Textarea
+                  id='team-description'
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  maxLength={4000}
+                />
+              </div>
+              <div className='space-y-2 sm:col-span-2'>
+                <Label htmlFor='team-task'>
+                  <LocalizedText text='首个任务' />
+                </Label>
+                <Input
+                  id='team-task'
+                  required
+                  value={taskSubject}
+                  onChange={(event) => setTaskSubject(event.target.value)}
+                  maxLength={200}
+                  placeholder={t('例如：整理产品竞品背景')}
+                />
+              </div>
+            </fieldset>
+          </FormDialog>
 
-          {selected && (
+          <Dialog
+            open={Boolean(selectedId && selected?.team_id === selectedId)}
+            onOpenChange={(open) => {
+              if (!open) setSelectedId(null)
+            }}
+          >
+            <DialogContent className='max-h-[min(88vh,48rem)] overflow-y-auto sm:max-w-5xl'>
+              <DialogHeader>
+                <DialogTitle className='break-all'>{selected?.name}</DialogTitle>
+                <DialogDescription className='break-words'>
+                  {selected?.description || <LocalizedText text='无团队说明' />}
+                </DialogDescription>
+              </DialogHeader>
+            {selected && (
             <Card className='min-w-0'>
-              <CardHeader>
-                <CardTitle className='break-all'>{selected.name}</CardTitle>
-                <CardDescription className='break-words'>
-                  {selected.description || <LocalizedText text='无团队说明' />}
-                </CardDescription>
-              </CardHeader>
               <CardContent className='min-w-0 space-y-4'>
                 {runId && runQuery.isLoading && (
                   <p role='status'>
@@ -1030,6 +1021,8 @@ function TeamsPage({
               </CardContent>
             </Card>
           )}
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </main>

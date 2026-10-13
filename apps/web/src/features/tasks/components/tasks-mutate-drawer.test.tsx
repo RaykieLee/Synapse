@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
+import { setLocale } from '@/lib/i18n'
 import { showSubmittedData } from '@/lib/show-submitted-data'
 import { type Task } from '../data/schema'
 import { TasksMutateDrawer } from './tasks-mutate-drawer'
@@ -17,7 +18,12 @@ const MOCK_TASK = {
 } as const satisfies Task
 
 describe('TasksMutateDrawer', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setLocale('en')
+  })
+
+  afterEach(() => setLocale('en'))
 
   it('renders create title and description', async () => {
     const { getByRole, getByText } = await render(
@@ -166,7 +172,8 @@ describe('TasksMutateDrawer', () => {
         name: /Close/i,
       })
       .all()
-    await userEvent.click(closeButtons[0])
+    await userEvent.click(closeButtons[1])
+    await expect.element(getByRole('dialog')).not.toBeInTheDocument()
 
     const reopenButton = getByRole('button', { name: /Reopen/i })
     await userEvent.click(reopenButton)

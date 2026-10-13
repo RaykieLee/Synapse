@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { formatMessage } from '@/lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -13,6 +12,7 @@ import { ApiProblem, api } from '@/lib/api'
 import { useWorkspace } from './context'
 import type { Workspace } from './types'
 import { LocalizedText } from '@/components/localized-text'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 type AgentData = {
   id: string
@@ -82,6 +82,7 @@ function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; 
   const scope = scopedKey(actorId, workspace, 'agent-list')
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [editor, setEditor] = React.useState<{ mode: 'create' } | { mode: 'edit'; id: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(null)
   const [draft, setDraft] = React.useState<AgentDraft>(() => toDraft())
   const [formError, setFormError] = React.useState('')
   const canCreate = workspace.status === 'active'
@@ -174,7 +175,7 @@ function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; 
       {errorMessage && <Alert variant='destructive'><AlertDescription>{errorMessage}</AlertDescription></Alert>}
       {deleteAgent.isError && <Alert variant='destructive'><AlertDescription>{formatError(deleteAgent.error)}</AlertDescription></Alert>}
 
-      <div className='grid gap-5 xl:grid-cols-[minmax(280px,0.8fr)_minmax(0,1.4fr)]'>
+      <div className='grid gap-3 lg:grid-cols-2 2xl:grid-cols-3'>
         <Card>
           <CardHeader><CardTitle><LocalizedText text={"智能体列表"} /></CardTitle><CardDescription>{agents.data?.total ?? 0} <LocalizedText text={" 个定义"} /></CardDescription></CardHeader>
           <CardContent className='space-y-2'>
@@ -186,21 +187,43 @@ function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; 
             )) : !agents.isError && <div className='rounded-lg border border-dashed p-6 text-center'><Bot className='mx-auto size-8 text-muted-foreground' /><p className='mt-2 text-sm font-medium'><LocalizedText text={"还没有智能体"} /></p><p className='mt-1 text-xs text-muted-foreground'><LocalizedText text={"创建一个定义后，可在聊天功能中选择使用。"} /></p>{canCreate && <Button className='mt-4' size='sm' variant='outline' onClick={openCreate}><Plus className='mr-2 size-4' /><LocalizedText text={"创建智能体"} /></Button>}</div>}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader><CardTitle><LocalizedText text={"智能体详情"} /></CardTitle><CardDescription><LocalizedText text={"从左侧列表选择一个智能体查看完整定义。"} /></CardDescription></CardHeader>
-          <CardContent>
-            {!selectedIdInScope ? <p className='py-8 text-center text-sm text-muted-foreground'><LocalizedText text={"尚未选择智能体"} /></p> : detail.isLoading ? <p className='py-8 text-sm text-muted-foreground'><LocalizedText text={"正在加载详情…"} /></p> : detail.isError ? <p role='alert' className='py-4 text-sm text-destructive'>{formatError(detail.error)}</p> : selected && <div className='space-y-5'>
-              <div className='flex flex-wrap items-start justify-between gap-3'><div><h2 className='text-xl font-semibold'>{selected.data.name}</h2><p className='mt-1 text-xs text-muted-foreground break-all'><LocalizedText text={"ID："} />{selected.id}</p></div><div className='flex gap-2'>{selected.editable && workspace.status === 'active' && <><Button size='sm' variant='outline' onClick={() => openEdit(selected)}><Pencil className='mr-2 size-3.5' /><LocalizedText text={"编辑"} /></Button><Button size='sm' variant='destructive' disabled={deleteAgent.isPending} onClick={() => { if (window.confirm(formatMessage('确定删除智能体“{name}”吗？', { name: selected.data.name }))) deleteAgent.mutate(selected.id) }}><Trash2 className='mr-2 size-3.5' /><LocalizedText text={"删除"} /></Button></>}</div></div>
-              <section className='space-y-2'><h3 className='text-sm font-medium'><LocalizedText text={"系统提示词"} /></h3><pre className='max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm'>{selected.data.system_prompt || '（空）'}</pre></section>
-              <JsonSection title='上下文配置' value={selected.data.context_config} />
-              <JsonSection title='ReAct 配置' value={selected.data.react_config} />
-              <JsonSection title='邀请配置' value={selected.data.invite_config} />
-              {!selected.editable && <p className='text-sm text-muted-foreground'><LocalizedText text={"你可以查看此智能体，但没有编辑或删除权限。"} /></p>}
-            </div>}
-          </CardContent>
-        </Card>
       </div>
+
+      <Dialog open={Boolean(selectedIdInScope)} onOpenChange={(open) => { if (!open) setSelectedId(null) }}>
+        <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-3xl'>
+          <DialogHeader>
+            <DialogTitle><LocalizedText text={"智能体详情"} /></DialogTitle>
+            <DialogDescription><LocalizedText text={"查看完整定义；有权限时可直接编辑或删除。"} /></DialogDescription>
+          </DialogHeader>
+          {detail.isLoading ? <p className="py-8 text-sm text-muted-foreground"><LocalizedText text={"正在加载详情…"} /></p> : detail.isError ? <p role="alert" className="py-4 text-sm text-destructive">{formatError(detail.error)}</p> : selected && <div className="space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-semibold">{selected.data.name}</h2><p className="mt-1 text-xs text-muted-foreground break-all"><LocalizedText text={"ID："} />{selected.id}</p></div><div className="flex gap-2">{selected.editable && workspace.status === 'active' && <><Button size="sm" variant="outline" onClick={() => openEdit(selected)}><Pencil className="mr-2 size-3.5" /><LocalizedText text={"编辑"} /></Button><Button size="sm" variant="destructive" disabled={deleteAgent.isPending} onClick={() => setDeleteTarget({ id: selected.id, name: selected.data.name })}><Trash2 className="mr-2 size-3.5" /><LocalizedText text={"删除"} /></Button></>}</div></div>
+            <section className="space-y-2"><h3 className="text-sm font-medium"><LocalizedText text={"系统提示词"} /></h3><pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{selected.data.system_prompt || '（空）'}</pre></section>
+            <JsonSection title='上下文配置' value={selected.data.context_config} />
+            <JsonSection title='ReAct 配置' value={selected.data.react_config} />
+            <JsonSection title='邀请配置' value={selected.data.invite_config} />
+            {!selected.editable && <p className="text-sm text-muted-foreground"><LocalizedText text={"你可以查看此智能体，但没有编辑或删除权限。"} /></p>}
+          </div>}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => { if (!open && !deleteAgent.isPending) setDeleteTarget(null) }}
+        title='删除智能体'
+        desc='删除后智能体定义不能恢复，关联的会话不会被自动迁移。'
+        confirmText='确认删除'
+        destructive
+        isLoading={deleteAgent.isPending}
+        handleConfirm={() => {
+          if (deleteTarget) {
+            deleteAgent.mutate(deleteTarget.id, {
+              onSuccess: () => setDeleteTarget(null),
+            })
+          }
+        }}
+      >
+        {deleteTarget && <p className='text-sm font-medium'>{deleteTarget.name}</p>}
+      </ConfirmDialog>
 
       <Dialog open={editor !== null} onOpenChange={(open) => { if (!open && !editorPending) setEditor(null) }}>
         <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>

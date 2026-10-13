@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
-import { formatMessage, getLocale, useLocale } from '@/lib/i18n'
+import { getLocale, useLocale } from '@/lib/i18n'
 import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
@@ -21,7 +21,10 @@ import {
 import { ApiProblem } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
+import { FormDialog } from '@/components/form-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 type TaskDraft = {
   task_id?: string; task_name: string; description: string; execution_target: string; schedule_type: 'cron' | 'interval'
@@ -49,6 +52,7 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
   const [draft, setDraft] = useState<TaskDraft | null>(null)
   const [historyTask, setHistoryTask] = useState<Task | null>(null)
   const [runConfirmation, setRunConfirmation] = useState<Task | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
   const [manualRun, setManualRun] = useState<{ tenantId: string; task: Task; run: TaskRun } | null>(null)
   const [manualRunError, setManualRunError] = useState('')
   const [manualRunPendingId, setManualRunPendingId] = useState<string | null>(null)
@@ -116,8 +120,8 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
   })
   const remove = useMutation({
     mutationFn: (taskId: string) => deleteScheduledTask(tenantId, taskId),
-    onSuccess: async () => { setError(''); await invalidate() },
-    onError: (cause) => setError(errorText(cause)),
+    onSuccess: async () => { setDeleteTarget(null); setError(''); await invalidate() },
+    onError: (cause) => { setDeleteTarget(null); setError(errorText(cause)) },
   })
   const confirmManualRun = async () => {
     if (!runConfirmation || manualRunPendingId) return
@@ -152,7 +156,7 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
     {!active && <ErrorBox message="租户未启用，任务定义只读。" />}
     {error && <ErrorBox message={error} />}
     {targets.isError && <ErrorBox message={`读取允许的执行目标失败：${errorText(targets.error)}`} />}
-    {draft && <TaskEditor draft={draft} targets={targets.data?.items ?? []} pending={save.isPending} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => save.mutate(draft)} />}
+    {draft && <TaskEditor draft={draft} targets={targets.data?.items ?? []} pending={save.isPending} error={error} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => save.mutate(draft)} />}
     <section className={`${panel} space-y-4`}>
       <div className="flex flex-wrap gap-3">
         <Input aria-label="按任务名称筛选" className={`${input} max-w-sm`} value={search} placeholder="按任务名称筛选" onChange={(event) => { setSearch(event.target.value); setPage(1) }} />
@@ -167,12 +171,12 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
           <td className="p-3"><code>{task.execution_target}</code>{target && <span className="mt-1 block text-xs text-muted-foreground">{target.name}</span>}</td>
           <td className="p-3">{task.schedule_type === 'cron' ? <><span className="font-mono">{task.cron_expression}</span><span className="block text-xs text-muted-foreground"><LocalizedText text={"Cron"} /></span></> : <>{task.interval_value} {unitLabels[task.interval_unit ?? 'minutes']}<span className="block text-xs text-muted-foreground"><LocalizedText text={"间隔"} /></span></>}</td>
           <td className="p-3">{task.timezone}</td><td className="p-3">{task.enabled ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td>
-          <td className="space-x-3 whitespace-nowrap p-3"><button className="underline" onClick={() => setHistoryTask(task)}><LocalizedText text={"执行记录"} /></button><button className="underline" disabled={!active || !task.enabled || pending || Boolean(manualRunPendingId)} onClick={() => { setManualRunError(''); setRunConfirmation(task) }}><LocalizedText text={"立即运行"} /></button><button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => { setError(''); setDraft(toDraft(task)) }}><LocalizedText text={"编辑"} /></button><button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => toggle.mutate(task)}>{task.enabled ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => { if (window.confirm(formatMessage('软删除任务“{name}”？', { name: task.task_name }))) remove.mutate(task.task_id) }}><LocalizedText text={"删除"} /></button></td>
+          <td className="space-x-3 whitespace-nowrap p-3"><button className="underline" onClick={() => setHistoryTask(task)}><LocalizedText text={"执行记录"} /></button><button className="underline" disabled={!active || !task.enabled || pending || Boolean(manualRunPendingId)} onClick={() => { setManualRunError(''); setRunConfirmation(task) }}><LocalizedText text={"立即运行"} /></button><button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => { setError(''); setDraft(toDraft(task)) }}><LocalizedText text={"编辑"} /></button><button className="underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => toggle.mutate(task)}>{task.enabled ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline" disabled={!active || pending || manualRunPendingId === task.task_id} onClick={() => setDeleteTarget(task)}><LocalizedText text={"删除"} /></button></td>
         </tr>
       })}</tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无任务定义"} /></p>}
       <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground"><LocalizedText text={"共 "} />{tasks.data?.total ?? 0} <LocalizedText text={" 项"} /></span><div className="flex gap-2"><button className={button} disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><LocalizedText text={"上一页"} /></button><span className="px-2 py-2 text-sm"><LocalizedText text={"第 "} />{page} <LocalizedText text={" 页"} /></span><button className={button} disabled={page * 20 >= (tasks.data?.total ?? 0)} onClick={() => setPage((value) => value + 1)}><LocalizedText text={"下一页"} /></button></div></div>
     </section>
-    {historyTask && <TaskRunsPanel key={`${tenantId}:${historyTask.task_id}`} tenantId={tenantId} actorId={actorId} task={historyTask} initialSelectedRunId={manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''} onClose={() => setHistoryTask(null)} />}
+    {historyTask && <TaskRunsPanel key={`${tenantId}:${historyTask.task_id}:${manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''}`} tenantId={tenantId} actorId={actorId} task={historyTask} initialSelectedRunId={manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''} onClose={() => setHistoryTask(null)} />}
     {manualRun?.tenantId === tenantId && <p role="status" aria-live="polite" className="rounded-md border p-3 text-sm">{manualRun.run.status === 'succeeded' ? (isEnglish ? 'Manual run succeeded. The execution record is open.' : '手工运行成功，已打开执行记录。') : manualRun.run.status === 'failed' ? <>{isEnglish ? 'Manual run failed. The execution record is open. Error code: ' : '手工运行失败，已打开执行记录。错误码：'}{manualRun.run.error_code ?? '—'}</> : (isEnglish ? 'The run record was created; the task is still running.' : '已创建运行记录，任务仍在运行中。')}</p>}
     {manualRunPendingId && <p role="status" aria-live="polite" className="rounded-md border p-3 text-sm">{isEnglish ? 'Task is running; waiting for the server to save its execution record…' : '正在运行任务，等待服务端写入执行记录…'}{` ${tasks.data?.items.find((task) => task.task_id === manualRunPendingId)?.task_name ?? ''}`}</p>}
     {manualRunError && <ErrorBox message={manualRunError} />}
@@ -189,6 +193,24 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    <ConfirmDialog
+      open={Boolean(deleteTarget)}
+      onOpenChange={(open) => { if (!open && !remove.isPending) setDeleteTarget(null) }}
+      title='软删除任务'
+      desc='删除后任务定义不再参与调度，执行记录会保留。'
+      confirmText='确认删除'
+      destructive
+      isLoading={remove.isPending}
+      handleConfirm={() => {
+        if (deleteTarget) {
+          remove.mutate(deleteTarget.task_id, {
+            onSuccess: () => setDeleteTarget(null),
+          })
+        }
+      }}
+    >
+      {deleteTarget && <p className='text-sm font-medium'>{deleteTarget.task_name}</p>}
+    </ConfirmDialog>
   </main>
 }
 
@@ -198,11 +220,6 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
   const [startedTo, setStartedTo] = useState('')
   const [page, setPage] = useState(1)
   const [selectedRunId, setSelectedRunId] = useState(initialSelectedRunId ?? '')
-  const [lastInitialSelectedRunId, setLastInitialSelectedRunId] = useState(initialSelectedRunId)
-  if (initialSelectedRunId !== lastInitialSelectedRunId) {
-    setLastInitialSelectedRunId(initialSelectedRunId)
-    if (initialSelectedRunId) setSelectedRunId(initialSelectedRunId)
-  }
   const params = new URLSearchParams({ page: String(page), page_size: '20' })
   if (status) params.set('status', status)
   if (startedFrom) params.set('started_from', new Date(startedFrom).toISOString())
@@ -224,8 +241,13 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
     queryFn: () => getScheduledTaskRun(tenantId, task.task_id, selectedRunId),
   })
   const invalidRange = startedFrom && startedTo && new Date(startedFrom) > new Date(startedTo)
-  return <section className={`${panel} space-y-4`}>
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold"><LocalizedText text={"执行记录："} />{task.task_name}</h2><p className="text-sm text-muted-foreground"><LocalizedText text={"只显示服务端保存的安全结果摘要或错误码，不包含任务参数、凭据或异常详情。"} /></p></div><button className={button} onClick={onClose}><LocalizedText text={"关闭"} /></button></header>
+  return <>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+    <DialogContent className="max-h-[min(85vh,44rem)] overflow-y-auto sm:max-w-5xl">
+      <DialogHeader>
+        <DialogTitle><LocalizedText text={"执行记录："} />{task.task_name}</DialogTitle>
+        <DialogDescription><LocalizedText text={"只显示服务端保存的安全结果摘要或错误码，不包含任务参数、凭据或异常详情。"} /></DialogDescription>
+      </DialogHeader>
     <div className="flex flex-wrap items-end gap-3">
       <label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={`${input} min-w-36`} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); setSelectedRunId('') }}><option value=""><LocalizedText text={"全部状态"} /></option><option value="running"><LocalizedText text={"运行中"} /></option><option value="succeeded"><LocalizedText text={"成功"} /></option><option value="failed"><LocalizedText text={"失败"} /></option></LocalizedNativeSelect></label>
       <label className="space-y-1 text-sm"><span><LocalizedText text={"开始时间从"} /></span><Input className={input} type="datetime-local" value={startedFrom} onChange={(event) => { setStartedFrom(event.target.value); setPage(1); setSelectedRunId('') }} /></label>
@@ -233,21 +255,44 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
     </div>
     {invalidRange && <ErrorBox message="开始时间范围无效：起始时间不能晚于结束时间。" />}
     {!invalidRange && (runs.isLoading ? <p className="py-5 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载执行记录…"} /></p> : runs.isError ? <ErrorBox message={errorText(runs.error)} /> : runs.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"运行 ID"} /></th><th className="p-3"><LocalizedText text={"计划槽"} /></th><th className="p-3"><LocalizedText text={"开始"} /></th><th className="p-3"><LocalizedText text={"结束"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"详情"} /></th></tr></thead><tbody>{runs.data.items.map((run) => <tr className="border-b last:border-0" key={`${run.tenant_id}:${run.task_id}:${run.run_id}`}><td className="p-3">{run.run_id}</td><td className="p-3">{formatTime(run.slot_at)}</td><td className="p-3">{formatTime(run.started_at)}</td><td className="p-3">{run.finished_at ? formatTime(run.finished_at) : <LocalizedText text={"—"} />}</td><td className="p-3">{runStatus[run.status]}</td><td className="p-3"><button className="underline" onClick={() => setSelectedRunId(run.run_id)}>{selectedRunId === run.run_id ? <LocalizedText text={"已选择"} /> : <LocalizedText text={"查看"} />}</button></td></tr>)}</tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"没有匹配的执行记录"} /></p>)}
-    {selectedRunId && <div className="rounded-md border bg-muted/20 p-4" aria-live="polite"><h3 className="font-medium"><LocalizedText text={"运行详情"} /></h3>{detail.isLoading ? <p className="mt-2 text-sm text-muted-foreground"><LocalizedText text={"正在加载详情…"} /></p> : detail.isError ? <ErrorBox message={errorText(detail.error)} /> : detail.data && <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2"><DetailItem label="目标" value={detail.data.execution_target} /><DetailItem label="状态" value={runStatus[detail.data.status]} /><DetailItem label="开始时间" value={formatTime(detail.data.started_at)} /><DetailItem label="结束时间" value={detail.data.finished_at ? formatTime(detail.data.finished_at) : '—'} /><DetailItem label="错误码" value={detail.data.error_code ?? '—'} /><div className="sm:col-span-2"><dt className="text-muted-foreground"><LocalizedText text={"安全结果摘要"} /></dt><dd className="mt-1"><pre className="overflow-x-auto rounded bg-background p-3 text-xs">{detail.data.result_summary ? JSON.stringify(detail.data.result_summary, null, 2) : <LocalizedText text={"—"} />}</pre></dd></div></dl>}</div>}
     <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground"><LocalizedText text={"共 "} />{runs.data?.total ?? 0} <LocalizedText text={" 条"} /></span><div className="flex gap-2"><button className={button} disabled={page <= 1} onClick={() => { setPage((value) => value - 1); setSelectedRunId('') }}><LocalizedText text={"上一页"} /></button><span className="px-2 py-2 text-sm"><LocalizedText text={"第 "} />{page} <LocalizedText text={" 页"} /></span><button className={button} disabled={page * 20 >= (runs.data?.total ?? 0)} onClick={() => { setPage((value) => value + 1); setSelectedRunId('') }}><LocalizedText text={"下一页"} /></button></div></div>
-  </section>
+    </DialogContent>
+    </Dialog>
+    <Dialog open={Boolean(selectedRunId)} onOpenChange={(open) => { if (!open) setSelectedRunId('') }}>
+      <DialogContent className="max-h-[min(80vh,36rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle><LocalizedText text={"运行详情"} /></DialogTitle>
+          <DialogDescription>{task.task_name}</DialogDescription>
+        </DialogHeader>
+        <div aria-live="polite">
+          {detail.isLoading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在加载详情…"} /></p> : detail.isError ? <ErrorBox message={errorText(detail.error)} /> : detail.data && <dl className="grid gap-3 text-sm sm:grid-cols-2"><DetailItem label="目标" value={detail.data.execution_target} /><DetailItem label="状态" value={runStatus[detail.data.status]} /><DetailItem label="开始时间" value={formatTime(detail.data.started_at)} /><DetailItem label="结束时间" value={detail.data.finished_at ? formatTime(detail.data.finished_at) : '—'} /><DetailItem label="错误码" value={detail.data.error_code ?? '—'} /><div className="sm:col-span-2"><dt className="text-muted-foreground"><LocalizedText text={"安全结果摘要"} /></dt><dd className="mt-1"><pre className="overflow-x-auto rounded bg-muted/30 p-3 text-xs">{detail.data.result_summary ? JSON.stringify(detail.data.result_summary, null, 2) : <LocalizedText text={"—"} />}</pre></dd></div></dl>}
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>
 }
 
 const runStatus: Record<TaskRun['status'], string> = { running: '运行中', succeeded: '成功', failed: '失败' }
 function DetailItem({ label, value }: { label: string; value: string }) { return <div><dt className="text-muted-foreground"><LocalizedText text={label} /></dt><dd className="mt-1 break-all">{value}</dd></div> }
 function formatTime(value: string) { return new Date(value).toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'medium' }) }
 
-function TaskEditor({ draft, targets, pending, onChange, onCancel, onSave }: {
-  draft: TaskDraft; targets: Target[]; pending: boolean; onChange: (draft: TaskDraft) => void; onCancel: () => void; onSave: () => void
+function TaskEditor({ draft, targets, pending, error, onChange, onCancel, onSave }: {
+  draft: TaskDraft; targets: Target[]; pending: boolean; error: string; onChange: (draft: TaskDraft) => void; onCancel: () => void; onSave: () => void
 }) {
   const set = <K extends keyof TaskDraft>(key: K, value: TaskDraft[K]) => onChange({ ...draft, [key]: value })
-  return <form className={`${panel} space-y-4`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
-    <h2 className="font-semibold">{draft.task_id ? <LocalizedText text={"编辑任务"} /> : <LocalizedText text={"创建任务"} />}</h2>
+  return <FormDialog
+    open
+    onOpenChange={(open) => { if (!open) onCancel() }}
+    title={draft.task_id ? <LocalizedText text={"编辑任务"} /> : <LocalizedText text={"创建任务"} />}
+    formAriaLabel={draft.task_id ? '编辑任务' : '创建任务'}
+    description="从平台 allowlist 选择执行目标，并配置服务端可校验的调度计划。"
+    error={error}
+    submitLabel={draft.task_id ? <LocalizedText text={"保存任务"} /> : <LocalizedText text={"创建任务"} />}
+    pending={pending}
+    disabled={targets.length === 0}
+    onSubmit={onSave}
+    onCancel={onCancel}
+  >
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="space-y-1 text-sm"><span><LocalizedText text={"任务名称"} /></span><Input className={input} required maxLength={120} value={draft.task_name} onChange={(event) => set('task_name', event.target.value)} /></label>
       <label className="space-y-1 text-sm"><span><LocalizedText text={"执行目标"} /></span><LocalizedNativeSelect className={input} required value={draft.execution_target} onChange={(event) => set('execution_target', event.target.value)}><option value="" disabled><LocalizedText text={"选择 allowlist 目标"} /></option>{targets.map((target) => <option key={target.target_id} value={target.target_id}>{target.name} <LocalizedText text={" · "} />{target.target_id}</option>)}</LocalizedNativeSelect></label>
@@ -257,8 +302,7 @@ function TaskEditor({ draft, targets, pending, onChange, onCancel, onSave }: {
       <label className="space-y-1 text-sm sm:col-span-2"><span><LocalizedText text={"说明（可选）"} /></span><textarea className="min-h-20 w-full rounded-md border bg-background p-3 text-sm" maxLength={1000} value={draft.description} onChange={(event) => set('description', event.target.value)} /></label>
       {!draft.task_id && <label className="flex items-center gap-2 text-sm"><Input type="checkbox" checked={draft.enabled} onChange={(event) => set('enabled', event.target.checked)} /><LocalizedText text={"创建后启用"} /></label>}
     </div>
-    <div className="flex gap-2"><button className={primary} disabled={pending || targets.length === 0}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
-  </form>
+  </FormDialog>
 }
 
 function emptyDraft(targetId: string): TaskDraft {

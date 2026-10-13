@@ -1,6 +1,7 @@
 """Run F12d member-role UI checks against a disposable migrated API and Vite app."""
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[4]
 API = ROOT / "apps" / "api"
 WEB = ROOT / "apps" / "web"
 FLOW = Path(__file__).with_name("f12d_member_role_frontend.mjs")
+PNPM = shutil.which("pnpm") or ("pnpm.cmd" if os.name == "nt" else "pnpm")
 
 
 def free_port():
@@ -35,10 +37,29 @@ def wait_url(url, process):
     raise RuntimeError(f"Timed out waiting for {url}")
 
 
+def terminate_process_tree(process):
+    if process is None:
+        return
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+            )
+        else:
+            process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
 def main():
-    build = subprocess.run(["pnpm", "build"], cwd=WEB)
-    if build.returncode:
-        return build.returncode
+    if os.environ.get("F12D_SKIP_BUILD") != "1":
+        build = subprocess.run([PNPM, "build"], cwd=WEB)
+        if build.returncode:
+            return build.returncode
 
     with tempfile.TemporaryDirectory(prefix="synapse-f12d-") as temp:
         temp_path = Path(temp)
@@ -109,25 +130,32 @@ def main():
                 "actor_token": issue_token(actor.user_id, actor.token_version),
                 "member_token": issue_token(member.user_id, member.token_version),
             }
+        get_engine().dispose()
 
         seed_path = temp_path / "seed.json"
         seed_path.write_text(json.dumps(seed))
         env = os.environ.copy()
         api_port, web_port = free_port(), free_port()
         env.update({"SYNAPSE_DATABASE_URL": db_url, "SYNAPSE_JWT_SECRET": secret, "SYNAPSE_API_PREFIX": "/api/v1", "VITE_API_PROXY_TARGET": f"http://127.0.0.1:{api_port}"})
-        api_log = (temp_path / "api.log").open("w")
+        api_log = (temp_path / "api.log").open("w+")
         web_log = (temp_path / "vite.log").open("w")
         api = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", str(api_port)], cwd=API, env=env, stdout=api_log, stderr=api_log)
-        web = subprocess.Popen(["pnpm", "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
+        web = subprocess.Popen([PNPM, "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
         seed.update({"web": f"http://127.0.0.1:{web_port}", "api": f"http://127.0.0.1:{api_port}/api/v1"})
         seed_path.write_text(json.dumps(seed))
         try:
-            wait_url(seed["api"] + "/health", api)
+            try:
+                wait_url(seed["api"] + "/health", api)
+            except RuntimeError:
+                api_log.flush()
+                api_log.seek(0)
+                print(api_log.read())
+                raise
             wait_url(seed["web"], web)
             return subprocess.run(["node", str(FLOW), str(seed_path)], cwd=WEB, env=env).returncode
         finally:
-            web.terminate(); api.terminate()
-            web.wait(timeout=10); api.wait(timeout=10)
+            terminate_process_tree(web)
+            terminate_process_tree(api)
             api_log.close(); web_log.close()
 
 

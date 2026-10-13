@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
-import { formatMessage } from '@/lib/i18n'
 import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
+import { FormDialog } from '@/components/form-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 type Menu = {
   menu_id: string
@@ -34,7 +35,6 @@ type MenuTree = { items: Menu[] }
 
 const panel = 'rounded-lg border bg-card p-5 shadow-sm'
 const input = 'h-10 w-full rounded-md border bg-background px-3 text-sm'
-const button = 'rounded-md border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50'
 const primary = 'rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50'
 
 export function TenantMenusPage() {
@@ -42,6 +42,7 @@ export function TenantMenusPage() {
   const { tenantId } = useParams({ from: '/_authenticated/tenants/$tenantId/menus' })
   const client = useQueryClient()
   const [draft, setDraft] = useState<MenuDraft | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Menu | null>(null)
   const [error, setError] = useState('')
   const tenantKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant']
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
@@ -73,8 +74,8 @@ export function TenantMenusPage() {
   })
   const remove = useMutation({
     mutationFn: (menuId: string) => api<void>(`/tenants/${tenantId}/menus/${menuId}`, { method: 'DELETE' }),
-    onSuccess: async () => { setError(''); await refresh() },
-    onError: (cause) => setError(errorText(cause)),
+    onSuccess: async () => { setRemoveTarget(null); setError(''); await refresh() },
+    onError: (cause) => { setRemoveTarget(null); setError(errorText(cause)) },
   })
   const toggle = useMutation({
     mutationFn: ({ menuId, status }: { menuId: string; status: '0' | '1' }) => api<Menu>(`/tenants/${tenantId}/menus/${menuId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
@@ -98,11 +99,23 @@ export function TenantMenusPage() {
   return <main className="space-y-5 p-6">
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户菜单"} /></h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的目录、页面和操作元数据。此处不会修改系统内置导航或角色菜单授权。"} /></p></div><button className={primary} onClick={() => { setError(''); setDraft(emptyDraft()) }}><LocalizedText text={"创建菜单"} /></button></header>
     {error && <ErrorBox message={error} />}
-    {draft && <MenuEditor draft={draft} menus={allMenus} pending={save.isPending} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => save.mutate(draft)} />}
+    {draft && <MenuEditor draft={draft} menus={allMenus} pending={save.isPending} error={error} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => save.mutate(draft)} />}
     <section className={`${panel} space-y-4`}>
       <div><h2 className="font-semibold"><LocalizedText text={"菜单树"} /></h2><p className="text-sm text-muted-foreground"><LocalizedText text={"同级菜单可用上移/下移调整顺序。已停用项会保留在树中并标明状态。"} /></p></div>
-      {tree.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载菜单…"} /></p> : tree.isError ? <ErrorBox message={errorText(tree.error)} /> : menus.length ? <div className="space-y-2">{menus.map((menu, index) => <MenuTreeNode key={menu.menu_id} menu={menu} siblings={menus} index={index} depth={0} pending={reorder.isPending || toggle.isPending || remove.isPending} onEdit={(value) => { setError(''); setDraft(toDraft(value)) }} onMove={moveSibling} onToggle={(value) => toggle.mutate({ menuId: value.menu_id, status: value.status === '0' ? '1' : '0' })} onDelete={(value) => { if (window.confirm(formatMessage('删除菜单“{name}”？有子菜单时服务端会拒绝删除。', { name: value.menu_name }))) remove.mutate(value.menu_id) }} />)}</div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无菜单"} /></p>}
+      {tree.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载菜单…"} /></p> : tree.isError ? <ErrorBox message={errorText(tree.error)} /> : menus.length ? <div className="space-y-2">{menus.map((menu, index) => <MenuTreeNode key={menu.menu_id} menu={menu} siblings={menus} index={index} depth={0} pending={reorder.isPending || toggle.isPending || remove.isPending} onEdit={(value) => { setError(''); setDraft(toDraft(value)) }} onMove={moveSibling} onToggle={(value) => toggle.mutate({ menuId: value.menu_id, status: value.status === '0' ? '1' : '0' })} onDelete={setRemoveTarget} />)}</div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无菜单"} /></p>}
     </section>
+    <ConfirmDialog
+      open={Boolean(removeTarget)}
+      onOpenChange={(open) => { if (!open && !remove.isPending) setRemoveTarget(null) }}
+      title="删除菜单"
+      desc="有子菜单时服务端会拒绝删除。删除后不能恢复。"
+      confirmText="确认删除"
+      destructive
+      isLoading={remove.isPending}
+      handleConfirm={() => { if (removeTarget) remove.mutate(removeTarget.menu_id) }}
+    >
+      {removeTarget && <p className='text-sm font-medium'>{removeTarget.menu_name}</p>}
+    </ConfirmDialog>
   </main>
 }
 
@@ -128,10 +141,11 @@ function MenuTreeNode({ menu, siblings, index, depth, pending, onEdit, onMove, o
   </div>
 }
 
-function MenuEditor({ draft, menus, pending, onChange, onCancel, onSave }: {
+function MenuEditor({ draft, menus, pending, error, onChange, onCancel, onSave }: {
   draft: MenuDraft
   menus: Menu[]
   pending: boolean
+  error: string
   onChange: (next: MenuDraft) => void
   onCancel: () => void
   onSave: () => void
@@ -143,8 +157,19 @@ function MenuEditor({ draft, menus, pending, onChange, onCancel, onSave }: {
     visit(draft.menu_id)
   }
   const parentOptions = menus.filter((menu) => menu.menu_id !== draft.menu_id && !descendants.has(menu.menu_id))
-  return <form className={`${panel} space-y-4`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
-    <h2 className="font-semibold">{draft.menu_id ? <LocalizedText text={"编辑菜单"} /> : <LocalizedText text={"创建菜单"} />}</h2>
+  return <FormDialog
+    open
+    onOpenChange={(open) => { if (!open) onCancel() }}
+    title={draft.menu_id ? <LocalizedText text={"编辑菜单"} /> : <LocalizedText text={"创建菜单"} />}
+    formAriaLabel={draft.menu_id ? '编辑菜单' : '创建菜单'}
+    description="配置菜单层级、路由元数据、权限标识和展示状态。"
+    error={error}
+    submitLabel={draft.menu_id ? <LocalizedText text={"保存菜单"} /> : <LocalizedText text={"创建菜单"} />}
+    pending={pending}
+    disabled={!draft.menu_name.trim()}
+    onSubmit={onSave}
+    onCancel={onCancel}
+  >
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <label className="space-y-1 text-sm"><span><LocalizedText text={"名称"} /></span><Input autoFocus required maxLength={50} className={input} value={draft.menu_name} onChange={(event) => set('menu_name', event.target.value)} /></label>
       <label className="space-y-1 text-sm"><span><LocalizedText text={"父级菜单"} /></span><LocalizedNativeSelect className={input} value={draft.parent_id ?? ''} onChange={(event) => set('parent_id', event.target.value || null)}><option value=""><LocalizedText text={"顶级菜单"} /></option>{parentOptions.map((menu) => <option key={menu.menu_id} value={menu.menu_id}>{menu.menu_name}</option>)}</LocalizedNativeSelect></label>
@@ -161,8 +186,7 @@ function MenuEditor({ draft, menus, pending, onChange, onCancel, onSave }: {
       <label className="space-y-1 text-sm"><span><LocalizedText text={"缓存"} /></span><LocalizedNativeSelect className={input} value={draft.is_cache} onChange={(event) => set('is_cache', Number(event.target.value) as 0 | 1)}><option value={0}><LocalizedText text={"允许缓存"} /></option><option value={1}><LocalizedText text={"不缓存"} /></option></LocalizedNativeSelect></label>
     </div>
     <label className="block space-y-1 text-sm"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={2} className="w-full rounded-md border bg-background p-3" value={draft.remark ?? ''} onChange={(event) => set('remark', event.target.value || null)} /></label>
-    <div className="flex gap-2"><button className={primary} disabled={pending || !draft.menu_name.trim()}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存菜单"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
-  </form>
+  </FormDialog>
 }
 
 function emptyDraft(): MenuDraft {

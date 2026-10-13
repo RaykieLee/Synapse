@@ -564,9 +564,19 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
       form.getByLabelText('新 API key', { exact: true }),
       'fixture-workspace-private-key'
     )
+    await userEvent.click(
+      form.getByRole('button', { name: '取消', exact: true })
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: '添加模型', exact: true })
+    )
+    const modelForm = screen.getByRole('form', { name: '添加模型' })
     await userEvent.fill(
-      screen.getByRole('form', { name: '添加模型' }).getByLabelText('显示名称'),
+      modelForm.getByLabelText('显示名称'),
       'Workspace 11 draft'
+    )
+    await userEvent.click(
+      modelForm.getByRole('button', { name: '取消', exact: true })
     )
     await router.navigate({
       to: '/w/$workspaceId/models',
@@ -582,6 +592,9 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
       .element(screen.getByText('Company chat', { exact: true }))
       .not.toBeInTheDocument()
     await expect.element(form).not.toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: '添加凭据', exact: true })
+    )
     await expect
       .element(
         screen
@@ -597,11 +610,13 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
       .element(screen.getByText('Gateway credential', { exact: true }))
       .toBeInTheDocument()
     await expect.element(form).not.toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: '添加模型', exact: true })
+    )
+    const reopenedModelForm = screen.getByRole('form', { name: '添加模型' })
     await expect
       .element(
-        screen
-          .getByRole('form', { name: '添加模型' })
-          .getByLabelText('显示名称')
+        reopenedModelForm.getByLabelText('显示名称')
       )
       .toHaveValue('')
   })
@@ -624,6 +639,9 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
     await expect
       .element(screen.getByText('当前账号在此空间还没有凭据。'))
       .toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: '添加凭据', exact: true })
+    )
     release()
     await expect
       .poll(
@@ -666,6 +684,12 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
       section.getByRole('button', { name: '重试', exact: true })
     )
     await expect
+      .element(screen.getByRole('button', { name: '添加凭据', exact: true }))
+      .toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: '添加凭据', exact: true })
+    )
+    await expect
       .element(screen.getByRole('form', { name: '添加凭据' }))
       .toBeInTheDocument()
     await expect.element(section.getByRole('alert')).not.toBeInTheDocument()
@@ -691,6 +715,9 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
       })
       const { screen, router, queryClient } = await renderPage()
       if (action === 'create') {
+        await userEvent.click(
+          screen.getByRole('button', { name: '添加凭据', exact: true })
+        )
         const form = screen.getByRole('form', { name: '添加凭据' })
         await userEvent.fill(
           form.getByLabelText('名称', { exact: true }),
@@ -746,6 +773,12 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
       await expect
         .element(screen.getByRole('form', { name: '编辑凭据' }))
         .not.toBeInTheDocument()
+      await expect
+        .element(screen.getByRole('button', { name: '添加凭据', exact: true }))
+        .toBeInTheDocument()
+      await userEvent.click(
+        screen.getByRole('button', { name: '添加凭据', exact: true })
+      )
       const nextForm = screen.getByRole('form', { name: '添加凭据' })
       await expect
         .element(nextForm.getByLabelText('API key', { exact: true }))
@@ -802,12 +835,8 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
         authorization: 'Bearer fixture-actor-1',
       })
       await expect
-        .element(
-          screen
-            .getByRole('form', { name: '添加模型' })
-            .getByLabelText('凭据', { exact: true })
-        )
-        .toHaveValue('')
+        .element(screen.getByRole('button', { name: '添加模型', exact: true }))
+        .not.toBeInTheDocument()
     }
   )
 
@@ -826,14 +855,6 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
       .element(form.getByRole('alert'))
       .toHaveTextContent('提交内容无效，请检查字段后重试。')
     setLocale('en')
-    await expect
-      .element(
-        screen.getByRole('heading', {
-          name: 'Models and credentials',
-          exact: true,
-        })
-      )
-      .toBeInTheDocument()
     const englishForm = screen.getByRole('form', { name: 'Edit credential' })
     await expect
       .element(englishForm.getByRole('alert'))
@@ -847,6 +868,14 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
     await userEvent.click(
       englishForm.getByRole('button', { name: 'Cancel', exact: true })
     )
+    await expect
+      .element(
+        screen.getByRole('heading', {
+          name: 'Models and credentials',
+          exact: true,
+        })
+      )
+      .toBeInTheDocument()
     await userEvent.click(
       screen.getByRole('button', { name: 'Delete credential', exact: true })
     )

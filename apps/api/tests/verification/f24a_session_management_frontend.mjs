@@ -16,7 +16,17 @@ const page = await context.newPage()
 page.setDefaultTimeout(15000)
 page.on('pageerror', (error) => console.error('Browser page error:', error.message))
 const sessionsPath = (workspace) => `${seed.web}/w/${workspace}/sessions`
+const closeSessionDetails = async () => {
+  const details = page
+    .locator('[data-slot="dialog-content"]')
+    .filter({ hasText: '会话信息' })
+  if (await details.count()) {
+    await details.locator('[data-slot="dialog-close"]').click()
+    await details.waitFor({ state: 'detached' })
+  }
+}
 const chooseWorkspace = async (name) => {
+  await closeSessionDetails()
   await page.getByRole('button', { name: '选择工作区' }).click()
   await page.getByPlaceholder('搜索空间或租户…').fill(name)
   await page.getByRole('option').filter({ hasText: name }).click()
@@ -61,6 +71,7 @@ try {
   assert.equal(foreign.status, 404, foreign.text)
 
   // Team-origin sessions remain view-only in the UI.
+  await closeSessionDetails()
   await page.getByRole('button', { name: /F24a Team Read Only Session/ }).click()
   await page.getByRole('heading', { name: 'F24a Team Read Only Session', exact: true }).waitFor()
   await page.getByText('此会话由系统流程或团队创建，仅可查看', { exact: false }).waitFor()
@@ -68,6 +79,7 @@ try {
   assert.equal(await page.getByRole('button', { name: '删除', exact: true }).count(), 0)
 
   // A genuine Redis session lock drives the API's running state and disables edits.
+  await closeSessionDetails()
   await page.getByRole('button', { name: /F24a Running Session/ }).click()
   await page.getByRole('heading', { name: 'F24a Running Session', exact: true }).waitFor()
   await page.locator('dd').filter({ hasText: '运行中' }).waitFor()
@@ -75,8 +87,10 @@ try {
   assert.equal(await page.getByRole('button', { name: '删除', exact: true }).isDisabled(), true)
 
   // The scope key and keyed page discard an unsaved dialog and session selection.
+  await closeSessionDetails()
   await page.getByRole('button', { name: /F24a Alpha Renamed/ }).click()
   await page.getByRole('heading', { name: 'F24a Alpha Renamed', exact: true }).waitFor()
+  await closeSessionDetails()
   await page.getByRole('button', { name: '新建会话', exact: true }).click()
   await page.getByLabel('会话名称').fill('Unsaved Alpha Session Draft')
   // Use the workspace route while the modal is open (the modal intentionally
@@ -110,9 +124,9 @@ try {
   await page.getByLabel('智能体').selectOption(seed.alpha_agent_id)
   await page.getByRole('button', { name: /F24a Alpha Renamed/ }).click()
   await page.getByRole('heading', { name: 'F24a Alpha Renamed', exact: true }).waitFor()
-  page.once('dialog', (dialog) => dialog.accept())
   const deletedRow = page.getByRole('button', { name: /F24a Alpha Renamed/ })
   await page.getByRole('button', { name: '删除', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   await deletedRow.waitFor({ state: 'detached' })
   const afterDelete = JSON.parse((await fetchApi(`/api/v1/ai/sessions/?agent_id=${encodeURIComponent(seed.alpha_agent_id)}`, seed.alpha_one)).text).sessions
   assert.ok(!afterDelete.some((row) => row.session.id === alphaSessionId), 'manual session is removed from backend listing')

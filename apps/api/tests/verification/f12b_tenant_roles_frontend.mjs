@@ -35,7 +35,7 @@ try {
   assert.equal(await page.getByText('Beta only sentinel').count(), 0, 'Tenant A excludes Tenant B role')
   await page.goto(`${seed.web}/tenants/${seed.tenant_b_id}`)
   await page.getByRole('heading', { name: 'F12b Tenant B' }).waitFor()
-  await page.getByRole('link', { name: '角色管理' }).click()
+  await page.getByRole('main').getByRole('link', { name: '角色管理' }).first().click()
   await page.getByRole('heading', { name: '租户角色' }).waitFor()
   await page.getByText('Beta only sentinel').waitFor()
   assert.equal(await page.getByText('Alpha only sentinel').count(), 0, 'Tenant B excludes cached Tenant A role')
@@ -45,8 +45,13 @@ try {
 
   // Search and server pagination use the API query parameters.
   const search = page.getByPlaceholder('搜索角色名称或标识')
+  const searchResponse = page.waitForResponse((response) =>
+    response.url().includes(`/tenants/${seed.tenant_a_id}/roles`) &&
+    response.url().includes('search=Needle+search+target'),
+  )
   await search.fill('Needle search target')
-  await page.getByText('Needle search target').waitFor()
+  await searchResponse
+  await page.locator('tbody tr').filter({ hasText: 'Needle search target' }).waitFor()
   assert.equal(await page.locator('tbody tr').count(), 1)
   await search.fill('')
   await page.getByText('Alpha only sentinel').waitFor()
@@ -59,12 +64,12 @@ try {
 
   // Create form serializes exactly the supported permission allowlist, with no global/workspace actions.
   await page.getByRole('button', { name: '创建角色' }).click()
-  const editor = page.locator('form')
+  const editor = page.getByRole('dialog', { name: '创建角色' }).getByRole('form', { name: '创建角色' })
   await editor.getByLabel('角色名称').fill('UI verification role')
   await editor.getByLabel('角色标识').fill('ui_verification_role')
-  await page.getByRole('checkbox').nth(0).check()
-  await page.getByRole('checkbox').nth(3).check()
-  await editor.getByRole('button', { name: '保存角色' }).click()
+  await editor.getByRole('checkbox').nth(0).check()
+  await editor.getByRole('checkbox').nth(3).check()
+  await editor.getByRole('button', { name: '创建角色' }).click()
   const createdRow = page.locator('tr').filter({ hasText: 'UI verification role' })
   await createdRow.waitFor()
   const createRequest = requests.find((request) => request.method === 'POST' && request.url.endsWith(`/tenants/${seed.tenant_a_id}/roles`))
@@ -75,7 +80,7 @@ try {
 
   // Edit and status changes round-trip to PATCH; enabled/disabled filters reflect server state.
   await createdRow.getByRole('button', { name: '编辑' }).click()
-  const editForm = page.locator('form')
+  const editForm = page.getByRole('dialog', { name: '编辑角色' }).getByRole('form', { name: '编辑角色' })
   await editForm.getByLabel('角色名称').fill('UI verification role edited')
   await editForm.getByLabel('角色标识').fill('ui_verification_role_edited')
   await editForm.getByRole('button', { name: '保存角色' }).click()
@@ -84,6 +89,7 @@ try {
   const patchRequest = requests.find((request) => request.method === 'PATCH' && request.url.includes(`/tenants/${seed.tenant_a_id}/roles/`))
   assert.ok(patchRequest && patchRequest.body.role_key === 'ui_verification_role_edited')
   await editedRow.getByRole('button', { name: '停用' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认停用' }).click()
   await page.getByLabel('角色状态筛选').selectOption('disabled')
   const disabledRow = page.locator('tr').filter({ hasText: 'UI verification role edited' })
   await disabledRow.waitFor()
@@ -97,16 +103,17 @@ try {
 
   // Server conflict is shown to the user instead of silently dropping the mutation error.
   await page.getByRole('button', { name: '创建角色' }).click()
-  const duplicateForm = page.locator('form')
+  const duplicateForm = page.getByRole('dialog', { name: '创建角色' }).getByRole('form', { name: '创建角色' })
   await duplicateForm.getByLabel('角色名称').fill('Different name')
   await duplicateForm.getByLabel('角色标识').fill('ui_verification_role_edited')
-  await duplicateForm.getByRole('button', { name: '保存角色' }).click()
+  await duplicateForm.getByRole('button', { name: '创建角色' }).click()
   await page.getByRole('alert').getByText('当前租户已有相同角色名称或标识。').waitFor()
+  await duplicateForm.getByRole('button', { name: '取消' }).click()
 
   // Soft delete is confirmed, sent as DELETE, and removes the row from subsequent API-backed rendering.
   const finalRow = page.locator('tr').filter({ hasText: 'UI verification role edited' })
-  page.once('dialog', (dialog) => dialog.accept())
   await finalRow.getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认软删除' }).click()
   await finalRow.waitFor({ state: 'detached' })
   assert.ok(requests.some((request) => request.method === 'DELETE' && request.url.includes(`/tenants/${seed.tenant_a_id}/roles/`)))
 

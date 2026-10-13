@@ -55,7 +55,7 @@ const defaultValues: Partial<DisplayFormValues> = {
   items: ['recents', 'home'],
 }
 
-export function DisplayForm() {
+export function DisplayForm({ onSaved }: { onSaved?: () => void }) {
   const form = useForm<DisplayFormValues>({
     resolver: zodResolver(displayFormSchema),
     defaultValues,
@@ -64,7 +64,7 @@ export function DisplayForm() {
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((data) => showSubmittedData(data))}
+        onSubmit={form.handleSubmit((data) => { showSubmittedData(data); onSaved?.() })}
         className='space-y-8'
       >
         <FormField

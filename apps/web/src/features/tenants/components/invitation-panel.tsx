@@ -12,6 +12,16 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DetailDialog } from '@/components/detail-dialog'
+import { FormDialog } from '@/components/form-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -61,6 +71,8 @@ export function InvitationPanel({
 }) {
   const [role, setRole] = useState<'admin' | 'member'>('member')
   const [target, setTarget] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+  const [dismissedInvitationId, setDismissedInvitationId] = useState('')
   const [copyMessage, setCopyMessage] = useState('')
   const [revokeTarget, setRevokeTarget] = useState<TenantInvitation | null>(
     null
@@ -68,18 +80,33 @@ export function InvitationPanel({
 
   return (
     <div className='space-y-4'>
-      <form
-        className='grid gap-3 rounded-lg border bg-muted/20 p-4 lg:grid-cols-[minmax(0,1fr)_180px_auto]'
-        onSubmit={(event) => {
-          event.preventDefault()
+      <div className='flex flex-wrap justify-end'>
+        <Button onClick={() => setCreateOpen(true)} disabled={pending}>
+          <Link2 className='size-4' /> <LocalizedText text={" 创建邀请\n          "} />
+        </Button>
+      </div>
+      <FormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        title={<LocalizedText text={'创建租户邀请'} />}
+        formAriaLabel='创建租户邀请'
+        description='向指定邮箱生成租户邀请链接；对方接受后会成为租户成员。'
+        submitLabel={<LocalizedText text={'创建邀请'} />}
+        pending={pending}
+        disabled={!target.trim()}
+        onSubmit={() => {
           const value = target.trim()
           if (!value) return
+          setCopyMessage('')
           onCreate({ email: value, tenant_role: canInviteAdmin ? role : 'member' })
+          setCreateOpen(false)
+          setTarget('')
         }}
+        onCancel={() => setCreateOpen(false)}
       >
-        <div className='space-y-2'>
-          <Label htmlFor='invite-target'><LocalizedText text={"成员邮箱"} /></Label>
-          <div>
+        <div className='grid gap-3 sm:grid-cols-2'>
+          <div className='space-y-2'>
+            <Label htmlFor='invite-target'><LocalizedText text={'成员邮箱'} /></Label>
             <Input
               id='invite-target'
               required
@@ -89,51 +116,63 @@ export function InvitationPanel({
               placeholder='name@example.com'
             />
           </div>
-        </div>
-        <div className='space-y-2'>
-          <Label htmlFor='invite-role'><LocalizedText text={"租户角色"} /></Label>
-          <Select
-            value={canInviteAdmin ? role : 'member'}
-            onValueChange={(value) => setRole(value as 'admin' | 'member')}
-          >
-            <SelectTrigger id='invite-role' className='w-full'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value='member'><LocalizedText text={"成员"} /></SelectItem>
-              {canInviteAdmin && <SelectItem value='admin'><LocalizedText text={"管理员"} /></SelectItem>}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className='flex items-end'>
-          <Button type='submit' className='w-full lg:w-auto' disabled={pending}>
-            <Link2 className='size-4' /> <LocalizedText text={" 创建邀请\n          "} /></Button>
-        </div>
-      </form>
-
-      {created ? (
-        <div className='rounded-lg border border-primary/30 bg-primary/5 p-4'>
-          <p className='text-sm font-medium'><LocalizedText text={"邀请链接已创建"} /></p>
-          <p className='mt-1 text-xs break-all text-muted-foreground'>
-            {absoluteInviteLink(created.invite_link)}
-          </p>
-          <div className='mt-3 flex flex-wrap items-center gap-3'>
-            <Button
-              size='sm'
-              variant='outline'
-              onClick={() => {
-                void copyInviteLink(created.invite_link)
-                  .then(() => setCopyMessage('已复制邀请链接'))
-                  .catch(() => setCopyMessage('复制失败，请手动复制'))
-              }}
+          <div className='space-y-2'>
+            <Label htmlFor='invite-role'><LocalizedText text={'租户角色'} /></Label>
+            <Select
+              value={canInviteAdmin ? role : 'member'}
+              onValueChange={(value) => setRole(value as 'admin' | 'member')}
             >
-              <Copy className='size-4' /> <LocalizedText text={" 复制链接\n            "} /></Button>
-            <span role='status' className='text-xs text-muted-foreground'>
-              {copyMessage}
-            </span>
+              <SelectTrigger id='invite-role' className='w-full'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='member'><LocalizedText text={'成员'} /></SelectItem>
+                {canInviteAdmin && <SelectItem value='admin'><LocalizedText text={'管理员'} /></SelectItem>}
+              </SelectContent>
+            </Select>
           </div>
         </div>
-      ) : null}
+      </FormDialog>
+
+      <Dialog
+        open={Boolean(created) && created?.invitation_id !== dismissedInvitationId}
+        onOpenChange={(open) => {
+          if (!open && created) setDismissedInvitationId(created.invitation_id)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle><LocalizedText text='邀请链接已创建' /></DialogTitle>
+            <DialogDescription>
+              <LocalizedText text='请复制链接并发送给收件人；对方接受后会成为租户成员。' />
+            </DialogDescription>
+          </DialogHeader>
+          {created && (
+            <div className='space-y-4'>
+              <p className='break-all rounded-md border bg-muted/30 p-3 text-sm'>
+                {absoluteInviteLink(created.invite_link)}
+              </p>
+              <DialogFooter className='sm:justify-between'>
+                <span role='status' className='text-xs text-muted-foreground'>
+                  {copyMessage}
+                </span>
+                <Button
+                  size='sm'
+                  variant='outline'
+                  onClick={() => {
+                    void copyInviteLink(created.invite_link)
+                      .then(() => setCopyMessage('已复制邀请链接'))
+                      .catch(() => setCopyMessage('复制失败，请手动复制'))
+                  }}
+                >
+                  <Copy className='size-4' />
+                  <LocalizedText text='复制链接' />
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className='overflow-hidden rounded-lg border'>
         <Table>
@@ -158,10 +197,14 @@ export function InvitationPanel({
                 <TableRow key={invitation.invitation_id}>
                   <TableCell className='ps-4'>
                     {invitation.email || (
-                      <details className='text-sm'>
-                        <summary className='cursor-pointer'><LocalizedText text={"已有账号邀请"} /></summary>
-                        <code className='text-xs text-muted-foreground'>账号 ID {invitation.target_user_id}</code>
-                      </details>
+                      <DetailDialog
+                        trigger={<LocalizedText text={"已有账号邀请"} />}
+                        title={<LocalizedText text={"已有账号邀请"} />}
+                        description={invitation.invitation_id}
+                        triggerClassName='h-auto px-0 text-sm underline'
+                      >
+                        <p className='text-sm'><LocalizedText text={"账号 ID："} /><code className='break-all'>{invitation.target_user_id}</code></p>
+                      </DetailDialog>
                     )}
                   </TableCell>
                   <TableCell>

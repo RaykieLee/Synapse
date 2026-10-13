@@ -40,6 +40,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { FormDialog } from '@/components/form-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LocalizedText } from '@/components/localized-text'
@@ -115,6 +116,8 @@ function WorkspaceModelsContent({
   const [credentialError, setCredentialError] = React.useState('')
   const [modelError, setModelError] = React.useState('')
   const [notice, setNotice] = React.useState('')
+  const [credentialOpen, setCredentialOpen] = React.useState(false)
+  const [modelOpen, setModelOpen] = React.useState(false)
   const credentialSelectId = React.useId()
   const firstProvider = providers.isSuccess ? providers.data[0] : undefined
   const credentialsReady = credentials.isSuccess
@@ -157,6 +160,7 @@ function WorkspaceModelsContent({
     },
     onSuccess: async (created) => {
       setCredential(emptyCredential)
+      setCredentialOpen(false)
       if (canManage)
         setModel((current) => ({
           ...current,
@@ -181,6 +185,7 @@ function WorkspaceModelsContent({
     },
     onSuccess: async () => {
       setModel(emptyModel)
+      setModelOpen(false)
       await refreshResources('模型已添加。')
     },
     onError: (cause) => setModelError(errorText(cause)),
@@ -309,23 +314,39 @@ function WorkspaceModelsContent({
               </>
             )}
             {canCreateCredential && firstProvider && credentialsReady && (
-              <form
-                aria-label={t('添加凭据')}
-                className='space-y-3 rounded-lg border p-4'
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  if (
-                    credentialMutation.isPending ||
-                    !credential.name.trim() ||
-                    !credential.api_key.trim() ||
-                    !credential.base_url.trim()
-                  )
-                    return
-                  setCredentialError('')
-                  setNotice('')
-                  credentialMutation.mutate()
-                }}
-              >
+              <Button onClick={() => setCredentialOpen(true)}>
+                <Plus aria-hidden='true' className='mr-2 size-4' />
+                <LocalizedText text='添加凭据' />
+              </Button>
+            )}
+            <FormDialog
+              open={credentialOpen}
+              onOpenChange={(open) => {
+                setCredentialOpen(open)
+                if (!open) setCredentialError('')
+              }}
+              title={<LocalizedText text='添加凭据' />}
+              formAriaLabel='添加凭据'
+              description={
+                <LocalizedText text='凭据只属于当前账号；API key 仅提交时发送，保存后不会回显。' />
+              }
+              submitLabel={<LocalizedText text='添加凭据' />}
+              pending={credentialMutation.isPending}
+              disabled={
+                !credential.name.trim() ||
+                !credential.api_key.trim() ||
+                !credential.base_url.trim()
+              }
+              onSubmit={() => {
+                setCredentialError('')
+                setNotice('')
+                credentialMutation.mutate()
+              }}
+              onCancel={() => {
+                setCredentialOpen(false)
+                setCredentialError('')
+              }}
+            >
                 {credentialError && (
                   <p role='alert' className='text-sm text-destructive'>
                     <LocalizedText text={credentialError} />
@@ -333,7 +354,7 @@ function WorkspaceModelsContent({
                 )}
                 <fieldset
                   disabled={credentialMutation.isPending}
-                  className='grid gap-3 md:grid-cols-4'
+                  className='grid gap-3 md:grid-cols-3'
                 >
                   <legend className='sr-only'>
                     <LocalizedText text='添加凭据' />
@@ -370,34 +391,8 @@ function WorkspaceModelsContent({
                     required
                     maxLength={4096}
                   />
-                  <div className='flex items-end'>
-                    <Button
-                      type='submit'
-                      disabled={
-                        credentialMutation.isPending ||
-                        !credential.name.trim() ||
-                        !credential.api_key.trim() ||
-                        !credential.base_url.trim()
-                      }
-                    >
-                      {credentialMutation.isPending ? (
-                        <Loader2
-                          aria-hidden='true'
-                          className='mr-2 size-4 animate-spin'
-                        />
-                      ) : (
-                        <Plus aria-hidden='true' className='mr-2 size-4' />
-                      )}
-                      <LocalizedText
-                        text={
-                          credentialMutation.isPending ? '保存中…' : '添加凭据'
-                        }
-                      />
-                    </Button>
-                  </div>
                 </fieldset>
-              </form>
-            )}
+            </FormDialog>
           </section>
           <section
             aria-label={t('Workspace 模型')}
@@ -469,23 +464,39 @@ function WorkspaceModelsContent({
               firstProvider &&
               credentialsReady &&
               models.isSuccess && (
-                <form
-                  aria-label={t('添加模型')}
-                  className='space-y-3 rounded-lg border p-4'
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    if (
-                      modelMutation.isPending ||
-                      !model.display_name.trim() ||
-                      !model.model.trim() ||
-                      !selectedCredential
-                    )
-                      return
-                    setModelError('')
-                    setNotice('')
-                    modelMutation.mutate()
-                  }}
-                >
+                <Button onClick={() => setModelOpen(true)}>
+                  <Plus aria-hidden='true' className='mr-2 size-4' />
+                  <LocalizedText text='添加模型' />
+                </Button>
+              )}
+            <FormDialog
+              open={modelOpen}
+              onOpenChange={(open) => {
+                setModelOpen(open)
+                if (!open) setModelError('')
+              }}
+              title={<LocalizedText text='添加模型' />}
+              formAriaLabel='添加模型'
+              description={
+                <LocalizedText text='模型定义共享给 Workspace；执行时使用你自己的凭据。' />
+              }
+              submitLabel={<LocalizedText text='添加模型' />}
+              pending={modelMutation.isPending}
+              disabled={
+                !model.display_name.trim() ||
+                !model.model.trim() ||
+                !selectedCredential
+              }
+              onSubmit={() => {
+                setModelError('')
+                setNotice('')
+                modelMutation.mutate()
+              }}
+              onCancel={() => {
+                setModelOpen(false)
+                setModelError('')
+              }}
+            >
                   {modelError && (
                     <p role='alert' className='text-sm text-destructive'>
                       <LocalizedText text={modelError} />
@@ -500,7 +511,7 @@ function WorkspaceModelsContent({
                     disabled={
                       modelMutation.isPending || !availableCredentials.length
                     }
-                    className='grid gap-3 md:grid-cols-4'
+                    className='grid gap-3 md:grid-cols-3'
                   >
                     <legend className='sr-only'>
                       <LocalizedText text='添加模型' />
@@ -552,34 +563,8 @@ function WorkspaceModelsContent({
                         ))}
                       </select>
                     </div>
-                    <div className='flex items-end'>
-                      <Button
-                        type='submit'
-                        disabled={
-                          modelMutation.isPending ||
-                          !model.display_name.trim() ||
-                          !model.model.trim() ||
-                          !selectedCredential
-                        }
-                      >
-                        {modelMutation.isPending ? (
-                          <Loader2
-                            aria-hidden='true'
-                            className='mr-2 size-4 animate-spin'
-                          />
-                        ) : (
-                          <Plus aria-hidden='true' className='mr-2 size-4' />
-                        )}
-                        <LocalizedText
-                          text={
-                            modelMutation.isPending ? '保存中…' : '添加模型'
-                          }
-                        />
-                      </Button>
-                    </div>
                   </fieldset>
-                </form>
-              )}
+            </FormDialog>
           </section>
         </>
       )}
@@ -686,7 +671,6 @@ function CredentialRow({
   onUpdated: () => Promise<unknown>
   onDeleted: () => Promise<unknown>
 }) {
-  const t = useLocaleText()
   const [editing, setEditing] = React.useState(false)
   const [draft, setDraft] = React.useState({
     name: item.name,
@@ -774,19 +758,23 @@ function CredentialRow({
         </p>
       )}
       {editing && canEdit && (
-        <form
-          aria-label={t('编辑凭据')}
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (!dirty || !draft.name.trim() || update.isPending) return
+        <FormDialog
+          open
+          onOpenChange={(open) => { if (!open) closeEditor() }}
+          title={<LocalizedText text='编辑凭据' />}
+          formAriaLabel='编辑凭据'
+          description={
+            <LocalizedText text='原密钥和完整地址不会回显。留空表示保留；填写新 API key 会替换原密钥。' />
+          }
+          submitLabel={<LocalizedText text='保存凭据' />}
+          pending={update.isPending}
+          disabled={!dirty || !draft.name.trim()}
+          onSubmit={() => {
             setError('')
             update.mutate()
           }}
-          className='space-y-3'
+          onCancel={closeEditor}
         >
-          <p className='text-xs text-muted-foreground'>
-            <LocalizedText text='原密钥和完整地址不会回显。留空表示保留；填写新 API key 会替换原密钥。' />
-          </p>
           {error && (
             <p role='alert' className='text-sm text-destructive'>
               <LocalizedText text={error} />
@@ -829,29 +817,7 @@ function CredentialRow({
               maxLength={4096}
             />
           </fieldset>
-          <div className='flex flex-wrap gap-2'>
-            <Button
-              type='submit'
-              disabled={update.isPending || !dirty || !draft.name.trim()}
-            >
-              {update.isPending && (
-                <Loader2
-                  aria-hidden='true'
-                  className='mr-2 size-4 animate-spin'
-                />
-              )}
-              <LocalizedText text={update.isPending ? '保存中…' : '保存凭据'} />
-            </Button>
-            <Button
-              type='button'
-              variant='outline'
-              disabled={update.isPending}
-              onClick={closeEditor}
-            >
-              <LocalizedText text='取消' />
-            </Button>
-          </div>
-        </form>
+        </FormDialog>
       )}
     </article>
   )

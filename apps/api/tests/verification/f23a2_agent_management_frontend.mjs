@@ -23,8 +23,25 @@ const createAgent = async (name, prompt) => {
   await page.getByRole('button', { name: '创建智能体', exact: true }).click()
   await page.getByRole('heading', { name, exact: true }).waitFor()
 }
+const closeAgentDetails = async () => {
+  const details = page
+    .locator('[data-slot="dialog-content"]')
+    .filter({ hasText: '智能体详情' })
+  if (await details.count()) {
+    await details.locator('[data-slot="dialog-close"]').click()
+    await details.waitFor({ state: 'detached' })
+  }
+}
 const chooseWorkspace = async (name) => {
-  await page.getByRole('button', { name: '选择工作区' }).click()
+  await closeAgentDetails()
+  const switcher = page.getByRole('button', { name: '选择工作区' })
+  try {
+    await switcher.click()
+  } catch (error) {
+    console.error(`Workspace switcher missing at ${page.url()}`)
+    console.error((await page.locator('body').innerText()).slice(0, 2500))
+    throw error
+  }
   await page.getByPlaceholder('搜索空间或租户…').fill(name)
   await page.getByRole('option').filter({ hasText: name }).click()
 }
@@ -53,9 +70,7 @@ try {
 
   // A direct foreign ID request is 404 even while the same actor belongs to
   // both tenants. Create its target in Beta first.
-  await page.getByRole('button', { name: '选择工作区' }).click()
-  await page.getByPlaceholder('搜索空间或租户…').fill('Beta One')
-  await page.getByRole('option').filter({ hasText: 'Beta One' }).click()
+  await chooseWorkspace('Beta One')
   await page.goto(agentsPath(seed.beta_one))
   await page.getByRole('heading', { name: '智能体', exact: true }).waitFor()
   await page.getByText('还没有智能体').waitFor()
@@ -84,6 +99,7 @@ try {
   await page.getByRole('button', { name: /F23a2 Alpha Agent Edited/ }).click()
   await page.getByRole('heading', { name: 'F23a2 Alpha Agent Edited', exact: true }).waitFor()
   assert.equal(await page.getByText('F23a2 Beta Agent', { exact: true }).count(), 0)
+  await closeAgentDetails()
   await page.getByRole('button', { name: '新建智能体', exact: true }).click()
   await page.getByLabel('名称').fill('Unsaved Alpha Draft')
   await page.getByRole('button', { name: '取消' }).click()
@@ -92,6 +108,7 @@ try {
   await page.getByRole('heading', { name: '智能体', exact: true }).waitFor()
   await page.getByRole('button', { name: /F23a2 Beta Agent/ }).click()
   await page.getByRole('heading', { name: 'F23a2 Beta Agent', exact: true }).waitFor()
+  await closeAgentDetails()
   await page.getByRole('button', { name: '新建智能体', exact: true }).click()
   assert.equal(await page.getByLabel('名称').inputValue(), '', 'new scope starts with a clean draft')
   await page.getByRole('button', { name: '取消' }).click()
@@ -115,8 +132,8 @@ try {
   await page.getByRole('heading', { name: '智能体', exact: true }).waitFor()
   await page.getByRole('button', { name: /F23a2 Alpha Agent Edited/ }).click()
   await page.getByRole('heading', { name: 'F23a2 Alpha Agent Edited', exact: true }).waitFor()
-  page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   await page.getByText('还没有智能体').waitFor()
   const afterDelete = await page.evaluate(async ({ workspace, token }) => {
     const response = await fetch('/api/v1/ai/agent/', { headers: { 'X-Workspace-ID': workspace, Authorization: `Bearer ${token}` } })

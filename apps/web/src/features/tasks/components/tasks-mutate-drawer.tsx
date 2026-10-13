@@ -14,14 +14,13 @@ import {
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { SelectDropdown } from '@/components/select-dropdown'
 import { type Task } from '../data/schema'
 import { LocalizedText } from '@/components/localized-text'
@@ -65,20 +64,20 @@ export function TasksMutateDrawer({
   }
 
   return (
-    <Sheet
+    <Dialog
       open={open}
       onOpenChange={(v) => {
         onOpenChange(v)
         form.reset()
       }}
     >
-      <SheetContent className='flex flex-col'>
-        <SheetHeader className='text-start'>
-          <SheetTitle>{isUpdate ? <LocalizedText text={"Update"} /> : <LocalizedText text={"Create"} />} <LocalizedText text={" Task"} /></SheetTitle>
-          <SheetDescription>
+      <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>
+        <DialogHeader className='text-start'>
+          <DialogTitle>{isUpdate ? <LocalizedText text={"Update"} /> : <LocalizedText text={"Create"} />} <LocalizedText text={" Task"} /></DialogTitle>
+          <DialogDescription>
             {isUpdate ? <LocalizedText text={"Update the task by providing necessary info."} /> : <LocalizedText text={"Add a new task by providing necessary info."} />}
-            <LocalizedText text={"\n            Click save when you&apos;re done.\n          "} /></SheetDescription>
-        </SheetHeader>
+            <LocalizedText text={"\n            Click save when you&apos;re done.\n          "} /></DialogDescription>
+        </DialogHeader>
         <Form {...form}>
           <form
             id='tasks-form'
@@ -195,14 +194,14 @@ export function TasksMutateDrawer({
             />
           </form>
         </Form>
-        <SheetFooter className='gap-2'>
-          <SheetClose asChild>
-            <Button variant='outline'><LocalizedText text={"Close"} /></Button>
-          </SheetClose>
+        <DialogFooter className='gap-2'>
+          <Button type='button' variant='outline' onClick={() => onOpenChange(false)}>
+            <LocalizedText text={"Close"} />
+          </Button>
           <Button form='tasks-form' type='submit'>
             <LocalizedText text={"\n            Save changes\n          "} /></Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

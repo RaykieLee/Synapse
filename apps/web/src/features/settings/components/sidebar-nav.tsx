@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react'
+import { type JSX } from 'react'
 import { useLocation, useNavigate, Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
@@ -23,17 +23,15 @@ type SidebarNavProps = React.HTMLAttributes<HTMLElement> & {
 export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const [val, setVal] = useState(pathname ?? '/settings')
 
   const handleSelect = (e: string) => {
-    setVal(e)
     navigate({ to: e })
   }
 
   return (
     <>
       <div className='p-1 md:hidden'>
-        <Select value={val} onValueChange={handleSelect}>
+        <Select value={pathname ?? '/settings'} onValueChange={handleSelect}>
           <SelectTrigger className='h-12 sm:w-48'>
             <SelectValue placeholder='Theme' />
           </SelectTrigger>

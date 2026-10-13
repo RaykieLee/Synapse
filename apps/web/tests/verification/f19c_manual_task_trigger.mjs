@@ -30,6 +30,19 @@ async function runTask(page, taskName, expectedText) {
   return row
 }
 
+async function closeRunDialogs(page, taskName) {
+  const detailDialog = page.getByRole('dialog', { name: '运行详情' })
+  if (await detailDialog.isVisible().catch(() => false)) {
+    await page.keyboard.press('Escape')
+    await detailDialog.waitFor({ state: 'hidden' })
+  }
+  const historyDialog = page.getByRole('dialog', { name: `执行记录：${taskName}` })
+  if (await historyDialog.isVisible().catch(() => false)) {
+    await page.keyboard.press('Escape')
+    await historyDialog.waitFor({ state: 'hidden' })
+  }
+}
+
 try {
   const owner = await login(process.env.OWNER_USER, tenantA)
   const { page } = owner
@@ -40,17 +53,23 @@ try {
   assert.equal(await disabledRow.getByRole('button', { name: '立即运行' }).isDisabled(), true)
 
   const successRow = await runTask(page, 'F19c Browser Success', '手工运行成功')
+  const successDetail = page.getByRole('dialog', { name: '运行详情' })
+  await successDetail.waitFor()
+  await successDetail.getByText('成功', { exact: true }).waitFor()
+  await page.keyboard.press('Escape')
+  await successDetail.waitFor({ state: 'hidden' })
   await page.getByRole('heading', { name: '执行记录：F19c Browser Success' }).waitFor()
   await page.getByText('共 1 条').waitFor()
-  await page.getByRole('button', { name: '关闭' }).click()
+  await closeRunDialogs(page, 'F19c Browser Success')
 
   await runTask(page, 'F19c Browser Failure', '手工运行失败')
   await page.getByText('INVALID_PARAMETERS', { exact: true }).waitFor()
   const failureText = await page.locator('[role="status"]').last().innerText()
   assert.equal(failureText.includes('F19C-BROWSER-SENSITIVE'), false)
-  await page.getByRole('button', { name: '关闭' }).click()
+  await closeRunDialogs(page, 'F19c Browser Failure')
 
   const leasedRow = page.locator('tr').filter({ hasText: 'F19c Browser Leased' })
+  await leasedRow.waitFor()
   await leasedRow.getByRole('button', { name: '立即运行' }).click()
   await page.getByRole('alertdialog').locator('button').last().click()
   await page.getByRole('alert').filter({ hasText: '该任务已有正在执行的计划运行' }).waitFor()
@@ -66,7 +85,7 @@ try {
   await page.getByRole('status').filter({ hasText: '手工运行成功' }).waitFor()
   assert.equal(doubleClickPosts, 1)
   page.off('request', countDoubleClickPosts)
-  await page.getByRole('button', { name: '关闭' }).click()
+  await closeRunDialogs(page, 'F19c Browser Double Click')
 
   await page.getByRole('button', { name: '创建任务' }).focus()
   await page.getByRole('button', { name: '立即运行' }).first().focus()

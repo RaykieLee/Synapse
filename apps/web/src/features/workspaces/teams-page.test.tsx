@@ -209,6 +209,10 @@ async function mountPage(): Promise<RenderResult> {
   )
 }
 
+async function openFirstTeam(screen: RenderResult) {
+  await userEvent.click(screen.getByRole('button', { name: /Fixture team/ }))
+}
+
 beforeEach(async () => {
   setLocale('zh-CN')
   sessionStorage.clear()
@@ -289,12 +293,31 @@ afterEach(async () => {
 })
 
 describe('F27b team control UI with fixture APIs', () => {
+  it('opens team details only after a team is selected', async () => {
+    const screen = await mountPage()
+
+    await expect
+      .element(page.getByRole('dialog'))
+      .not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /Fixture team/ }))
+    await expect
+      .element(page.getByRole('dialog'))
+      .toHaveTextContent('Fixture team description')
+
+    await userEvent.keyboard('{Escape}')
+    await expect
+      .element(page.getByRole('dialog'))
+      .not.toBeInTheDocument()
+  })
+
   it.each(['viewer', 'member'] as const)(
     '%s cannot mutate even when a run exposes can_interrupt',
     async (role) => {
       fixtureContext.workspace.workspace_role = role
       rememberRun()
       const screen = await mountPage()
+      await openFirstTeam(screen)
       await expect
         .element(screen.getByRole('status'))
         .toHaveTextContent('控制状态已保存')
@@ -334,6 +357,7 @@ describe('F27b team control UI with fixture APIs', () => {
       const pending = deferred<Response>()
       overrides.set(`POST ${base}/team-a/runs`, () => pending.promise)
       const screen = await mountPage()
+      await openFirstTeam(screen)
       await expect
         .element(screen.getByRole('button', { name: '启动团队运行' }))
         .toBeEnabled()
@@ -367,6 +391,7 @@ describe('F27b team control UI with fixture APIs', () => {
       await cleanup()
       queryClient.clear()
       const reopened = await mountPage()
+      await openFirstTeam(reopened)
       await expect
         .element(reopened.getByRole('status'))
         .toHaveTextContent('控制状态已保存')
@@ -382,6 +407,7 @@ describe('F27b team control UI with fixture APIs', () => {
     const pending = deferred<Response>()
     overrides.set(`POST ${runPath}/interrupt`, () => pending.promise)
     const screen = await mountPage()
+    await openFirstTeam(screen)
     const trigger = screen.getByRole('button', { name: '请求中断运行' })
     await expect.element(trigger).toBeEnabled()
     await userEvent.click(trigger)
@@ -441,6 +467,7 @@ describe('F27b team control UI with fixture APIs', () => {
       json({ code: 'SERVICE_UNAVAILABLE', detail: 'fixture unavailable' }, 503)
     )
     const screen = await mountPage()
+    await openFirstTeam(screen)
     await userEvent.click(screen.getByRole('button', { name: '请求中断运行' }))
     await userEvent.click(page.getByRole('button', { name: '确认中断请求' }))
     await expect
@@ -468,6 +495,7 @@ describe('F27b team control UI with fixture APIs', () => {
       .not.toBeInTheDocument()
     overrides.delete(`GET ${base}`)
     await userEvent.click(screen.getByRole('button', { name: '重新加载团队' }))
+    await userEvent.click(screen.getByRole('button', { name: /Fixture team/ }))
     await expect
       .element(screen.getByRole('button', { name: '启动团队运行' }))
       .toBeEnabled()
@@ -480,6 +508,9 @@ describe('F27b team control UI with fixture APIs', () => {
       json({ code: 'SERVICE_UNAVAILABLE' }, 503)
     )
     const screen = await mountPage()
+    await userEvent.click(
+      screen.getByRole('button', { name: '创建团队草稿', exact: true })
+    )
     await expect
       .element(screen.getByRole('button', { name: '创建草稿', exact: true }))
       .toBeDisabled()
@@ -490,6 +521,9 @@ describe('F27b team control UI with fixture APIs', () => {
     await userEvent.click(
       screen.getByRole('button', { name: '重新加载智能体' })
     )
+    await expect
+      .element(screen.getByRole('button', { name: '重新加载智能体' }))
+      .not.toBeInTheDocument()
     await userEvent.fill(
       screen.getByRole('textbox', { name: '团队名称' }),
       'New fixture team'
@@ -509,8 +543,8 @@ describe('F27b team control UI with fixture APIs', () => {
       screen.getByRole('button', { name: '创建草稿', exact: true })
     )
     await expect
-      .element(screen.getByRole('textbox', { name: '团队名称' }))
-      .toHaveValue('')
+      .element(page.getByRole('dialog'))
+      .toHaveTextContent('New fixture team')
     const request = mutations(base)[0]
     expect(request.body?.members).toEqual([
       { agent_id: 'agent-a', role: 'leader', is_leader: true },
@@ -530,6 +564,9 @@ describe('F27b team control UI with fixture APIs', () => {
       json({ code: 'CONFLICT', detail: 'Fixture duplicate name' }, 409)
     )
     const screen = await mountPage()
+    await userEvent.click(
+      screen.getByRole('button', { name: '创建团队草稿', exact: true })
+    )
     await userEvent.fill(
       screen.getByRole('textbox', { name: '团队名称' }),
       'Duplicate fixture name'
@@ -563,8 +600,8 @@ describe('F27b team control UI with fixture APIs', () => {
       screen.getByRole('button', { name: '创建草稿', exact: true })
     )
     await expect
-      .element(screen.getByRole('textbox', { name: '团队名称' }))
-      .toHaveValue('')
+      .element(page.getByRole('dialog'))
+      .toHaveTextContent('Unique fixture name')
     await expect.element(screen.getByRole('alert')).not.toBeInTheDocument()
     expect(mutations(base)).toHaveLength(2)
     expect(mutations(base)[1].body?.name).toBe('Unique fixture name')
@@ -575,6 +612,7 @@ describe('F27b team control UI with fixture APIs', () => {
       throw new TypeError('Fixture lost response after accepting run')
     })
     const screen = await mountPage()
+    await openFirstTeam(screen)
     await userEvent.click(screen.getByRole('button', { name: '启动团队运行' }))
     await expect
       .element(screen.getByRole('alert'))
@@ -596,6 +634,7 @@ describe('F27b team control UI with fixture APIs', () => {
       json({ code: 'SERVICE_UNAVAILABLE' }, 503)
     )
     const screen = await mountPage()
+    await openFirstTeam(screen)
     await userEvent.click(screen.getByRole('button', { name: '启动团队运行' }))
     await expect
       .element(screen.getByRole('button', { name: '重新加载运行' }))
@@ -623,8 +662,10 @@ describe('F27b team control UI with fixture APIs', () => {
     rememberRun()
     runFixture.capabilities.can_interrupt = false
     const screen = await mountPage()
+    await openFirstTeam(screen)
+    await expect.element(page.getByRole('dialog')).toBeVisible()
     await expect
-      .element(screen.getByRole('status'))
+      .element(page.getByRole('dialog').getByRole('status'))
       .toHaveTextContent('控制状态已保存')
     await expect
       .element(screen.getByRole('button', { name: '请求中断运行' }))
@@ -647,6 +688,7 @@ describe('F27b team control UI with fixture APIs', () => {
   it('isolates remembered runs by actor and membership version', async () => {
     rememberRun()
     const screen = await mountPage()
+    await openFirstTeam(screen)
     await expect
       .element(screen.getByRole('status'))
       .toHaveTextContent('控制状态已保存')
@@ -661,7 +703,10 @@ describe('F27b team control UI with fixture APIs', () => {
         <WorkspaceTeamsPage />
       </QueryClientProvider>
     )
-    await expect.element(screen.getByRole('status')).toHaveTextContent('草稿')
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+    await expect
+      .element(screen.getByText('草稿', { exact: true }))
+      .toBeInTheDocument()
     await expect
       .element(screen.getByRole('region', { name: '运行事件' }))
       .not.toBeInTheDocument()
@@ -676,6 +721,7 @@ describe('F27b team control UI with fixture APIs', () => {
     runFixture.members[0].agent_id = longId
     runFixture.tasks[0].owner_member_id = longId
     const screen = await mountPage()
+    await openFirstTeam(screen)
     await expect
       .element(screen.getByRole('button', { name: '请求中断运行' }))
       .toBeEnabled()
@@ -700,11 +746,8 @@ describe('F27b team control UI with fixture APIs', () => {
   it('localizes the owner flow, limitation, keyboard dialog, and pending result in English', async () => {
     setLocale('en')
     const screen = await mountPage()
-    await expect
-      .element(
-        screen.getByRole('heading', { name: 'Sub-agent team', exact: true })
-      )
-      .toBeVisible()
+    expect(document.querySelector('h1')?.textContent).toBe('Agent teams')
+    await openFirstTeam(screen)
     await expect
       .element(
         screen.getByText(
@@ -778,7 +821,9 @@ describe('F27b team control UI with fixture APIs', () => {
       .toBeVisible()
     overrides.delete(`GET ${base}`)
     await userEvent.click(screen.getByRole('button', { name: 'Reload teams' }))
-    await expect.element(screen.getByRole('status')).toHaveTextContent('Draft')
+    await expect
+      .element(screen.getByText('Draft', { exact: true }))
+      .toBeInTheDocument()
     expect(document.querySelector('main')!.textContent).not.toMatch(
       /[\u3400-\u9fff]/
     )

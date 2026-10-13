@@ -17,8 +17,8 @@ page.on('request', (request) => {
 page.on('pageerror', (error) => console.error('Browser page error:', error.message))
 const typeRow = (name) => page.locator('tbody tr').filter({ hasText: name })
 const typeRows = () => page.locator('main > section').first().locator('tbody tr')
-const entryRow = (label) => page.locator('tbody tr').filter({ hasText: label })
-const entryRows = () => page.locator('main > section').nth(1).locator('tbody tr')
+const entryRow = (label) => page.getByRole('dialog').locator('tbody tr').filter({ hasText: label })
+const entryRows = () => page.getByRole('dialog').locator('tbody tr')
 const typeUrl = (tenantId) => `/api/v1/tenants/${tenantId}/dict/types`
 const entryUrl = (tenantId, typeId) => `${typeUrl(tenantId)}/${typeId}/data`
 const fetchAs = async (url, method = 'GET', body, token = seed.owner_token) => page.evaluate(async ({ url, method, body, token }) => {
@@ -52,9 +52,10 @@ try {
   await page.getByLabel('类型标识').fill('alpha.created')
   await page.getByLabel('排序').fill('300')
   const createTypeResponse = page.waitForResponse((response) => response.url().endsWith('/dict/types') && response.request().method() === 'POST')
-  await page.getByRole('button', { name: '保存类型' }).click()
+  await page.getByRole('button', { name: '创建类型' }).click()
   assert.equal((await createTypeResponse).status(), 201)
   let createdType = (await fetchAs(typeUrl(seed.tenant_a_id) + '?dict_type=alpha.created')).data.items[0]
+  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click()
   assert.ok(createdType)
   await page.getByLabel('类型搜索字段').selectOption('dict_type')
   await page.getByLabel('搜索字典类型').fill('alpha.created')
@@ -102,7 +103,7 @@ try {
   await page.getByLabel('键值').fill('alpha-new')
   await page.getByLabel('排序').last().fill('300')
   const createEntryResponse = page.waitForResponse((response) => response.url().endsWith(`/dict/types/${seed.type_a_id}/data`) && response.request().method() === 'POST')
-  await page.getByRole('button', { name: '保存条目' }).click()
+  await page.getByRole('button', { name: '创建条目' }).last().click()
   assert.equal((await createEntryResponse).status(), 201)
   await page.getByLabel('搜索字典条目').fill('Alpha New Entry')
   await entryRow('Alpha New Entry').waitFor()
@@ -130,21 +131,24 @@ try {
   const entries = (await fetchAs(entryUrl(seed.tenant_a_id, seed.type_a_id))).data.items
   assert.equal(entries[0].dict_data_id, seed.entry_a_next_id)
 
-  // Deleting a type with values shows a useful conflict; delete entry, then empty type.
-  page.once('dialog', (dialog) => dialog.accept())
-  await typeRow('Alpha Colors').getByRole('button', { name: '删除' }).click()
-  await page.getByRole('alert').getByText('请先删除该字典类型下的所有条目。').waitFor()
-  assert.equal((await fetchAs(`${typeUrl(seed.tenant_a_id)}/${seed.type_a_id}`, 'DELETE')).status, 409)
+  // Delete an entry from its modal, then return to the type list.
   await page.getByLabel('搜索字典条目').fill('Alpha New Entry Updated')
-  page.once('dialog', (dialog) => dialog.accept())
   await entryRow('Alpha New Entry Updated').getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   await entryRow('Alpha New Entry Updated').waitFor({ state: 'detached' })
   assert.equal((await fetchAs(`${entryUrl(seed.tenant_a_id, seed.type_a_id)}/${createdEntry.dict_data_id}`)).status, 404)
+  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click()
+
+  // Deleting a type with values shows a useful conflict; delete it only after emptying it.
+  await typeRow('Alpha Colors').getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
+  await page.getByRole('alert').getByText('请先删除该字典类型下的所有条目。').waitFor()
+  assert.equal((await fetchAs(`${typeUrl(seed.tenant_a_id)}/${seed.type_a_id}`, 'DELETE')).status, 409)
   await page.getByLabel('类型搜索字段').selectOption('dict_type')
   await page.getByLabel('搜索字典类型').fill('alpha.empty')
   await typeRow('Alpha Empty').waitFor()
-  page.once('dialog', (dialog) => dialog.accept())
   await typeRow('Alpha Empty').getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   await typeRow('Alpha Empty').waitFor({ state: 'detached' })
 
   // Same admin account enters Tenant B; same type key and entry label are isolated.

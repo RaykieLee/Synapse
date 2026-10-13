@@ -56,9 +56,10 @@ def terminate_process_tree(process):
 
 
 def main():
-    build = subprocess.run([PNPM, "build"], cwd=WEB, text=True)
-    if build.returncode:
-        return build.returncode
+    if os.environ.get("F10_SKIP_BUILD") != "1":
+        build = subprocess.run([PNPM, "build"], cwd=WEB, text=True)
+        if build.returncode:
+            return build.returncode
 
     with tempfile.TemporaryDirectory(prefix="synapse-f10-", ignore_cleanup_errors=True) as temp:
         temp_path = Path(temp)

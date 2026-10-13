@@ -44,7 +44,7 @@ try {
   await page.getByRole('button', { name: '创建部门' }).click()
   await page.getByLabel('部门名称').fill('Alpha New Team')
   await page.getByLabel('上级部门').selectOption(seed.alpha_root_id)
-  await page.getByRole('button', { name: '保存部门' }).click()
+  await page.getByRole('button', { name: '创建部门' }).last().click()
   await row('Alpha New Team').waitFor()
   let tree = (await managerFetch(api(seed.tenant_a_id, '/tree?include_disabled=true'))).data.items
   const newTeam = tree[0].children.find((department) => department.dept_name === 'Alpha New Team')
@@ -53,7 +53,7 @@ try {
   await page.getByRole('button', { name: '创建部门' }).click()
   await page.getByLabel('部门名称').fill('Alpha New Leaf')
   await page.getByLabel('上级部门').selectOption(newTeam.department_id)
-  await page.getByRole('button', { name: '保存部门' }).click()
+  await page.getByRole('button', { name: '创建部门' }).last().click()
   await row('Alpha New Leaf').waitFor()
   tree = (await managerFetch(api(seed.tenant_a_id, '/tree?include_disabled=true'))).data.items
   const leaf = tree[0].children.find((department) => department.department_id === newTeam.department_id).children[0]
@@ -94,12 +94,12 @@ try {
   assert.equal((await managerFetch(api(seed.tenant_a_id, `/${seed.alpha_root_id}`))).data.status, '0')
 
   // Leaf deletion succeeds; non-leaf deletion is explained in the UI.
-  page.once('dialog', (dialog) => dialog.accept())
   await row('Alpha New Leaf').getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   await row('Alpha New Leaf').waitFor({ state: 'detached' })
   assert.equal((await managerFetch(api(seed.tenant_a_id, `/${leaf.department_id}`))).status, 404)
-  page.once('dialog', (dialog) => dialog.accept())
   await row('Alpha Root').getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   await page.getByRole('alert').getByText('请先删除或移动此部门下的子部门。').waitFor()
 
   // Simulate a stale editor: a concurrent parent change makes the submitted move cyclic.
@@ -118,7 +118,7 @@ try {
   await page.getByRole('heading', { name: '租户部门' }).waitFor()
   await page.getByRole('button', { name: '创建部门' }).click()
   await page.getByLabel('部门名称').fill('Beta Admin Department')
-  await page.getByRole('button', { name: '保存部门' }).click()
+  await page.getByRole('button', { name: '创建部门' }).last().click()
   await row('Beta Admin Department').waitFor()
   assert.equal(await page.getByText('Alpha Root', { exact: true }).count(), 0)
 

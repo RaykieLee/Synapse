@@ -64,7 +64,8 @@ import {
 } from './components/tenant-table'
 import { tenantText, type TenantRoleRecord } from './types'
 import { LocalizedText } from '@/components/localized-text'
-import { formatMessage, useLocale, useLocaleText } from '@/lib/i18n'
+import { DetailDialog } from '@/components/detail-dialog'
+import { useLocale, useLocaleText } from '@/lib/i18n'
 
 const tenantsRoute = getRouteApi('/_authenticated/tenants/')
 
@@ -721,7 +722,6 @@ export function TenantDetail() {
       body: Parameters<typeof updateTenantMember>[2]
     }) => updateTenantMember(tenantId, userId, body),
     onSuccess: refresh,
-    onError: (cause) => setError(errorText(cause)),
   })
   const createInvite = useMutation({
     mutationFn: (body: TenantInvitationCreatePayload) =>
@@ -784,11 +784,7 @@ export function TenantDetail() {
             <TenantStatusActions
               tenant={item}
               onChange={(status) => patchTenant.mutate({ status })}
-              onArchive={() => {
-                if (window.confirm(formatMessage('确定归档租户“{name}”吗？', { name: item.name }))) {
-                  patchTenant.mutate({ status: 'archived' })
-                }
-              }}
+              onArchive={() => patchTenant.mutate({ status: 'archived' })}
             />
           ) : null}
         </div>
@@ -820,18 +816,17 @@ export function TenantDetail() {
           ) : null
         }
       />
-      <details className='text-xs text-muted-foreground'>
-        <summary className='w-fit cursor-pointer'><LocalizedText text={"技术信息"} /></summary>
-        <div className='mt-2 flex flex-wrap items-center gap-2'>
-          <code>租户 ID {item.tenant_id}</code>
-          <button
-            type='button'
-            className='underline'
-            onClick={() => navigator.clipboard.writeText(item.tenant_id)}
-          >
-            <LocalizedText text={"\n            复制 ID\n          "} /></button>
+      <DetailDialog
+        trigger={<LocalizedText text={"技术信息"} />}
+        title={<LocalizedText text={"租户技术信息"} />}
+        description={item.name}
+        triggerClassName='h-auto px-0 text-xs text-muted-foreground underline'
+      >
+        <div className='space-y-2 text-sm'>
+          <p><LocalizedText text={"租户 ID："} /><code className='break-all'>{item.tenant_id}</code></p>
+          <Button size='sm' variant='outline' onClick={() => navigator.clipboard.writeText(item.tenant_id)}><LocalizedText text={"复制 ID"} /></Button>
         </div>
-      </details>
+      </DetailDialog>
       <section className='grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]'>
         <TenantSummaryCard
           tenant={item}
@@ -879,23 +874,30 @@ export function TenantDetail() {
             canManage={canManage}
             currentRole={item.tenant_role}
             loading={members.isLoading}
+            mutationPending={patchMember.isPending}
+            mutationError={
+              patchMember.isError ? errorText(patchMember.error) : ''
+            }
             onRoleChange={(member, role) =>
-              patchMember.mutate({
+              patchMember.mutateAsync({
                 userId: member.user_id,
                 body: { tenant_role: role },
               })
             }
             onStatusChange={(member, status) =>
-              patchMember.mutate({ userId: member.user_id, body: { status } })
+              patchMember.mutateAsync({
+                userId: member.user_id,
+                body: { status },
+              })
             }
             onRemove={(member) =>
-              patchMember.mutate({
+              patchMember.mutateAsync({
                 userId: member.user_id,
                 body: { status: 'removed' },
               })
             }
             onReactivate={(member) =>
-              patchMember.mutate({
+              patchMember.mutateAsync({
                 userId: member.user_id,
                 body: { status: 'active' },
               })

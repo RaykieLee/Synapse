@@ -155,20 +155,50 @@ export function TenantStatusActions({
   onChange: (status: TenantStatus) => void
   onArchive: (tenant: Tenant) => void
 }) {
+  const [confirmation, setConfirmation] = useState<'suspend' | 'activate' | 'archive' | null>(null)
   if (tenant.status === 'archived') return null
   return (
     <>
       <Button
         variant={tenant.status === 'active' ? "outline" : "secondary"}
         size='sm'
-        onClick={() =>
-          onChange(tenant.status === 'active' ? 'suspended' : 'active')
-        }
+        onClick={() => setConfirmation(tenant.status === 'active' ? 'suspend' : 'activate')}
       >
         {tenant.status === 'active' ? <LocalizedText text={"停用租户"} /> : <LocalizedText text={"重新启用"} />}
       </Button>
-      <Button variant='outline' size='sm' onClick={() => onArchive(tenant)}>
+      <Button variant='outline' size='sm' onClick={() => setConfirmation('archive')}>
         <Archive className='size-4' /> <LocalizedText text={" 归档\n      "} /></Button>
+      <Dialog open={Boolean(confirmation)} onOpenChange={(open) => !open && setConfirmation(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmation === 'archive' ? <LocalizedText text={'归档租户'} />
+                : confirmation === 'suspend' ? <LocalizedText text={'停用租户'} />
+                : <LocalizedText text={'重新启用租户'} />}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmation === 'archive'
+                ? '归档后租户进入终态，无法重新启用。'
+                : confirmation === 'suspend'
+                  ? '停用后成员暂时无法访问该租户。'
+                  : '启用后成员可按有效期重新访问该租户。'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setConfirmation(null)}><LocalizedText text={'取消'} /></Button>
+            <Button
+              variant={confirmation === 'archive' ? 'destructive' : 'default'}
+              onClick={() => {
+                if (confirmation === 'archive') onArchive(tenant)
+                else if (confirmation) onChange(confirmation === 'suspend' ? 'suspended' : 'active')
+                setConfirmation(null)
+              }}
+            >
+              <LocalizedText text={'确认'} />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

@@ -52,6 +52,13 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   Table,
   TableBody,
   TableCell,
@@ -485,6 +492,7 @@ export function TenantTable({
 }) {
   const locale = useLocale()
   const t = useLocaleText()
+  const [detailTenant, setDetailTenant] = useState<Tenant | null>(null)
   const columns = tenantColumns.filter(
     (column) => column.key !== 'role' || !isAdmin
   )
@@ -577,13 +585,13 @@ export function TenantTable({
                 ) : null}
                 <TableCell className='max-w-72 ps-4'>
                   <div className='space-y-0.5'>
-                    <Link
-                      to='/tenants/$tenantId'
-                      params={{ tenantId: tenant.tenant_id }}
-                      className='font-medium hover:text-primary'
+                    <button
+                      type='button'
+                      className='text-start font-medium hover:text-primary'
+                      onClick={() => setDetailTenant(tenant)}
                     >
                       {tenant.name}
-                    </Link>
+                    </button>
                   </div>
                 </TableCell>
                 {visibleColumns.has('slug') ? (
@@ -614,22 +622,17 @@ export function TenantTable({
                 <TableCell className='pe-4'>
                   <div className='flex items-center justify-end gap-1'>
                     <Button
-                      asChild
                       variant='ghost'
                       size='icon'
                       className='size-8 lg:hidden'
+                      onClick={() => setDetailTenant(tenant)}
+                      aria-label={
+                        locale === 'en'
+                          ? `View ${tenant.name}`
+                          : `查看 ${tenant.name}`
+                      }
                     >
-                      <Link
-                        to='/tenants/$tenantId'
-                        params={{ tenantId: tenant.tenant_id }}
-                        aria-label={
-                          locale === 'en'
-                            ? `View ${tenant.name}`
-                            : `查看 ${tenant.name}`
-                        }
-                      >
-                        <Eye className='size-4' />
-                      </Link>
+                      <Eye className='size-4' />
                     </Button>
                     {isAdmin && tenant.status !== 'archived' ? (
                       <DropdownMenu>
@@ -648,12 +651,8 @@ export function TenantTable({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align='end' className='w-40'>
-                          <DropdownMenuItem asChild>
-                            <Link
-                              to='/tenants/$tenantId'
-                              params={{ tenantId: tenant.tenant_id }}
-                            >
-                              <Eye className='size-4' /> <LocalizedText text={" 查看详情\n                            "} /></Link>
+                          <DropdownMenuItem onSelect={() => setDetailTenant(tenant)}>
+                            <Eye className='size-4' /> <LocalizedText text={" 查看详情\n                            "} />
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={selectionDisabled}
@@ -708,6 +707,59 @@ export function TenantTable({
           )}
         </TableBody>
       </Table>
+      <Dialog
+        open={Boolean(detailTenant)}
+        onOpenChange={(open) => !open && setDetailTenant(null)}
+      >
+        <DialogContent className='sm:max-w-lg'>
+          <DialogHeader>
+            <DialogTitle><LocalizedText text='租户详情' /></DialogTitle>
+            <DialogDescription>{detailTenant?.name}</DialogDescription>
+          </DialogHeader>
+          {detailTenant && (
+            <div className='space-y-4 text-sm'>
+              <div className='flex flex-wrap items-center gap-2'>
+                <StatusBadge status={detailTenant.status} />
+                <span className='rounded-md bg-muted px-2 py-1 font-mono text-xs'>
+                  {detailTenant.slug}
+                </span>
+                {detailTenant.tenant_role ? (
+                  <span className='text-muted-foreground'>
+                    {localizedTenantText(detailTenant.tenant_role, locale)}
+                  </span>
+                ) : null}
+              </div>
+              <dl className='grid gap-3 sm:grid-cols-2'>
+                <div>
+                  <dt className='text-muted-foreground'><LocalizedText text='租户 ID' /></dt>
+                  <dd className='mt-1 break-all font-mono text-xs'>{detailTenant.tenant_id}</dd>
+                </div>
+                <div>
+                  <dt className='text-muted-foreground'><LocalizedText text='有效期' /></dt>
+                  <dd className='mt-1'>{formatDateRange(detailTenant.valid_from, detailTenant.valid_until, locale)}</dd>
+                </div>
+                <div>
+                  <dt className='text-muted-foreground'><LocalizedText text='创建时间' /></dt>
+                  <dd className='mt-1'>{formatDateTime(detailTenant.created_at, locale)}</dd>
+                </div>
+                <div>
+                  <dt className='text-muted-foreground'><LocalizedText text='更新时间' /></dt>
+                  <dd className='mt-1'>{formatDateTime(detailTenant.updated_at, locale)}</dd>
+                </div>
+              </dl>
+              <Button asChild variant='outline'>
+                <Link
+                  to='/tenants/$tenantId'
+                  params={{ tenantId: detailTenant.tenant_id }}
+                >
+                  <LocalizedText text='打开租户管理' />
+                  <ArrowUpRight className='size-4' />
+                </Link>
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

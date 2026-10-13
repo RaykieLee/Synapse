@@ -1,18 +1,21 @@
 import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
-import { formatMessage } from '@/lib/i18n'
 import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant, type Page } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
+import { FormDialog } from '@/components/form-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 type DictType = { dict_type_id: string; tenant_id: string; dict_name: string; dict_type: string; order_num: number; status: '0' | '1'; remark: string | null }
 type DictEntry = { dict_data_id: string; tenant_id: string; dict_type_id: string; dict_type: string; dict_sort: number; dict_label: string; dict_value: string; css_class: string | null; list_class: string | null; is_default: 'Y' | 'N'; status: '0' | '1'; remark: string | null }
 type TypeDraft = { dict_type_id?: string; dict_name: string; dict_type: string; order_num: number; status: '0' | '1'; remark: string }
 type EntryDraft = { dict_data_id?: string; dict_sort: number; dict_label: string; dict_value: string; css_class: string; list_class: string; is_default: 'Y' | 'N'; status: '0' | '1'; remark: string }
+type DeleteTarget = { kind: 'type'; row: DictType } | { kind: 'entry'; row: DictEntry }
 
 const panel = 'rounded-lg border bg-card p-5 shadow-sm'
 const input = 'h-10 w-full rounded-md border bg-background px-3 text-sm'
@@ -33,7 +36,10 @@ export function TenantDictionariesPage() {
   const [selectedTypeId, setSelectedTypeId] = useState('')
   const [typeDraft, setTypeDraft] = useState<TypeDraft | null>(null)
   const [entryDraft, setEntryDraft] = useState<EntryDraft | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [error, setError] = useState('')
+  const [typeError, setTypeError] = useState('')
+  const [entryError, setEntryError] = useState('')
 
   const tenantKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant'] as const
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
@@ -80,13 +86,19 @@ export function TenantDictionariesPage() {
         ? api<DictType>(`/tenants/${tenantId}/dict/types/${dict_type_id}`, { method: 'PATCH', body: JSON.stringify(body) })
         : api<DictType>(`/tenants/${tenantId}/dict/types`, { method: 'POST', body: JSON.stringify(body) })
     },
-    onSuccess: async (row) => { setError(''); setTypeDraft(null); setSelectedTypeId(row.dict_type_id); await invalidateTypes() },
-    onError: (cause) => setError(errorText(cause)),
+    onSuccess: async (row, value) => {
+      setError('')
+      setTypeError('')
+      setTypeDraft(null)
+      if (!value.dict_type_id) setSelectedTypeId(row.dict_type_id)
+      await invalidateTypes()
+    },
+    onError: (cause) => setTypeError(errorText(cause)),
   })
   const deleteType = useMutation({
     mutationFn: (id: string) => api<void>(`/tenants/${tenantId}/dict/types/${id}`, { method: 'DELETE' }),
     onSuccess: async (_result, id) => { setError(''); if (selectedTypeId === id) setSelectedTypeId(''); await invalidateTypes() },
-    onError: (cause) => setError(errorText(cause)),
+    onError: (cause) => { setDeleteTarget(null); setError(errorText(cause)) },
   })
   const saveEntry = useMutation({
     mutationFn: (value: EntryDraft) => {
@@ -96,13 +108,13 @@ export function TenantDictionariesPage() {
         ? api<DictEntry>(`${path}/${dict_data_id}`, { method: 'PATCH', body: JSON.stringify(body) })
         : api<DictEntry>(path, { method: 'POST', body: JSON.stringify(body) })
     },
-    onSuccess: async () => { setError(''); setEntryDraft(null); await invalidateEntries() },
-    onError: (cause) => setError(errorText(cause)),
+    onSuccess: async () => { setError(''); setEntryError(''); setEntryDraft(null); await invalidateEntries() },
+    onError: (cause) => setEntryError(errorText(cause)),
   })
   const deleteEntry = useMutation({
     mutationFn: (id: string) => api<void>(`/tenants/${tenantId}/dict/types/${selectedTypeId}/data/${id}`, { method: 'DELETE' }),
     onSuccess: async () => { setError(''); await invalidateEntries() },
-    onError: (cause) => setError(errorText(cause)),
+    onError: (cause) => { setDeleteTarget(null); setError(errorText(cause)) },
   })
   const reorderType = useMutation({
     mutationFn: async ({ id, delta }: { id: string; delta: -1 | 1 }) => {
@@ -144,53 +156,127 @@ export function TenantDictionariesPage() {
   const entryBusy = saveEntry.isPending || deleteEntry.isPending || reorderEntry.isPending
   return <main className="space-y-5 p-6">
     <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户字典"} /></h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的字典类型和条目。每个租户可独立使用相同类型标识。"} /></p></div>
-      <button className={primary} onClick={() => { setError(''); setTypeDraft(emptyTypeDraft()) }}><LocalizedText text={"创建字典类型"} /></button></header>
+      <button className={primary} onClick={() => { setError(''); setTypeError(''); setTypeDraft(emptyTypeDraft()) }}><LocalizedText text={"创建字典类型"} /></button></header>
     {error && <ErrorBox message={error} />}
-    {typeDraft && <TypeEditor draft={typeDraft} pending={saveType.isPending} onChange={setTypeDraft} onCancel={() => setTypeDraft(null)} onSave={() => saveType.mutate(typeDraft)} />}
+    {typeDraft && <TypeEditor draft={typeDraft} pending={saveType.isPending} error={typeError} onChange={setTypeDraft} onCancel={() => { setTypeDraft(null); setTypeError('') }} onSave={() => saveType.mutate(typeDraft)} />}
     <section className={`${panel} space-y-4`}>
       <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="font-semibold"><LocalizedText text={"字典类型"} /></h2><p className="text-sm text-muted-foreground"><LocalizedText text={"可按名称或标识筛选；上移/下移会重排当前租户全部类型。"} /></p></div><div className="flex flex-wrap gap-2"><LocalizedNativeSelect aria-label="类型搜索字段" className={`${input} max-w-36`} value={typeSearchField} onChange={(event) => { setTypeSearchField(event.target.value as 'dict_name' | 'dict_type'); setTypePage(1) }}><option value="dict_name"><LocalizedText text={"名称"} /></option><option value="dict_type"><LocalizedText text={"标识"} /></option></LocalizedNativeSelect><Input aria-label="搜索字典类型" className={`${input} max-w-64`} value={typeSearch} placeholder={typeSearchField === 'dict_name' ? "按名称筛选" : "按标识筛选"} onChange={(event) => { setTypeSearch(event.target.value); setTypePage(1) }} /><LocalizedNativeSelect aria-label="类型状态筛选" className={`${input} max-w-40`} value={typeStatus} onChange={(event) => { setTypeStatus(event.target.value); setTypePage(1) }}><option value=""><LocalizedText text={"全部状态"} /></option><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></div></div>
-      {types.isLoading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在加载字典类型…"} /></p> : types.isError ? <ErrorBox message={errorText(types.error)} /> : typesItems.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"名称"} /></th><th className="p-3"><LocalizedText text={"类型标识"} /></th><th className="p-3"><LocalizedText text={"排序"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{typesItems.map((row) => <tr className={`border-b last:border-0 ${selectedTypeId === row.dict_type_id ? 'bg-muted/40' : ''}`} key={row.dict_type_id}><td className="p-3 font-medium">{row.dict_name}</td><td className="p-3"><code>{row.dict_type}</code></td><td className="p-3">{row.order_num}</td><td className="p-3">{row.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td><td className="space-x-3 p-3"><button className="underline" onClick={() => { setSelectedTypeId(row.dict_type_id); setEntryPage(1); setEntrySearch(''); setEntryStatus(''); setEntryDraft(null); setError('') }}><LocalizedText text={"管理条目"} /></button><button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => reorderType.mutate({ id: row.dict_type_id, delta: -1 })}><LocalizedText text={"上移"} /></button><button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => reorderType.mutate({ id: row.dict_type_id, delta: 1 })}><LocalizedText text={"下移"} /></button><button className="underline" onClick={() => { setError(''); setTypeDraft(toTypeDraft(row)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => saveType.mutate({ ...toTypeDraft(row), status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={typeBusy} onClick={() => { if (window.confirm(formatMessage('删除字典类型“{name}”？类型下必须没有条目。', { name: row.dict_name }))) deleteType.mutate(row.dict_type_id) }}><LocalizedText text={"删除"} /></button></td></tr>)}</tbody></table></div> : <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无字典类型"} /></p>}
+      {types.isLoading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在加载字典类型…"} /></p> : types.isError ? <ErrorBox message={errorText(types.error)} /> : typesItems.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"名称"} /></th><th className="p-3"><LocalizedText text={"类型标识"} /></th><th className="p-3"><LocalizedText text={"排序"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{typesItems.map((row) => <tr className={`border-b last:border-0 ${selectedTypeId === row.dict_type_id ? 'bg-muted/40' : ''}`} key={row.dict_type_id}><td className="p-3 font-medium">{row.dict_name}</td><td className="p-3"><code>{row.dict_type}</code></td><td className="p-3">{row.order_num}</td><td className="p-3">{row.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td><td className="space-x-3 p-3"><button className="underline" onClick={() => { setSelectedTypeId(row.dict_type_id); setEntryPage(1); setEntrySearch(''); setEntryStatus(''); setEntryDraft(null); setError('') }}><LocalizedText text={"管理条目"} /></button><button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => reorderType.mutate({ id: row.dict_type_id, delta: -1 })}><LocalizedText text={"上移"} /></button><button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => reorderType.mutate({ id: row.dict_type_id, delta: 1 })}><LocalizedText text={"下移"} /></button><button className="underline" onClick={() => { setError(''); setTypeDraft(toTypeDraft(row)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={typeBusy} onClick={() => saveType.mutate({ ...toTypeDraft(row), status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={typeBusy} onClick={() => setDeleteTarget({ kind: 'type', row })}><LocalizedText text={"删除"} /></button></td></tr>)}</tbody></table></div> : <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无字典类型"} /></p>}
       <Pager page={typePage} size={20} total={types.data?.total ?? 0} setPage={setTypePage} />
     </section>
-    {selectedTypeId && <section className={`${panel} space-y-4`}>
-      {selectedType.isLoading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在加载类型…"} /></p> : selectedType.isError ? <ErrorBox message={errorText(selectedType.error)} /> : <>
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold"><LocalizedText text={"字典条目："} />{selectedType.data?.dict_name}</h2><p className="text-sm text-muted-foreground"><code>{selectedType.data?.dict_type}</code> <LocalizedText text={" · 类型状态："} />{selectedType.data?.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</p></div><button className={primary} onClick={() => { setError(''); setEntryDraft(emptyEntryDraft()) }}><LocalizedText text={"创建条目"} /></button></div>
-        {entryDraft && <EntryEditor draft={entryDraft} pending={saveEntry.isPending} onChange={setEntryDraft} onCancel={() => setEntryDraft(null)} onSave={() => saveEntry.mutate(entryDraft)} />}
-        <div className="flex flex-wrap gap-2"><Input aria-label="搜索字典条目" className={`${input} max-w-64`} value={entrySearch} placeholder="按标签搜索" onChange={(event) => { setEntrySearch(event.target.value); setEntryPage(1) }} /><LocalizedNativeSelect aria-label="条目状态筛选" className={`${input} max-w-40`} value={entryStatus} onChange={(event) => { setEntryStatus(event.target.value); setEntryPage(1) }}><option value=""><LocalizedText text={"全部状态"} /></option><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></div>
-        {entries.isLoading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在加载条目…"} /></p> : entries.isError ? <ErrorBox message={errorText(entries.error)} /> : entries.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"标签"} /></th><th className="p-3"><LocalizedText text={"键值"} /></th><th className="p-3"><LocalizedText text={"排序"} /></th><th className="p-3"><LocalizedText text={"默认"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{entries.data.items.map((row) => <tr key={row.dict_data_id} className="border-b last:border-0"><td className="p-3">{row.dict_label}</td><td className="p-3"><code>{row.dict_value}</code></td><td className="p-3">{row.dict_sort}</td><td className="p-3">{row.is_default === 'Y' ? <LocalizedText text={"是"} /> : <LocalizedText text={"否"} />}</td><td className="p-3">{row.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td><td className="space-x-3 p-3"><button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => reorderEntry.mutate({ id: row.dict_data_id, delta: -1 })}><LocalizedText text={"上移"} /></button><button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => reorderEntry.mutate({ id: row.dict_data_id, delta: 1 })}><LocalizedText text={"下移"} /></button><button className="underline" onClick={() => { setError(''); setEntryDraft(toEntryDraft(row)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => saveEntry.mutate({ ...toEntryDraft(row), status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={entryBusy} onClick={() => { if (window.confirm(formatMessage('删除字典条目“{name}”？', { name: row.dict_label }))) deleteEntry.mutate(row.dict_data_id) }}><LocalizedText text={"删除"} /></button></td></tr>)}</tbody></table></div> : <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无字典条目"} /></p>}
-        <Pager page={entryPage} size={20} total={entries.data?.total ?? 0} setPage={setEntryPage} />
-      </>}
-    </section>}
+    <Dialog open={Boolean(selectedTypeId)} onOpenChange={(open) => { if (!open) { setSelectedTypeId(''); setEntryDraft(null) } }}>
+      <DialogContent className="max-h-[min(88vh,48rem)] overflow-y-auto sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle><LocalizedText text={"字典条目："} />{selectedType.data?.dict_name}</DialogTitle>
+          <DialogDescription>
+            {selectedType.data ? <><code>{selectedType.data.dict_type}</code> <LocalizedText text={" · 类型状态："} />{selectedType.data.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</> : <LocalizedText text={"管理当前字典类型下的条目。"} />}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {selectedType.isLoading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在加载类型…"} /></p> : selectedType.isError ? <ErrorBox message={errorText(selectedType.error)} /> : <>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-muted-foreground"><LocalizedText text={"可在此新增、编辑、排序和启停字典条目。"} /></p></div><button className={primary} onClick={() => { setError(''); setEntryError(''); setEntryDraft(emptyEntryDraft()) }}><LocalizedText text={"创建条目"} /></button></div>
+            {entryDraft && <EntryEditor draft={entryDraft} pending={saveEntry.isPending} error={entryError} onChange={setEntryDraft} onCancel={() => { setEntryDraft(null); setEntryError('') }} onSave={() => saveEntry.mutate(entryDraft)} />}
+            <div className="flex flex-wrap gap-2"><Input aria-label="搜索字典条目" className={`${input} max-w-64`} value={entrySearch} placeholder="按标签搜索" onChange={(event) => { setEntrySearch(event.target.value); setEntryPage(1) }} /><LocalizedNativeSelect aria-label="条目状态筛选" className={`${input} max-w-40`} value={entryStatus} onChange={(event) => { setEntryStatus(event.target.value); setEntryPage(1) }}><option value=""><LocalizedText text={"全部状态"} /></option><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></div>
+            {entries.isLoading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在加载条目…"} /></p> : entries.isError ? <ErrorBox message={errorText(entries.error)} /> : entries.data?.items.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-muted-foreground"><th className="p-3"><LocalizedText text={"标签"} /></th><th className="p-3"><LocalizedText text={"键值"} /></th><th className="p-3"><LocalizedText text={"排序"} /></th><th className="p-3"><LocalizedText text={"默认"} /></th><th className="p-3"><LocalizedText text={"状态"} /></th><th className="p-3"><LocalizedText text={"操作"} /></th></tr></thead><tbody>{entries.data.items.map((row) => <tr key={row.dict_data_id} className="border-b last:border-0"><td className="p-3">{row.dict_label}</td><td className="p-3"><code>{row.dict_value}</code></td><td className="p-3">{row.dict_sort}</td><td className="p-3">{row.is_default === 'Y' ? <LocalizedText text={"是"} /> : <LocalizedText text={"否"} />}</td><td className="p-3">{row.status === '0' ? <LocalizedText text={"启用"} /> : <LocalizedText text={"停用"} />}</td><td className="space-x-3 p-3"><button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => reorderEntry.mutate({ id: row.dict_data_id, delta: -1 })}><LocalizedText text={"上移"} /></button><button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => reorderEntry.mutate({ id: row.dict_data_id, delta: 1 })}><LocalizedText text={"下移"} /></button><button className="underline" onClick={() => { setError(''); setEntryDraft(toEntryDraft(row)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={entryBusy} onClick={() => saveEntry.mutate({ ...toEntryDraft(row), status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={entryBusy} onClick={() => setDeleteTarget({ kind: 'entry', row })}><LocalizedText text={"删除"} /></button></td></tr>)}</tbody></table></div> : <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无字典条目"} /></p>}
+            <Pager page={entryPage} size={20} total={entries.data?.total ?? 0} setPage={setEntryPage} />
+          </>}
+        </div>
+      </DialogContent>
+    </Dialog>
+    <ConfirmDialog
+      open={Boolean(deleteTarget)}
+      onOpenChange={(open) => {
+        if (!open && !deleteType.isPending && !deleteEntry.isPending) {
+          setDeleteTarget(null)
+        }
+      }}
+      title={deleteTarget?.kind === 'type' ? '删除字典类型' : '删除字典条目'}
+      desc={deleteTarget?.kind === 'type' ? '类型下必须没有条目；删除后不能恢复。' : '删除后不能恢复；被其他业务引用时服务端可能拒绝删除。'}
+      confirmText='确认删除'
+      destructive
+      isLoading={deleteType.isPending || deleteEntry.isPending}
+      handleConfirm={() => {
+        if (!deleteTarget) return
+        if (deleteTarget.kind === 'type') {
+          deleteType.mutate(deleteTarget.row.dict_type_id, {
+            onSuccess: () => setDeleteTarget(null),
+          })
+        } else {
+          deleteEntry.mutate(deleteTarget.row.dict_data_id, {
+            onSuccess: () => setDeleteTarget(null),
+          })
+        }
+      }}
+    >
+      {deleteTarget && (
+        <div className='text-sm'>
+          <p className='font-medium'>
+            {deleteTarget.kind === 'type'
+              ? deleteTarget.row.dict_name
+              : deleteTarget.row.dict_label}
+          </p>
+          <code className='text-xs text-muted-foreground'>
+            {deleteTarget.kind === 'type'
+              ? deleteTarget.row.dict_type
+              : deleteTarget.row.dict_value}
+          </code>
+        </div>
+      )}
+    </ConfirmDialog>
   </main>
 }
 
-function TypeEditor({ draft, pending, onChange, onCancel, onSave }: { draft: TypeDraft; pending: boolean; onChange: (draft: TypeDraft) => void; onCancel: () => void; onSave: () => void }) {
+function TypeEditor({ draft, pending, error, onChange, onCancel, onSave }: { draft: TypeDraft; pending: boolean; error: string; onChange: (draft: TypeDraft) => void; onCancel: () => void; onSave: () => void }) {
   const set = <K extends keyof TypeDraft>(key: K, value: TypeDraft[K]) => onChange({ ...draft, [key]: value })
-  return <form className={`${panel} grid gap-3 sm:grid-cols-2`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
-    <h2 className="sm:col-span-2 font-semibold">{draft.dict_type_id ? <LocalizedText text={"编辑字典类型"} /> : <LocalizedText text={"创建字典类型"} />}</h2>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"类型名称"} /></span><Input required maxLength={100} className={input} value={draft.dict_name} onChange={(event) => set('dict_name', event.target.value)} /></label>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"类型标识"} /></span><Input required maxLength={100} pattern="[A-Za-z][A-Za-z0-9_.-]*" className={input} value={draft.dict_type} onChange={(event) => set('dict_type', event.target.value)} /></label>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"排序"} /></span><Input type="number" min={0} className={input} value={draft.order_num} onChange={(event) => set('order_num', Number(event.target.value))} /></label>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={input} value={draft.status} onChange={(event) => set('status', event.target.value as '0' | '1')}><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label>
-    <label className="space-y-1 text-sm sm:col-span-2"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={2} className="w-full rounded-md border bg-background p-3" value={draft.remark} onChange={(event) => set('remark', event.target.value)} /></label>
-    <div className="flex gap-2 sm:col-span-2"><button className={primary} disabled={pending || !draft.dict_name.trim() || !draft.dict_type.trim()}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存类型"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
-  </form>
+  return <FormDialog
+    open
+    onOpenChange={(open) => { if (!open) onCancel() }}
+    title={draft.dict_type_id ? <LocalizedText text={"编辑字典类型"} /> : <LocalizedText text={"创建字典类型"} />}
+    formAriaLabel={draft.dict_type_id ? '编辑字典类型' : '创建字典类型'}
+    description="定义租户级字典类型，后续可在其下维护条目。"
+    error={error}
+    submitLabel={draft.dict_type_id ? <LocalizedText text={"保存类型"} /> : <LocalizedText text={"创建类型"} />}
+    pending={pending}
+    disabled={!draft.dict_name.trim() || !draft.dict_type.trim()}
+    onSubmit={onSave}
+    onCancel={onCancel}
+  >
+    <div className="grid gap-3 sm:grid-cols-2">
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"类型名称"} /></span><Input autoFocus required maxLength={100} className={input} value={draft.dict_name} onChange={(event) => set('dict_name', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"类型标识"} /></span><Input required maxLength={100} pattern="[A-Za-z][A-Za-z0-9_.-]*" className={input} value={draft.dict_type} onChange={(event) => set('dict_type', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"排序"} /></span><Input type="number" min={0} className={input} value={draft.order_num} onChange={(event) => set('order_num', Number(event.target.value))} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={input} value={draft.status} onChange={(event) => set('status', event.target.value as '0' | '1')}><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label>
+      <label className="space-y-1 text-sm sm:col-span-2"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={2} className="w-full rounded-md border bg-background p-3" value={draft.remark} onChange={(event) => set('remark', event.target.value)} /></label>
+    </div>
+  </FormDialog>
 }
 
-function EntryEditor({ draft, pending, onChange, onCancel, onSave }: { draft: EntryDraft; pending: boolean; onChange: (draft: EntryDraft) => void; onCancel: () => void; onSave: () => void }) {
+function EntryEditor({ draft, pending, error, onChange, onCancel, onSave }: { draft: EntryDraft; pending: boolean; error: string; onChange: (draft: EntryDraft) => void; onCancel: () => void; onSave: () => void }) {
   const set = <K extends keyof EntryDraft>(key: K, value: EntryDraft[K]) => onChange({ ...draft, [key]: value })
-  return <form className={`${panel} grid gap-3 sm:grid-cols-2 lg:grid-cols-3`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
-    <h3 className="font-semibold sm:col-span-2 lg:col-span-3">{draft.dict_data_id ? <LocalizedText text={"编辑字典条目"} /> : <LocalizedText text={"创建字典条目"} />}</h3>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"标签"} /></span><Input required maxLength={100} className={input} value={draft.dict_label} onChange={(event) => set('dict_label', event.target.value)} /></label>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"键值"} /></span><Input required maxLength={100} className={input} value={draft.dict_value} onChange={(event) => set('dict_value', event.target.value)} /></label>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"排序"} /></span><Input type="number" min={0} className={input} value={draft.dict_sort} onChange={(event) => set('dict_sort', Number(event.target.value))} /></label>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"默认值"} /></span><LocalizedNativeSelect className={input} value={draft.is_default} onChange={(event) => set('is_default', event.target.value as 'Y' | 'N')}><option value="N"><LocalizedText text={"否"} /></option><option value="Y"><LocalizedText text={"是"} /></option></LocalizedNativeSelect></label>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={input} value={draft.status} onChange={(event) => set('status', event.target.value as '0' | '1')}><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"CSS 样式"} /></span><Input maxLength={100} className={input} value={draft.css_class} onChange={(event) => set('css_class', event.target.value)} /></label>
-    <label className="space-y-1 text-sm"><span><LocalizedText text={"列表样式"} /></span><Input maxLength={100} className={input} value={draft.list_class} onChange={(event) => set('list_class', event.target.value)} /></label>
-    <label className="space-y-1 text-sm sm:col-span-2 lg:col-span-3"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={2} className="w-full rounded-md border bg-background p-3" value={draft.remark} onChange={(event) => set('remark', event.target.value)} /></label>
-    <div className="flex gap-2 sm:col-span-2 lg:col-span-3"><button className={primary} disabled={pending || !draft.dict_label.trim() || !draft.dict_value.trim()}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存条目"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
-  </form>
+  return <FormDialog
+    open
+    onOpenChange={(open) => { if (!open) onCancel() }}
+    title={draft.dict_data_id ? <LocalizedText text={"编辑字典条目"} /> : <LocalizedText text={"创建字典条目"} />}
+    formAriaLabel={draft.dict_data_id ? '编辑字典条目' : '创建字典条目'}
+    description="为当前选中的字典类型添加标签、键值和展示样式。"
+    error={error}
+    submitLabel={draft.dict_data_id ? <LocalizedText text={"保存条目"} /> : <LocalizedText text={"创建条目"} />}
+    pending={pending}
+    disabled={!draft.dict_label.trim() || !draft.dict_value.trim()}
+    onSubmit={onSave}
+    onCancel={onCancel}
+  >
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"标签"} /></span><Input autoFocus required maxLength={100} className={input} value={draft.dict_label} onChange={(event) => set('dict_label', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"键值"} /></span><Input required maxLength={100} className={input} value={draft.dict_value} onChange={(event) => set('dict_value', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"排序"} /></span><Input type="number" min={0} className={input} value={draft.dict_sort} onChange={(event) => set('dict_sort', Number(event.target.value))} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"默认值"} /></span><LocalizedNativeSelect className={input} value={draft.is_default} onChange={(event) => set('is_default', event.target.value as 'Y' | 'N')}><option value="N"><LocalizedText text={"否"} /></option><option value="Y"><LocalizedText text={"是"} /></option></LocalizedNativeSelect></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={input} value={draft.status} onChange={(event) => set('status', event.target.value as '0' | '1')}><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"CSS 样式"} /></span><Input maxLength={100} className={input} value={draft.css_class} onChange={(event) => set('css_class', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"列表样式"} /></span><Input maxLength={100} className={input} value={draft.list_class} onChange={(event) => set('list_class', event.target.value)} /></label>
+      <label className="space-y-1 text-sm sm:col-span-2 lg:col-span-3"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={2} className="w-full rounded-md border bg-background p-3" value={draft.remark} onChange={(event) => set('remark', event.target.value)} /></label>
+    </div>
+  </FormDialog>
 }
 
 function emptyTypeDraft(): TypeDraft { return { dict_name: '', dict_type: '', order_num: 0, status: '0', remark: '' } }

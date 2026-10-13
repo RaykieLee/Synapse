@@ -42,7 +42,7 @@ const defaultValues: Partial<NotificationsFormValues> = {
   security_emails: true,
 }
 
-export function NotificationsForm() {
+export function NotificationsForm({ onSaved }: { onSaved?: () => void }) {
   const form = useForm<NotificationsFormValues>({
     resolver: zodResolver(notificationsFormSchema),
     defaultValues,
@@ -51,7 +51,7 @@ export function NotificationsForm() {
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((data) => showSubmittedData(data))}
+        onSubmit={form.handleSubmit((data) => { showSubmittedData(data); onSaved?.() })}
         className='space-y-8'
       >
         <FormField

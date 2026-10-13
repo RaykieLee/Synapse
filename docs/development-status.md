@@ -14,6 +14,8 @@
 
 > 2026-10-13 F26b-backend、F27b-1、F32 第一阶段完成最新修复与独立复验：F26b WakeupDispatcher 增加 consuming lease 的 attempt-safe CAS 恢复、任意 spawn 失败回滚和有界 512 条启动恢复索引，聚焦测试 `12 passed`；F27b 控制面增加创建/更新授权、创建者保护、tenant/workspace 复合外键和数据库级单 active run 约束，聚焦测试 `6 passed`，全新 Alembic `0001 -> 0018` 升级通过；F32 endpoint DNS 解析失败改为 fail-closed，同时保留开发环境 localhost 放行，聚焦测试 `4 passed`。这些修复仍不等于 C 级真实 AgentScope model/tool 执行、真实团队 worker 或真实 provider connection；F27b 仍为 `durable_control_only`。当前 API 全量、compile/build/lint 结果仍以各复验报告为准，真实模型 provider、真实工具执行和登录后的双角色浏览器场景仍未宣称通过。详见 [F26b-backend 复验](verification/F26b-wakeup-workspace-context-reacceptance-20261013.md)、[F27b 复验](verification/F27b-team-orchestration-reacceptance-20261013.md)、[F32 复验](verification/F32-model-provider-custom-model-reacceptance-20261013.md)。
 
+> 2026-10-13 设置域交互收口：个人资料、账号密码、外观、显示和通知页面改为“当前设置摘要 + 编辑弹窗”，保留原有设置路由和提交语义；移动端摘要按钮改为纵向布局，设置侧栏移动端选择器改为直接受路由控制。当前已通过设置域 ESLint、前端构建和既有 5 个前端测试文件（47 项）；Display/Notifications 仍是模板演示提交，未接入持久化 API，未宣称真实设置保存验收。
+
 ## 功能任务
 
 > 2026-10-12 F17 附件域已完成渐进式 service 化与前端 API 收口：新增 `AttachmentService`、附件 schema 和 `src/api/attachments.ts`，保持现有 wire contract、权限矩阵、个人附件 404 隐私语义和文件补偿行为；F17a 定向 API、默认 API、compileall、build、ESLint 及 F17b 真实 Redis/Vite/Chromium 均通过。验收中修复了中文 locale 反向翻译和 Windows Vite 子进程清理；证据见 [F17 附件 Service 化方案](verification/F17-attachment-service-refactor.md)、[F17a 附件验收](verification/F17a-attachments-api.md) 和 [F17b 附件前端验收](verification/F17b-attachments-frontend.md)。

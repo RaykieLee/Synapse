@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LocalizedText } from '@/components/localized-text'
 
-export function ProfileForm() {
+export function ProfileForm({ onSaved }: { onSaved?: () => void }) {
   const user = useAuthStore((s) => s.auth.user)
   const setUser = useAuthStore((s) => s.auth.setUser)
   const [form, setForm] = useState(() => ({
@@ -29,7 +29,7 @@ export function ProfileForm() {
     event.preventDefault(); setSaving(true)
     try {
       const updated = await api<AuthUser>('/account/profile', { method: 'PATCH', body: JSON.stringify({ nick_name: form.nick_name || null, email: form.email || null, phonenumber: form.phonenumber || null, sex: form.sex || null, avatar: form.avatar || null }) })
-      setUser(updated); toast.success('Profile updated.')
+      setUser(updated); toast.success('Profile updated.'); onSaved?.()
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not update profile.') }
     finally { setSaving(false) }
   }

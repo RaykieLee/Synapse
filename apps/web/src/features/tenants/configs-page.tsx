@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
-import { formatMessage, useLocaleText } from '@/lib/i18n'
 import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
@@ -17,6 +16,9 @@ import {
 import { ApiProblem } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
+import { FormDialog } from '@/components/form-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 type ConfigDraft = {
   config_id?: string
@@ -44,7 +46,6 @@ export function TenantConfigsPage() {
 }
 
 function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: string }) {
-  const t = useLocaleText()
   const client = useQueryClient()
   const [page, setPage] = useState(1)
   const [nameFilter, setNameFilter] = useState('')
@@ -54,7 +55,9 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
   const [sensitiveFilter, setSensitiveFilter] = useState('')
   const [draft, setDraft] = useState<ConfigDraft | null>(null)
   const [draftTenantId, setDraftTenantId] = useState<string | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<TenantConfig | null>(null)
   const [error, setError] = useState('')
+  const [saveError, setSaveError] = useState('')
   const [reveal, setReveal] = useState<{ tenantId: string; id: string; name: string; value: string | null; loading: boolean; error: string }>({ tenantId: '', id: '', name: '', value: null, loading: false, error: '' })
   const revealRequest = useRef(0)
   const tenantKey = ['synapse', actorId, tenantId, 'personal', 'tenant'] as const
@@ -88,13 +91,13 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
       if (value.is_sensitive && !replaceSensitiveValue) delete payload.config_value
       return updateTenantConfig(tenantId, config_id, payload)
     },
-    onSuccess: async () => { setDraft(null); setDraftTenantId(null); setError(''); await refresh() },
-    onError: (cause) => setError(errorText(cause)),
+    onSuccess: async () => { setDraft(null); setDraftTenantId(null); setSaveError(''); setError(''); await refresh() },
+    onError: (cause) => setSaveError(errorText(cause)),
   })
   const remove = useMutation({
     mutationFn: (id: string) => deleteTenantConfig(tenantId, id),
-    onSuccess: async () => { setError(''); await refresh() },
-    onError: (cause) => setError(errorText(cause)),
+    onSuccess: async () => { setRemoveTarget(null); setError(''); await refresh() },
+    onError: (cause) => { setRemoveTarget(null); setError(errorText(cause)) },
   })
   const toggle = useMutation({
     mutationFn: ({ id, status }: { id: string; status: '0' | '1' }) => updateTenantConfig(tenantId, id, { status }),
@@ -130,13 +133,20 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
   const busy = save.isPending || remove.isPending || toggle.isPending
   const setFilter = (setter: (value: string) => void) => (value: string) => { setter(value); setPage(1) }
   return <main className="space-y-5 p-6">
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户参数配置"} /></h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的运行参数。敏感值不会显示在列表或写入响应中，只会在你主动查看时单独请求。"} /></p></div><button className={primary} onClick={() => { setError(''); setDraftTenantId(tenantId); setDraft(emptyDraft()) }}><LocalizedText text={"创建参数"} /></button></header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户参数配置"} /></h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的运行参数。敏感值不会显示在列表或写入响应中，只会在你主动查看时单独请求。"} /></p></div><button className={primary} onClick={() => { setError(''); setSaveError(''); setDraftTenantId(tenantId); setDraft(emptyDraft()) }}><LocalizedText text={"创建参数"} /></button></header>
     {error && <ErrorBox message={error} />}
-    {draft && draftTenantId === tenantId && <ConfigEditor draft={draft} pending={save.isPending} onChange={setDraft} onCancel={() => { setDraft(null); setDraftTenantId(null) }} onSave={() => save.mutate(draft)} />}
-    {reveal.id && reveal.tenantId === tenantId && <section className={`${panel} space-y-3`} role="dialog" aria-modal="true" aria-label={t('查看敏感配置值')}>
-      <div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold"><LocalizedText text={"敏感配置："} />{reveal.name}</h2><p className="text-sm text-muted-foreground"><LocalizedText text={"仅本次按需读取；关闭后页面状态会清除。"} /></p></div><button className={button} onClick={closeReveal}><LocalizedText text={"关闭"} /></button></div>
-      {reveal.loading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在安全读取…"} /></p> : reveal.error ? <ErrorBox message={reveal.error} /> : <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-md border bg-muted/30 p-3 text-sm">{reveal.value ?? '（空值）'}</pre>}
-    </section>}
+    {draft && draftTenantId === tenantId && <ConfigEditor draft={draft} pending={save.isPending} error={saveError} onChange={setDraft} onCancel={() => { setDraft(null); setDraftTenantId(null); setSaveError('') }} onSave={() => save.mutate(draft)} />}
+    {reveal.id && reveal.tenantId === tenantId && (
+      <Dialog open onOpenChange={(open) => { if (!open) closeReveal() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle><LocalizedText text={"敏感配置："} />{reveal.name}</DialogTitle>
+            <DialogDescription><LocalizedText text={"仅本次按需读取；关闭后页面状态会清除。"} /></DialogDescription>
+          </DialogHeader>
+          {reveal.loading ? <p className="text-sm text-muted-foreground"><LocalizedText text={"正在安全读取…"} /></p> : reveal.error ? <ErrorBox message={reveal.error} /> : <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-md border bg-muted/30 p-3 text-sm">{reveal.value ?? '（空值）'}</pre>}
+        </DialogContent>
+      </Dialog>
+    )}
     <section className={`${panel} space-y-4`}>
       <div><h2 className="font-semibold"><LocalizedText text={"配置列表"} /></h2><p className="text-sm text-muted-foreground"><LocalizedText text={"按名称、键名、分组、状态和敏感级别筛选；敏感值仅显示为“未加载”。"} /></p></div>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
@@ -153,25 +163,49 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
           <td className="max-w-sm p-3">{row.is_sensitive || row.value_redacted ? <span className="text-muted-foreground"><LocalizedText text={"机密值（未加载）"} /></span> : <code className="line-clamp-3 whitespace-pre-wrap break-all">{row.config_value ?? ''}</code>}</td>
           <td className="p-3">{row.is_frontend && !row.is_sensitive ? <LocalizedText text={"租户成员可读"} /> : <LocalizedText text={"仅管理员"} />}</td>
           <td className="whitespace-nowrap p-3 text-xs text-muted-foreground">{new Date(row.updated_at).toLocaleString('zh-CN')}<span className="block"><LocalizedText text={"用户 "} />{row.updated_by}</span></td>
-          <td className="space-x-3 whitespace-nowrap p-3">{row.is_sensitive && <button className="underline" disabled={reveal.loading} onClick={() => void revealValue(row)}><LocalizedText text={"查看敏感值"} /></button>}<button className="underline" onClick={() => { setError(''); setDraftTenantId(tenantId); setDraft(toDraft(row)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={busy} onClick={() => toggle.mutate({ id: row.config_id, status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={busy} onClick={() => { if (window.confirm(formatMessage('删除参数“{name}”？', { name: row.config_name }))) remove.mutate(row.config_id) }}><LocalizedText text={"删除"} /></button></td>
+          <td className="space-x-3 whitespace-nowrap p-3">{row.is_sensitive && <button className="underline" disabled={reveal.loading} onClick={() => void revealValue(row)}><LocalizedText text={"查看敏感值"} /></button>}<button className="underline" onClick={() => { setError(''); setSaveError(''); setDraftTenantId(tenantId); setDraft(toDraft(row)) }}><LocalizedText text={"编辑"} /></button><button className="underline disabled:opacity-50" disabled={busy} onClick={() => toggle.mutate({ id: row.config_id, status: row.status === '0' ? '1' : '0' })}>{row.status === '0' ? <LocalizedText text={"停用"} /> : <LocalizedText text={"启用"} />}</button><button className="text-destructive underline disabled:opacity-50" disabled={busy} onClick={() => setRemoveTarget(row)}><LocalizedText text={"删除"} /></button></td>
         </tr>)}
       </tbody></table></div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无参数配置"} /></p>}
       <Pager page={page} size={20} total={configs.data?.total ?? 0} setPage={setPage} />
     </section>
+    <ConfirmDialog
+      open={Boolean(removeTarget)}
+      onOpenChange={(open) => { if (!open && !remove.isPending) setRemoveTarget(null) }}
+      title="删除参数"
+      desc="删除后不能恢复；被其他业务引用时服务端可能拒绝删除。"
+      confirmText="确认删除"
+      destructive
+      isLoading={remove.isPending}
+      handleConfirm={() => { if (removeTarget) remove.mutate(removeTarget.config_id) }}
+    >
+      {removeTarget && <div className='text-sm'><p className='font-medium'>{removeTarget.config_name}</p><code className='text-xs text-muted-foreground'>{removeTarget.config_key}</code></div>}
+    </ConfirmDialog>
   </main>
 }
 
-function ConfigEditor({ draft, pending, onChange, onCancel, onSave }: {
+function ConfigEditor({ draft, pending, error, onChange, onCancel, onSave }: {
   draft: ConfigDraft
   pending: boolean
+  error: string
   onChange: (draft: ConfigDraft) => void
   onCancel: () => void
   onSave: () => void
 }) {
   const set = <K extends keyof ConfigDraft>(key: K, value: ConfigDraft[K]) => onChange({ ...draft, [key]: value })
   const updateSensitive = Boolean(draft.config_id && draft.is_sensitive)
-  return <form className={`${panel} space-y-4`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
-    <h2 className="font-semibold">{draft.config_id ? <LocalizedText text={"编辑参数配置"} /> : <LocalizedText text={"创建参数配置"} />}</h2>
+  return <FormDialog
+    open
+    onOpenChange={(open) => { if (!open) onCancel() }}
+    title={draft.config_id ? <LocalizedText text={"编辑参数配置"} /> : <LocalizedText text={"创建参数配置"} />}
+    formAriaLabel={draft.config_id ? '编辑参数配置' : '创建参数配置'}
+    description="配置租户运行参数、公开读取范围和敏感级别。"
+    error={error}
+    submitLabel={draft.config_id ? <LocalizedText text={"保存配置"} /> : <LocalizedText text={"创建参数"} />}
+    pending={pending}
+    disabled={!draft.config_name.trim() || !draft.config_key.trim()}
+    onSubmit={onSave}
+    onCancel={onCancel}
+  >
     {updateSensitive && <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><LocalizedText text={"现有机密值不会自动读取。勾选“替换敏感值”后输入新值；不勾选则仅保存其他字段。"} /></p>}
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <label className="space-y-1 text-sm"><span><LocalizedText text={"配置名称"} /></span><Input autoFocus required maxLength={100} className={input} value={draft.config_name} onChange={(event) => set('config_name', event.target.value)} /></label>
@@ -194,8 +228,7 @@ function ConfigEditor({ draft, pending, onChange, onCancel, onSave }: {
       onChange={(event) => set('config_value', event.target.value)}
     /></label>
     <label className="block space-y-1 text-sm"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={2} className="w-full rounded-md border bg-background p-3" value={draft.remark} onChange={(event) => set('remark', event.target.value)} /></label>
-    <div className="flex gap-2"><button className={primary} disabled={pending || !draft.config_name.trim() || !draft.config_key.trim()}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存配置"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
-  </form>
+  </FormDialog>
 }
 
 function emptyDraft(): ConfigDraft { return { config_name: '', config_key: '', config_value: '', group_name: '', is_frontend: false, is_sensitive: false, status: '0', remark: '', replaceSensitiveValue: true } }

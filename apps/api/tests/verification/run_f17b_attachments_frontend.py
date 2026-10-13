@@ -72,7 +72,7 @@ def main():
         secret = "f17b-verification-only-secret"
         redis_host = os.environ.get("F17B_REDIS_HOST", "127.0.0.1")
         redis_port = int(os.environ.get("F17B_REDIS_PORT", "6380"))
-        redis_client = redis.Redis(host=redis_host, port=redis_port, db=13, socket_connect_timeout=1)
+        redis_client = redis.Redis(host=redis_host, port=redis_port, db=13, socket_connect_timeout=5)
         redis_version = str(redis_client.info("server").get("redis_version", "0"))
         if int(redis_version.split(".")[0]) < 7:
             raise RuntimeError(f"F17b requires Redis 7+, got {redis_version}")

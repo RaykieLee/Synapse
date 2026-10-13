@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { Input } from '@/components/ui/input'
-import { formatMessage } from '@/lib/i18n'
 import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
+import { FormDialog } from '@/components/form-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 type Department = {
   department_id: string
@@ -28,7 +29,6 @@ type DepartmentOrder = { department_id: string; parent_id: string | null; order_
 
 const panel = 'rounded-lg border bg-card p-5 shadow-sm'
 const input = 'h-10 w-full rounded-md border bg-background px-3 text-sm'
-const button = 'rounded-md border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50'
 const primary = 'rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50'
 
 export function TenantDepartmentsPage() {
@@ -36,7 +36,9 @@ export function TenantDepartmentsPage() {
   const { tenantId } = useParams({ from: '/_authenticated/tenants/$tenantId/departments' })
   const client = useQueryClient()
   const [draft, setDraft] = useState<DepartmentDraft | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Department | null>(null)
   const [error, setError] = useState('')
+  const [saveError, setSaveError] = useState('')
   const actorId = actor?.user_id ?? 'anonymous'
   const tenantKey = ['synapse', actorId, tenantId, 'personal', 'tenant']
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
@@ -58,8 +60,8 @@ export function TenantDepartmentsPage() {
         ? api<Department>(`/tenants/${tenantId}/departments/${department_id}`, { method: 'PATCH', body: JSON.stringify(body) })
         : api<Department>(`/tenants/${tenantId}/departments`, { method: 'POST', body: JSON.stringify(body) })
     },
-    onSuccess: async () => { setDraft(null); setError(''); await invalidate() },
-    onError: (cause) => setError(errorText(cause)),
+    onSuccess: async () => { setDraft(null); setSaveError(''); setError(''); await invalidate() },
+    onError: (cause) => setSaveError(errorText(cause)),
   })
   const reorder = useMutation({
     mutationFn: (items: DepartmentOrder[]) => api<{ updated: number }>(`/tenants/${tenantId}/departments/reorder`, { method: 'POST', body: JSON.stringify({ items }) }),
@@ -73,8 +75,8 @@ export function TenantDepartmentsPage() {
   })
   const remove = useMutation({
     mutationFn: (departmentId: string) => api<void>(`/tenants/${tenantId}/departments/${departmentId}`, { method: 'DELETE' }),
-    onSuccess: async () => { setError(''); await invalidate() },
-    onError: (cause) => setError(errorText(cause)),
+    onSuccess: async () => { setRemoveTarget(null); setError(''); await invalidate() },
+    onError: (cause) => { setRemoveTarget(null); setError(errorText(cause)) },
   })
 
   if (tenant.isLoading) return <main className="p-6"><LocalizedText text={"正在加载租户…"} /></main>
@@ -92,13 +94,25 @@ export function TenantDepartmentsPage() {
   }
 
   return <main className="space-y-5 p-6">
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户部门"} /></h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的部门层级、排序和状态。部门不会自动关联租户成员。"} /></p></div><button className={primary} onClick={() => { setError(''); setDraft(emptyDraft()) }}><LocalizedText text={"创建部门"} /></button></header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-semibold"><LocalizedText text={"租户部门"} /></h1><p className="mt-1 max-w-2xl text-sm text-muted-foreground"><LocalizedText text={"管理当前租户的部门层级、排序和状态。部门不会自动关联租户成员。"} /></p></div><button className={primary} onClick={() => { setError(''); setSaveError(''); setDraft(emptyDraft()) }}><LocalizedText text={"创建部门"} /></button></header>
     {error && <ErrorBox message={error} />}
-    {draft && <DepartmentEditor draft={draft} departments={flat} pending={save.isPending} onChange={setDraft} onCancel={() => setDraft(null)} onSave={() => save.mutate(draft)} />}
+    {draft && <DepartmentEditor draft={draft} departments={flat} pending={save.isPending} error={saveError} onChange={setDraft} onCancel={() => { setDraft(null); setSaveError('') }} onSave={() => save.mutate(draft)} />}
     <section className={`${panel} space-y-4`}>
       <div><h2 className="font-semibold"><LocalizedText text={"部门树"} /></h2><p className="text-sm text-muted-foreground"><LocalizedText text={"上移或下移调整同级顺序；编辑部门可移动到其他有效父级。停用部门会保留在树中。"} /></p></div>
-      {tree.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载部门…"} /></p> : tree.isError ? <ErrorBox message={errorText(tree.error)} /> : departments.length ? <div className="space-y-2">{departments.map((department, index) => <DepartmentTreeNode key={department.department_id} department={department} siblings={departments} index={index} depth={0} pending={reorder.isPending || toggle.isPending || remove.isPending} onEdit={(value) => { setError(''); setDraft(toDraft(value)) }} onMove={moveSibling} onToggle={(value) => toggle.mutate({ departmentId: value.department_id, status: value.status === '0' ? '1' : '0' })} onDelete={(value) => { if (window.confirm(formatMessage('删除部门“{name}”？有子部门时服务端会拒绝删除。', { name: value.dept_name }))) remove.mutate(value.department_id) }} />)}</div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无部门"} /></p>}
+      {tree.isLoading ? <p className="py-6 text-center text-sm text-muted-foreground"><LocalizedText text={"正在加载部门…"} /></p> : tree.isError ? <ErrorBox message={errorText(tree.error)} /> : departments.length ? <div className="space-y-2">{departments.map((department, index) => <DepartmentTreeNode key={department.department_id} department={department} siblings={departments} index={index} depth={0} pending={reorder.isPending || toggle.isPending || remove.isPending} onEdit={(value) => { setError(''); setSaveError(''); setDraft(toDraft(value)) }} onMove={moveSibling} onToggle={(value) => toggle.mutate({ departmentId: value.department_id, status: value.status === '0' ? '1' : '0' })} onDelete={setRemoveTarget} />)}</div> : <p className="py-8 text-center text-sm text-muted-foreground"><LocalizedText text={"暂无部门"} /></p>}
     </section>
+    <ConfirmDialog
+      open={Boolean(removeTarget)}
+      onOpenChange={(open) => { if (!open && !remove.isPending) setRemoveTarget(null) }}
+      title="删除部门"
+      desc="有子部门时服务端会拒绝删除。删除后不能恢复。"
+      confirmText="确认删除"
+      destructive
+      isLoading={remove.isPending}
+      handleConfirm={() => { if (removeTarget) remove.mutate(removeTarget.department_id) }}
+    >
+      {removeTarget && <p className='text-sm font-medium'>{removeTarget.dept_name}</p>}
+    </ConfirmDialog>
   </main>
 }
 
@@ -123,10 +137,11 @@ function DepartmentTreeNode({ department, siblings, index, depth, pending, onEdi
   </div>
 }
 
-function DepartmentEditor({ draft, departments, pending, onChange, onCancel, onSave }: {
+function DepartmentEditor({ draft, departments, pending, error, onChange, onCancel, onSave }: {
   draft: DepartmentDraft
   departments: Department[]
   pending: boolean
+  error: string
   onChange: (next: DepartmentDraft) => void
   onCancel: () => void
   onSave: () => void
@@ -138,8 +153,19 @@ function DepartmentEditor({ draft, departments, pending, onChange, onCancel, onS
     visit(draft.department_id)
   }
   const parents = departments.filter((department) => department.status === '0' && department.department_id !== draft.department_id && !descendants.has(department.department_id))
-  return <form className={`${panel} space-y-4`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
-    <h2 className="font-semibold">{draft.department_id ? <LocalizedText text={"编辑部门"} /> : <LocalizedText text={"创建部门"} />}</h2>
+  return <FormDialog
+    open
+    onOpenChange={(open) => { if (!open) onCancel() }}
+    title={draft.department_id ? <LocalizedText text={"编辑部门"} /> : <LocalizedText text={"创建部门"} />}
+    formAriaLabel={draft.department_id ? '编辑部门' : '创建部门'}
+    description="配置部门层级、负责人信息和启用状态。"
+    error={error}
+    submitLabel={draft.department_id ? <LocalizedText text={"保存部门"} /> : <LocalizedText text={"创建部门"} />}
+    pending={pending}
+    disabled={!draft.dept_name.trim()}
+    onSubmit={onSave}
+    onCancel={onCancel}
+  >
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <label className="space-y-1 text-sm"><span><LocalizedText text={"部门名称"} /></span><Input autoFocus required maxLength={30} className={input} value={draft.dept_name} onChange={(event) => set('dept_name', event.target.value)} /></label>
       <label className="space-y-1 text-sm"><span><LocalizedText text={"上级部门"} /></span><LocalizedNativeSelect className={input} value={draft.parent_id ?? ''} onChange={(event) => set('parent_id', event.target.value || null)}><option value=""><LocalizedText text={"顶级部门"} /></option>{parents.map((department) => <option key={department.department_id} value={department.department_id}>{department.dept_name}</option>)}</LocalizedNativeSelect></label>
@@ -149,8 +175,7 @@ function DepartmentEditor({ draft, departments, pending, onChange, onCancel, onS
       <label className="space-y-1 text-sm"><span><LocalizedText text={"邮箱"} /></span><Input type="email" maxLength={50} className={input} value={draft.email} onChange={(event) => set('email', event.target.value)} /></label>
       <label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={input} value={draft.status} onChange={(event) => set('status', event.target.value as '0' | '1')}><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label>
     </div>
-    <div className="flex gap-2"><button className={primary} disabled={pending || !draft.dept_name.trim()}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存部门"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
-  </form>
+  </FormDialog>
 }
 
 function emptyDraft(): DepartmentDraft { return { dept_name: '', parent_id: null, order_num: 0, leader: '', phone: '', email: '', status: '0' } }

@@ -28,7 +28,7 @@ const appearanceFormSchema = z.object({
 
 type AppearanceFormValues = z.infer<typeof appearanceFormSchema>
 
-export function AppearanceForm() {
+export function AppearanceForm({ onSaved }: { onSaved?: () => void }) {
   const { font, setFont } = useFont()
   const { theme, setTheme } = useTheme()
 
@@ -47,7 +47,7 @@ export function AppearanceForm() {
     if (data.font != font) setFont(data.font)
     if (data.theme != theme) setTheme(data.theme)
 
-    showSubmittedData(data)
+    showSubmittedData(data); onSaved?.()
   }
 
   return (

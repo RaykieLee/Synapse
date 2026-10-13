@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -16,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[4]
 API = ROOT / "apps" / "api"
 WEB = ROOT / "apps" / "web"
 PLAYWRIGHT = Path(__file__).with_name("f23a2_agent_management_frontend.mjs")
+PNPM = shutil.which("pnpm") or ("pnpm.cmd" if os.name == "nt" else "pnpm")
 
 
 def free_port():
@@ -38,8 +40,26 @@ def wait_url(url, process, timeout=40):
     raise RuntimeError(f"timed out waiting for {url}")
 
 
+def terminate_process_tree(process):
+    if process is None:
+        return
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+            )
+        else:
+            process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=10)
+
+
 def main():
-    build = subprocess.run(["pnpm", "build"], cwd=WEB, text=True)
+    build = subprocess.run([PNPM, "build"], cwd=WEB, text=True)
     if build.returncode:
         return build.returncode
 
@@ -133,7 +153,7 @@ def main():
         web_log = (temp_path / "vite.log").open("w")
         api = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", str(api_port)], cwd=API, env=env, stdout=api_log, stderr=api_log)
         env["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{api_port}"
-        web = subprocess.Popen(["pnpm", "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
+        web = subprocess.Popen([PNPM, "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=web_log)
         seed.update({"web": f"http://127.0.0.1:{web_port}", "api": f"http://127.0.0.1:{api_port}/api/v1"})
         seed_path.write_text(json.dumps(seed))
         try:
@@ -147,9 +167,11 @@ def main():
                 raise
             return subprocess.run(["node", str(PLAYWRIGHT), str(seed_path)], cwd=WEB, env=env).returncode
         finally:
-            web.terminate(); api.terminate()
-            web.wait(timeout=10); api.wait(timeout=10)
+            terminate_process_tree(web); terminate_process_tree(api)
             api_log.close(); web_log.close()
+            get_engine().dispose()
+            get_session_factory.cache_clear()
+            get_engine.cache_clear()
             asyncio.run(clean_old_fixture_records())
 
 

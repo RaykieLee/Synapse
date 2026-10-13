@@ -22,18 +22,20 @@ const login = (username, password) => page.evaluate(async ({ user_name, password
   const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_name, password: pass }) })
   return { status: response.status, body: await response.json() }
 }, { user_name: username, password })
-const searchFor = async (value) => {
+const searchFor = async (value, expectedTotal = value ? 1 : 25) => {
   const input = page.getByLabel('搜索用户')
   await input.fill(value)
   await page.waitForURL((url) => {
     const current = url.searchParams.get('search') ?? ''
     return url.pathname === '/users' && current === value
   })
-  if (value) {
-    await page.getByText('共 1 个账号').waitFor()
+  await page.getByText(`共 ${expectedTotal} 个账号`).waitFor()
+  if (value && expectedTotal > 0) {
     await rowFor(value).waitFor()
   }
-  else await page.getByText(/共 \d+ 个账号/).waitFor()
+  else if (value) {
+    await page.getByText('没有匹配的用户。').waitFor()
+  }
 }
 
 try {
@@ -41,7 +43,7 @@ try {
   await setToken(seed.admin_token)
   await page.goto(`${seed.web}/users?page=1&pageSize=10`)
   await page.getByRole('heading', { name: '全局用户' }).waitFor()
-  await page.getByRole('link', { name: 'Users' }).waitFor()
+  await page.locator('a[href="/users"]').waitFor()
   await page.getByText('共 25 个账号').waitFor()
   assert.equal(await page.locator('tbody tr').count(), 10, 'page size limits the visible live rows')
   await page.getByText('第 1 / 3 页').waitFor()
@@ -78,9 +80,7 @@ try {
   assert.equal(createOutcome, 'success', `create user outcome: ${createOutcome}; API ${createResponse.status()} ${JSON.stringify(createBody)}`)
   await searchFor('f11a-created')
   assert.equal(await rowFor('f11a-created').count(), 1)
-  const createdIdentityCell = await rowFor('f11a-created').locator('td:first-child').innerText()
-  assert.match(createdIdentityCell, /user/, 'new account is not created as a platform admin')
-  assert.doesNotMatch(createdIdentityCell, /platform_admin/)
+  assert.equal(createBody.platform_role, 'user', 'new account is created as a regular user, not a platform admin')
 
   await page.getByRole('button', { name: '创建用户' }).click()
   await page.getByLabel('用户名').fill('f11a-another-name')
@@ -109,10 +109,12 @@ try {
   assert.equal(victimLogin.status, 200)
   const beforeDisable = victimLogin.body.access_token
   await victimRow.getByRole('button', { name: '停用' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '确认停用' }).click()
   await page.getByRole('status').filter({ hasText: '账号已停用' }).waitFor()
   await victimRow.getByText('已停用').waitFor()
   assert.equal(await apiStatus(beforeDisable), 401)
   await victimRow.getByRole('button', { name: '启用' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '确认启用' }).click()
   await page.getByRole('status').filter({ hasText: '账号已启用' }).waitFor()
   const afterReactivate = await login('f11a-victim', seed.password)
   assert.equal(afterReactivate.status, 200)
@@ -129,18 +131,18 @@ try {
   assert.equal(resetLogin.status, 200)
 
   // Soft delete removes the account from list/search and revokes its current token.
-  page.once('dialog', (dialog) => dialog.accept())
   await victimRow.getByRole('button', { name: '删除' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '确认软删除' }).click()
   await victimRow.waitFor({ state: 'detached' })
   assert.equal(await apiStatus(resetLogin.body.access_token), 401)
-  await searchFor('f11a-victim')
+  await searchFor('f11a-victim', 0)
   await page.getByText('没有匹配的用户。').waitFor()
 
   // Ordinary user has no Users navigation entry and cannot enter the route directly.
   await setToken(seed.ordinary_token)
   await page.goto(`${seed.web}/`)
   await page.getByRole('heading').first().waitFor()
-  assert.equal(await page.getByRole('link', { name: 'Users' }).count(), 0, 'ordinary-user sidebar hides platform user management')
+  assert.equal(await page.locator('a[href="/users"]').count(), 0, 'ordinary-user sidebar hides platform user management')
   await page.goto(`${seed.web}/users`)
   await page.waitForURL((url) => url.pathname === '/403')
   assert.equal(await page.getByRole('heading', { name: '全局用户' }).count(), 0, 'direct route is rejected for ordinary account')

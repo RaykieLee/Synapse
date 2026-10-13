@@ -1,5 +1,7 @@
+import * as React from 'react'
 import { MoreHorizontal, RotateCcw } from 'lucide-react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
+import { DetailDialog } from '@/components/detail-dialog'
 import type { Member, MemberRole } from '@/api/tenants'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,6 +11,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -48,20 +59,32 @@ export function MemberTable({
   onStatusChange,
   onRemove,
   onReactivate,
+  mutationPending,
+  mutationError,
   renderCustomRole,
 }: {
   members: Member[]
   canManage: boolean
   currentRole: 'owner' | 'admin' | 'member' | null
   loading: boolean
-  onRoleChange: (member: Member, role: MemberRole) => void
-  onStatusChange: (member: Member, status: Member['status']) => void
-  onRemove: (member: Member) => void
-  onReactivate: (member: Member) => void
+  onRoleChange: (member: Member, role: MemberRole) => Promise<unknown>
+  onStatusChange: (member: Member, status: Member['status']) => Promise<unknown>
+  onRemove: (member: Member) => Promise<unknown>
+  onReactivate: (member: Member) => Promise<unknown>
+  mutationPending: boolean
+  mutationError: string
   renderCustomRole: (member: Member) => React.ReactNode
 }) {
-  const t = useLocaleText()
   const columnCount = canManage ? 6 : 5
+  const [roleTarget, setRoleTarget] = React.useState<{
+    member: Member
+    role: MemberRole
+  } | null>(null)
+  const [statusTarget, setStatusTarget] = React.useState<{
+    member: Member
+    status: Member['status']
+    action: 'suspend' | 'remove' | 'reactivate'
+  } | null>(null)
 
   return (
     <div className='overflow-hidden border-t'>
@@ -96,31 +119,28 @@ export function MemberTable({
                     <p className='text-xs text-muted-foreground'>
                       {member.email || member.user_name}
                     </p>
-                    <details className='text-xs text-muted-foreground'>
-                      <summary className='w-fit cursor-pointer'><LocalizedText text={"技术信息"} /></summary>
-                      <div className='mt-1 flex flex-wrap items-center gap-2'>
-                        <code>账号 ID {member.user_id}</code>
-                        <button type='button' className='underline' onClick={() => navigator.clipboard.writeText(member.user_id)}><LocalizedText text={"复制"} /></button>
+                    <DetailDialog
+                      trigger={<LocalizedText text={"技术信息"} />}
+                      title={<LocalizedText text={"成员技术信息"} />}
+                      description={member.nick_name || member.user_name}
+                      triggerClassName='mt-1 h-auto px-0 py-0 text-xs text-muted-foreground underline'
+                    >
+                      <div className='space-y-2 text-sm'>
+                        <p><LocalizedText text={"账号 ID："} /><code className='break-all'>{member.user_id}</code></p>
+                        <Button size='sm' variant='outline' onClick={() => navigator.clipboard.writeText(member.user_id)}><LocalizedText text={"复制 ID"} /></Button>
                       </div>
-                    </details>
+                    </DetailDialog>
                   </div>
                 </TableCell>
                 <TableCell>
                   {canManage && member.tenant_role !== 'owner' ? (
-                    <LocalizedNativeSelect
-                      aria-label={`${member.user_name} ${t('角色')}`}
-                      className='h-8 rounded-md border bg-background px-2 text-sm shadow-xs'
-                      value={member.tenant_role}
-                      onChange={(event) =>
-                        onRoleChange(member, event.target.value as MemberRole)
-                      }
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setRoleTarget({ member, role: member.tenant_role })}
                     >
-                      <option value='member'><LocalizedText text={"成员"} /></option>
-                      <option value='admin'><LocalizedText text={"管理员"} /></option>
-                      {currentRole === 'owner' ? (
-                        <option value='owner'><LocalizedText text={"所有者"} /></option>
-                      ) : null}
-                    </LocalizedNativeSelect>
+                      {tenantText[member.tenant_role]}
+                    </Button>
                   ) : (
                     <Badge variant='outline'>
                       {tenantText[member.tenant_role]}
@@ -144,15 +164,16 @@ export function MemberTable({
                     ) : member.status === 'active' ? (
                       <MemberRowActions
                         member={member}
-                        onStatusChange={onStatusChange}
-                        onRemove={onRemove}
+                        onStatusConfirm={(status) =>
+                          setStatusTarget({ member, status, action: status === 'suspended' ? 'suspend' : 'remove' })
+                        }
                       />
                     ) : member.status === 'removed' ||
                       member.status === 'suspended' ? (
                       <Button
                         variant='ghost'
                         size='sm'
-                        onClick={() => onReactivate(member)}
+                        onClick={() => setStatusTarget({ member, status: 'active', action: 'reactivate' })}
                       >
                         <RotateCcw className='size-4' /> <LocalizedText text={" 重新加入\n                      "} /></Button>
                     ) : (
@@ -174,18 +195,152 @@ export function MemberTable({
           )}
         </TableBody>
       </Table>
+      <Dialog
+        open={Boolean(roleTarget)}
+        onOpenChange={(open) => {
+          if (!open && !mutationPending) setRoleTarget(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle><LocalizedText text={'编辑成员角色'} /></DialogTitle>
+            <DialogDescription>
+              {roleTarget?.member.nick_name || roleTarget?.member.user_name}
+              <LocalizedText text={' · 角色变化会立即影响租户权限。'} />
+            </DialogDescription>
+          </DialogHeader>
+          {mutationError && (
+            <p role='alert' className='text-sm text-destructive'>
+              {mutationError}
+            </p>
+          )}
+          <div className='space-y-2'>
+            <Label htmlFor='member-role'><LocalizedText text={'租户角色'} /></Label>
+            <LocalizedNativeSelect
+              id='member-role'
+              className='h-10 w-full rounded-md border bg-background px-3 text-sm'
+              disabled={mutationPending}
+              value={roleTarget?.role ?? 'member'}
+              onChange={(event) =>
+                setRoleTarget((current) =>
+                  current ? { ...current, role: event.target.value as MemberRole } : current,
+                )
+              }
+            >
+              <option value='member'><LocalizedText text={'成员'} /></option>
+              <option value='admin'><LocalizedText text={'管理员'} /></option>
+              {currentRole === 'owner' ? (
+                <option value='owner'><LocalizedText text={'所有者'} /></option>
+              ) : null}
+            </LocalizedNativeSelect>
+          </div>
+          <DialogFooter>
+            <Button
+              variant='outline'
+              disabled={mutationPending}
+              onClick={() => setRoleTarget(null)}
+            >
+              <LocalizedText text={'取消'} />
+            </Button>
+            <Button
+              disabled={
+                mutationPending ||
+                roleTarget?.role === roleTarget?.member.tenant_role
+              }
+              onClick={async () => {
+                if (!roleTarget) return
+                try {
+                  await onRoleChange(roleTarget.member, roleTarget.role)
+                  setRoleTarget(null)
+                } catch {
+                  // Keep the editor open so the mutation error remains actionable.
+                }
+              }}
+            >
+              {mutationPending ? (
+                <LocalizedText text={'保存中…'} />
+              ) : (
+                <LocalizedText text={'保存角色'} />
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(statusTarget)}
+        onOpenChange={(open) => {
+          if (!open && !mutationPending) setStatusTarget(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {statusTarget?.action === 'suspend' ? (
+                <LocalizedText text={'暂停成员'} />
+              ) : statusTarget?.action === 'remove' ? (
+                <LocalizedText text={'移除成员'} />
+              ) : (
+                <LocalizedText text={'重新加入成员'} />
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {statusTarget?.member.nick_name || statusTarget?.member.user_name}
+              <LocalizedText text={' · 确认后才会提交状态变更。'} />
+            </DialogDescription>
+          </DialogHeader>
+          {mutationError && (
+            <p role='alert' className='text-sm text-destructive'>
+              {mutationError}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              variant='outline'
+              disabled={mutationPending}
+              onClick={() => setStatusTarget(null)}
+            >
+              <LocalizedText text={'取消'} />
+            </Button>
+            <Button
+              variant={statusTarget?.action === 'remove' ? 'destructive' : 'default'}
+              disabled={mutationPending}
+              onClick={async () => {
+                if (!statusTarget) return
+                try {
+                  if (statusTarget.action === 'reactivate')
+                    await onReactivate(statusTarget.member)
+                  else if (statusTarget.action === 'remove')
+                    await onRemove(statusTarget.member)
+                  else
+                    await onStatusChange(
+                      statusTarget.member,
+                      statusTarget.status,
+                    )
+                  setStatusTarget(null)
+                } catch {
+                  // Keep the confirmation open so the mutation error is visible.
+                }
+              }}
+            >
+              {mutationPending ? (
+                <LocalizedText text={'处理中…'} />
+              ) : (
+                <LocalizedText text={'确认'} />
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
 function MemberRowActions({
   member,
-  onStatusChange,
-  onRemove,
+  onStatusConfirm,
 }: {
   member: Member
-  onStatusChange: (member: Member, status: Member['status']) => void
-  onRemove: (member: Member) => void
+  onStatusConfirm: (status: Member['status']) => void
 }) {
   const t = useLocaleText()
   return (
@@ -193,7 +348,7 @@ function MemberRowActions({
       <Button
         variant='ghost'
         size='sm'
-        onClick={() => onStatusChange(member, 'suspended')}
+        onClick={() => onStatusConfirm('suspended')}
       >
         <LocalizedText text={"\n        暂停\n      "} /></Button>
       <DropdownMenu>
@@ -210,7 +365,7 @@ function MemberRowActions({
         <DropdownMenuContent align='end' className='w-32'>
           <DropdownMenuItem
             variant='destructive'
-            onClick={() => onRemove(member)}
+            onClick={() => onStatusConfirm('removed')}
           >
             <LocalizedText text={"\n            移除成员\n          "} /></DropdownMenuItem>
         </DropdownMenuContent>

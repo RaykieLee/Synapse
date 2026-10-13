@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
-import { formatMessage } from '@/lib/i18n'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
@@ -9,6 +8,7 @@ import {
   removeWorkspaceMember,
   transferWorkspaceOwnership,
   updateWorkspace,
+  type WorkspaceMember,
 } from '@/api/workspaces'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,9 @@ import {
   type WorkspaceStatus,
 } from './types'
 import { LocalizedText } from '@/components/localized-text'
+import { FormDialog } from '@/components/form-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const panel = 'rounded-xl border bg-card p-5'
 const scopedKey = (actorId: string, workspace: Workspace, resource: string) =>
@@ -126,6 +129,8 @@ export function WorkspaceSettings() {
     workspace.workspace_role === 'owner' || workspace.workspace_role === 'admin'
   const [name, setName] = React.useState(workspace.name)
   const [icon, setIcon] = React.useState(workspace.icon ?? '')
+  const [basicOpen, setBasicOpen] = React.useState(false)
+  const [archiveOpen, setArchiveOpen] = React.useState(false)
   const [error, setError] = React.useState('')
   const refresh = async () => {
     await client.invalidateQueries({
@@ -146,6 +151,7 @@ export function WorkspaceSettings() {
       updateWorkspace(workspace.workspace_id, body),
     onSuccess: async () => {
       setError('')
+      setBasicOpen(false)
       await refresh()
     },
     onError: (cause) =>
@@ -170,23 +176,16 @@ export function WorkspaceSettings() {
       </header>
       <section className={`${panel} max-w-2xl space-y-4`}>
         <h2 className='font-semibold'><LocalizedText text={"基本信息"} /></h2>
-        <div className='space-y-2'>
-          <Label htmlFor='workspace-name-edit'><LocalizedText text={"名称"} /></Label>
-          <Input
-            id='workspace-name-edit'
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            maxLength={120}
-          />
-        </div>
-        <div className='space-y-2'>
-          <Label htmlFor='workspace-icon-edit'><LocalizedText text={"图标标识（可选）"} /></Label>
-          <Input
-            id='workspace-icon-edit'
-            value={icon}
-            onChange={(event) => setIcon(event.target.value)}
-            maxLength={64}
-          />
+        <div className='flex flex-wrap items-center justify-between gap-3'>
+          <div>
+            <p className='font-medium'>{workspace.name}</p>
+            <p className='text-sm text-muted-foreground'>
+              {workspace.icon || <LocalizedText text={'未设置图标标识'} />}
+            </p>
+          </div>
+          <Button variant='outline' onClick={() => { setError(''); setName(workspace.name); setIcon(workspace.icon ?? ''); setBasicOpen(true) }}>
+            <LocalizedText text='编辑基本信息' />
+          </Button>
         </div>
         <div className='grid gap-2 text-sm sm:grid-cols-2'>
           <div>
@@ -206,14 +205,30 @@ export function WorkspaceSettings() {
             {statusLabel[workspace.status]}
           </div>
         </div>
-        <Button
-          disabled={!name.trim() || update.isPending}
-          onClick={() =>
-            update.mutate({ name: name.trim(), icon: icon.trim() || null })
-          }
+        <FormDialog
+          open={basicOpen}
+          onOpenChange={setBasicOpen}
+          title={<LocalizedText text='编辑 Workspace 基本信息' />}
+          formAriaLabel='编辑 Workspace 基本信息'
+          description={<LocalizedText text='修改名称和图标标识，保存后会刷新当前 Workspace 导航。' />}
+          error={error}
+          submitLabel={<LocalizedText text='保存设置' />}
+          pending={update.isPending}
+          disabled={!name.trim()}
+          onSubmit={() => update.mutate({ name: name.trim(), icon: icon.trim() || null })}
+          onCancel={() => setBasicOpen(false)}
         >
-          {update.isPending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存设置"} />}
-        </Button>
+          <div className='space-y-3'>
+            <div className='space-y-2'>
+              <Label htmlFor='workspace-name-edit'><LocalizedText text={"名称"} /></Label>
+              <Input id='workspace-name-edit' autoFocus value={name} onChange={(event) => setName(event.target.value)} maxLength={120} />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='workspace-icon-edit'><LocalizedText text={"图标标识（可选）"} /></Label>
+              <Input id='workspace-icon-edit' value={icon} onChange={(event) => setIcon(event.target.value)} maxLength={64} />
+            </div>
+          </div>
+        </FormDialog>
       </section>
       <section className={`${panel} max-w-2xl`}>
         <h2 className='font-semibold'><LocalizedText text={"归档空间"} /></h2>
@@ -223,16 +238,7 @@ export function WorkspaceSettings() {
           className='mt-4'
           variant={workspace.status === 'active' ? "destructive" : "default"}
           disabled={setStatus.isPending}
-          onClick={() => {
-            if (
-              workspace.status === 'active' &&
-              !window.confirm(formatMessage('确定归档“{name}”吗？', { name: workspace.name }))
-            )
-              return
-            setStatus.mutate(
-              workspace.status === 'active' ? 'archived' : 'active'
-            )
-          }}
+          onClick={() => workspace.status === 'active' ? setArchiveOpen(true) : setStatus.mutate('active')}
         >
           {workspace.status === 'active' ? <LocalizedText text={"归档空间"} /> : <LocalizedText text={"恢复空间"} />}
         </Button>
@@ -242,6 +248,18 @@ export function WorkspaceSettings() {
           {error}
         </p>
       )}
+      <ConfirmDialog
+        open={archiveOpen}
+        onOpenChange={(open) => { if (!open && !setStatus.isPending) setArchiveOpen(false) }}
+        title='归档 Workspace'
+        desc='归档后空间不会出现在普通空间列表中，成员关系和资源会保留。'
+        confirmText='确认归档'
+        destructive
+        isLoading={setStatus.isPending}
+        handleConfirm={() => setStatus.mutate('archived', { onSuccess: () => setArchiveOpen(false) })}
+      >
+        <p className='text-sm font-medium'>{workspace.name}</p>
+      </ConfirmDialog>
     </main>
   )
 }
@@ -253,6 +271,11 @@ export function WorkspaceMembers() {
   const [targetId, setTargetId] = React.useState('')
   const [targetRole, setTargetRole] = React.useState<WorkspaceRole>('member')
   const [newOwnerId, setNewOwnerId] = React.useState('')
+  const [addOpen, setAddOpen] = React.useState(false)
+  const [roleTarget, setRoleTarget] = React.useState<{ member: WorkspaceMember; role: WorkspaceRole } | null>(null)
+  const [actionTarget, setActionTarget] = React.useState<{ kind: 'remove' | 'rejoin'; member: WorkspaceMember } | null>(null)
+  const [transferTarget, setTransferTarget] = React.useState<WorkspaceMember | null>(null)
+  const [transferOpen, setTransferOpen] = React.useState(false)
   const [error, setError] = React.useState('')
   const canManage =
     workspace.workspace_role === 'owner' || workspace.workspace_role === 'admin'
@@ -298,6 +321,10 @@ export function WorkspaceMembers() {
     onSuccess: async () => {
       setError('')
       setTargetId('')
+      setRoleTarget(null)
+      setAddOpen(false)
+      setTransferOpen(false)
+      setTransferTarget(null)
       await refresh()
     },
     onError: (cause) =>
@@ -316,6 +343,8 @@ export function WorkspaceMembers() {
     onSuccess: async () => {
       setError('')
       setNewOwnerId('')
+      setTransferOpen(false)
+      setTransferTarget(null)
       await refresh()
     },
     onError: (cause) =>
@@ -335,48 +364,37 @@ export function WorkspaceMembers() {
       {canEdit && (
         <section className={`${panel} space-y-3`}>
           <h2 className='font-semibold'><LocalizedText text={"添加或恢复成员"} /></h2>
-          <p className='text-sm text-muted-foreground'>
-            <LocalizedText text={"\n            输入现有全局账号 ID；API 会校验其当前租户成员资格。\n          "} /></p>
-          <div className='flex flex-wrap items-end gap-3'>
-            <div className='space-y-2'>
-              <Label htmlFor='workspace-member-id'><LocalizedText text={"用户 ID"} /></Label>
-              <Input
-                id='workspace-member-id'
-                inputMode='numeric'
-                pattern='[0-9]+'
-                value={targetId}
-                onChange={(event) => setTargetId(event.target.value)}
-                className='w-48'
-              />
+          <p className='text-sm text-muted-foreground'><LocalizedText text={"输入现有全局账号 ID；API 会校验其当前租户成员资格。"} /></p>
+          <Button onClick={() => { setError(''); setTargetId(''); setTargetRole('member'); setAddOpen(true) }}><LocalizedText text='加入空间' /></Button>
+          <FormDialog
+            open={addOpen}
+            onOpenChange={setAddOpen}
+            title={<LocalizedText text='添加或恢复成员' />}
+            formAriaLabel='添加或恢复成员'
+            description={<LocalizedText text='输入现有全局账号 ID，并为其选择 Workspace 角色。' />}
+            error={error}
+            submitLabel={<LocalizedText text='加入空间' />}
+            pending={changeRole.isPending}
+            disabled={!/^\d+$/.test(targetId)}
+            onSubmit={() => changeRole.mutate({ userId: targetId, workspace_role: targetRole })}
+            onCancel={() => setAddOpen(false)}
+          >
+            <div className='space-y-3'>
+              <div className='space-y-2'>
+                <Label htmlFor='workspace-member-id'><LocalizedText text='用户 ID' /></Label>
+                <Input id='workspace-member-id' autoFocus inputMode='numeric' pattern='[0-9]+' value={targetId} onChange={(event) => setTargetId(event.target.value)} />
+              </div>
+              <div className='space-y-2'>
+                <Label htmlFor='workspace-member-role'><LocalizedText text='角色' /></Label>
+                <LocalizedNativeSelect id='workspace-member-role' className='h-10 w-full rounded-md border bg-background px-3 text-sm' value={targetRole} onChange={(event) => setTargetRole(event.target.value as WorkspaceRole)}>
+                  <option value='member'><LocalizedText text='成员' /></option>
+                  <option value='viewer'><LocalizedText text='只读成员' /></option>
+                  <option value='admin'><LocalizedText text='管理员' /></option>
+                  {isOwner && <option value='owner'><LocalizedText text='所有者' /></option>}
+                </LocalizedNativeSelect>
+              </div>
             </div>
-            <div className='space-y-2'>
-              <Label htmlFor='workspace-member-role'><LocalizedText text={"角色"} /></Label>
-              <LocalizedNativeSelect
-                id='workspace-member-role'
-                className='h-9 rounded-md border bg-background px-3 text-sm'
-                value={targetRole}
-                onChange={(event) =>
-                  setTargetRole(event.target.value as WorkspaceRole)
-                }
-              >
-                <option value='member'><LocalizedText text={"成员"} /></option>
-                <option value='viewer'><LocalizedText text={"只读成员"} /></option>
-                <option value='admin'><LocalizedText text={"管理员"} /></option>
-                {isOwner && <option value='owner'><LocalizedText text={"所有者"} /></option>}
-              </LocalizedNativeSelect>
-            </div>
-            <Button
-              disabled={!/^\d+$/.test(targetId) || changeRole.isPending}
-              onClick={() =>
-                changeRole.mutate({
-                  userId: targetId,
-                  workspace_role: targetRole,
-                })
-              }
-            >
-              {changeRole.isPending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"加入空间"} />}
-            </Button>
-          </div>
+          </FormDialog>
         </section>
       )}
       <section className={panel}>
@@ -418,23 +436,13 @@ export function WorkspaceMembers() {
                         {canEdit &&
                         !protectedOwner &&
                         member.status === 'active' ? (
-                          <LocalizedNativeSelect
-                            aria-label={`${member.user_name} 空间角色`}
-                            className='rounded border bg-background p-1'
-                            value={member.workspace_role}
-                            onChange={(event) =>
-                              changeRole.mutate({
-                                userId: member.user_id,
-                                workspace_role: event.target
-                                  .value as WorkspaceRole,
-                              })
-                            }
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            onClick={() => setRoleTarget({ member, role: member.workspace_role })}
                           >
-                            <option value='member'><LocalizedText text={"成员"} /></option>
-                            <option value='viewer'><LocalizedText text={"只读成员"} /></option>
-                            <option value='admin'><LocalizedText text={"管理员"} /></option>
-                            {isOwner && <option value='owner'><LocalizedText text={"所有者"} /></option>}
-                          </LocalizedNativeSelect>
+                            {roleLabel[member.workspace_role]}
+                          </Button>
                         ) : (
                           roleLabel[member.workspace_role]
                         )}
@@ -451,30 +459,14 @@ export function WorkspaceMembers() {
                           ) : member.status === 'active' ? (
                             <button
                               className='underline'
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    formatMessage('确定从空间移除“{name}”吗？', { name: member.nick_name || member.user_name })
-                                  )
-                                )
-                                  remove.mutate(member.user_id)
-                              }}
+                              onClick={() => { setError(''); setActionTarget({ kind: 'remove', member }) }}
                             >
                               <LocalizedText text={"\n                              移除\n                            "} /></button>
                           ) : (
                             workspace.status === 'active' && (
                               <button
                                 className='underline'
-                                onClick={() =>
-                                  changeRole.mutate({
-                                    userId: member.user_id,
-                                    workspace_role:
-                                      member.workspace_role === 'owner' &&
-                                      !isOwner
-                                        ? 'member'
-                                        : member.workspace_role,
-                                  })
-                                }
+                                onClick={() => { setError(''); setActionTarget({ kind: 'rejoin', member }) }}
                               >
                                 <LocalizedText text={"\n                                重新加入\n                              "} /></button>
                             )
@@ -485,15 +477,7 @@ export function WorkspaceMembers() {
                             workspace.status === 'active' && (
                               <button
                                 className='ml-3 underline'
-                                onClick={() => {
-                                  setNewOwnerId(member.user_id)
-                                  if (
-                                    window.confirm(
-                                      formatMessage('将空间所有权转交给“{name}”？你将变为空间管理员。', { name: member.nick_name || member.user_name })
-                                    )
-                                  )
-                                    transfer.mutate(member.user_id)
-                                }}
+                                onClick={() => { setError(''); setTransferTarget(member); setNewOwnerId(member.user_id); setTransferOpen(true) }}
                               >
                                 <LocalizedText text={"\n                                转移所有权\n                              "} /></button>
                             )}
@@ -534,28 +518,28 @@ export function WorkspaceMembers() {
           <h2 className='font-semibold'><LocalizedText text={"转移空间所有权"} /></h2>
           <p className='text-sm text-muted-foreground'>
             <LocalizedText text={"\n            新所有者必须已经是该空间的 active 成员。转移完成后你会成为管理员。\n          "} /></p>
-          <div className='flex items-end gap-3'>
+          <Button variant='outline' onClick={() => { setError(''); setTransferTarget(null); setNewOwnerId(''); setTransferOpen(true) }}>
+            <LocalizedText text='选择新所有者' />
+          </Button>
+          <FormDialog
+            open={transferOpen}
+            onOpenChange={setTransferOpen}
+            title={<LocalizedText text='转移空间所有权' />}
+            formAriaLabel='转移空间所有权'
+            description={<LocalizedText text='新所有者必须已经是该 Workspace 的 active 成员；转移后你会成为管理员。' />}
+            error={error}
+            submitLabel={<LocalizedText text='确认转移' />}
+            pending={transfer.isPending}
+            disabled={!/^\d+$/.test(newOwnerId) || newOwnerId === String(actorId)}
+            onSubmit={() => transfer.mutate(newOwnerId)}
+            onCancel={() => setTransferOpen(false)}
+          >
             <div className='space-y-2'>
-              <Label htmlFor='new-owner-id'><LocalizedText text={"新所有者用户 ID"} /></Label>
-              <Input
-                id='new-owner-id'
-                inputMode='numeric'
-                pattern='[0-9]+'
-                value={newOwnerId}
-                onChange={(event) => setNewOwnerId(event.target.value)}
-              />
+              <Label htmlFor='new-owner-id'><LocalizedText text='新所有者用户 ID' /></Label>
+              <Input id='new-owner-id' autoFocus inputMode='numeric' pattern='[0-9]+' value={newOwnerId} onChange={(event) => setNewOwnerId(event.target.value)} />
+              {transferTarget && <p className='text-xs text-muted-foreground'>{transferTarget.nick_name || transferTarget.user_name}</p>}
             </div>
-            <Button
-              variant='outline'
-              disabled={!/^\d+$/.test(newOwnerId) || transfer.isPending}
-              onClick={() => {
-                if (window.confirm(formatMessage('确认转移空间所有权？', {})))
-                  transfer.mutate(newOwnerId)
-              }}
-            >
-              {transfer.isPending ? <LocalizedText text={"转移中…"} /> : <LocalizedText text={"确认转移"} />}
-            </Button>
-          </div>
+          </FormDialog>
         </section>
       )}
       {error && (
@@ -563,6 +547,51 @@ export function WorkspaceMembers() {
           {error}
         </p>
       )}
+      <Dialog open={Boolean(roleTarget)} onOpenChange={(open) => { if (!open && !changeRole.isPending) setRoleTarget(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle><LocalizedText text='编辑空间角色' /></DialogTitle>
+            <DialogDescription>{roleTarget?.member.nick_name || roleTarget?.member.user_name}</DialogDescription>
+          </DialogHeader>
+          {error && <p role='alert' className='text-sm text-destructive'>{error}</p>}
+          <div className='space-y-2'>
+            <Label htmlFor='workspace-role-edit'><LocalizedText text='角色' /></Label>
+            <LocalizedNativeSelect id='workspace-role-edit' className='h-10 w-full rounded-md border bg-background px-3 text-sm' value={roleTarget?.role ?? 'member'} onChange={(event) => setRoleTarget((current) => current ? { ...current, role: event.target.value as WorkspaceRole } : current)}>
+              <option value='member'><LocalizedText text='成员' /></option>
+              <option value='viewer'><LocalizedText text='只读成员' /></option>
+              <option value='admin'><LocalizedText text='管理员' /></option>
+              {isOwner && <option value='owner'><LocalizedText text='所有者' /></option>}
+            </LocalizedNativeSelect>
+          </div>
+          <DialogFooter>
+            <Button variant='outline' disabled={changeRole.isPending} onClick={() => setRoleTarget(null)}><LocalizedText text='取消' /></Button>
+            <Button disabled={!roleTarget || changeRole.isPending} onClick={() => roleTarget && changeRole.mutate({ userId: roleTarget.member.user_id, workspace_role: roleTarget.role })}>{changeRole.isPending ? <LocalizedText text='保存中…' /> : <LocalizedText text='保存角色' />}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={Boolean(actionTarget)}
+        onOpenChange={(open) => { if (!open && !remove.isPending && !changeRole.isPending) setActionTarget(null) }}
+        title={actionTarget?.kind === 'remove' ? '移除空间成员' : '重新加入空间'}
+        desc={actionTarget?.kind === 'remove' ? '移除后成员不能访问当前 Workspace，但租户成员关系不会改变。' : '确认将该成员恢复为 active 状态并加入当前 Workspace？'}
+        confirmText={actionTarget?.kind === 'remove' ? '确认移除' : '确认加入'}
+        destructive={actionTarget?.kind === 'remove'}
+        isLoading={remove.isPending || changeRole.isPending}
+        handleConfirm={() => {
+          if (!actionTarget) return
+          if (actionTarget.kind === 'remove') {
+            remove.mutate(actionTarget.member.user_id, { onSuccess: () => setActionTarget(null) })
+          } else {
+            changeRole.mutate({
+              userId: actionTarget.member.user_id,
+              workspace_role: actionTarget.member.workspace_role === 'owner' && !isOwner ? 'member' : actionTarget.member.workspace_role,
+            }, { onSuccess: () => setActionTarget(null) })
+          }
+        }}
+      >
+        {actionTarget && <p className='text-sm font-medium'>{actionTarget.member.nick_name || actionTarget.member.user_name}</p>}
+        {error && <p role='alert' className='text-sm text-destructive'>{error}</p>}
+      </ConfirmDialog>
     </main>
   )
 }

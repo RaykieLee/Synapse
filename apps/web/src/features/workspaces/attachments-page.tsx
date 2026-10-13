@@ -19,6 +19,7 @@ import {
 } from '@/api/attachments'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FormDialog } from '@/components/form-dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -85,6 +86,7 @@ function WorkspaceAttachmentsContent({
   const page = search.page ?? 1
   const pageSize = search.page_size ?? pageSizeDefault
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
+  const [uploadOpen, setUploadOpen] = React.useState(false)
   const [uploadError, setUploadError] = React.useState('')
   const [downloadError, setDownloadError] = React.useState('')
   const [deleteError, setDeleteError] = React.useState('')
@@ -173,6 +175,7 @@ function WorkspaceAttachmentsContent({
     onSuccess: async () => {
       setUploadError('')
       setSelectedFile(null)
+      setUploadOpen(false)
       if (fileInput.current) fileInput.current.value = ''
       setPage(1)
       await refresh()
@@ -336,43 +339,63 @@ function WorkspaceAttachmentsContent({
                 <LocalizedText text={'我的个人附件'} />
               </Button>
             </div>
-            <div className='flex flex-col gap-3 sm:flex-row sm:items-end'>
-              <div className='min-w-0 flex-1 space-y-2'>
-                <label
-                  className='text-sm font-medium'
-                  htmlFor='workspace-attachment-file'
-                >
-                  <LocalizedText text={'选择文件'} />
-                </label>
-                <Input
-                  ref={fileInput}
-                  id='workspace-attachment-file'
-                  type='file'
-                  accept={accepted}
-                  disabled={!canUpload || upload.isPending}
-                  onChange={(event) => chooseFile(event.target.files?.[0])}
-                  className='block w-full rounded-md border bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5'
-                />
-                <p className='text-xs text-muted-foreground'>
-                  <LocalizedText
-                    text={
-                      '单个文件最大 25 MiB。支持 PNG、JPEG、GIF、WebP、PDF、TXT、CSV、DOCX、XLSX、PPTX。'
-                    }
-                  />
-                </p>
-              </div>
+            <div className='flex flex-wrap justify-end'>
               <Button
                 type='button'
-                disabled={!canUpload || !selectedFile || upload.isPending}
-                onClick={() => selectedFile && upload.mutate(selectedFile)}
+                disabled={!canUpload}
+                onClick={() => setUploadOpen(true)}
               >
                 <FileUp className='mr-2 size-4' />
-                {upload.isPending ? (
-                  <LocalizedText text={'上传中…'} />
-                ) : (
-                  <LocalizedText text={'上传附件'} />
-                )}
+                <LocalizedText text={'上传附件'} />
               </Button>
+            </div>
+            {!canUpload && (
+              <p className='text-sm text-muted-foreground'>
+                <LocalizedText text={'当前空间角色无上传权限。'} />
+              </p>
+            )}
+          </section>
+
+          <FormDialog
+            open={uploadOpen}
+            onOpenChange={(open) => {
+              setUploadOpen(open)
+              if (!open) {
+                setSelectedFile(null)
+                setUploadError('')
+                if (fileInput.current) fileInput.current.value = ''
+              }
+            }}
+            title={<LocalizedText text={'上传附件'} />}
+            formAriaLabel='上传附件'
+            description='单个文件最大 25 MiB。支持 PNG、JPEG、GIF、WebP、PDF、TXT、CSV、DOCX、XLSX、PPTX。'
+            submitLabel={<LocalizedText text={'上传附件'} />}
+            pending={upload.isPending}
+            disabled={!selectedFile}
+            onSubmit={() => selectedFile && upload.mutate(selectedFile)}
+            onCancel={() => {
+              setUploadOpen(false)
+              setSelectedFile(null)
+              setUploadError('')
+              if (fileInput.current) fileInput.current.value = ''
+            }}
+          >
+            <div className='space-y-2'>
+              <label
+                className='text-sm font-medium'
+                htmlFor='workspace-attachment-file'
+              >
+                <LocalizedText text={'选择文件'} />
+              </label>
+              <Input
+                ref={fileInput}
+                id='workspace-attachment-file'
+                type='file'
+                accept={accepted}
+                disabled={upload.isPending}
+                onChange={(event) => chooseFile(event.target.files?.[0])}
+                className='block w-full rounded-md border bg-background px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5'
+              />
             </div>
             {selectedFile && (
               <p className='text-sm text-muted-foreground'>
@@ -387,12 +410,7 @@ function WorkspaceAttachmentsContent({
                 {t(uploadError)}
               </p>
             )}
-            {!canUpload && (
-              <p className='text-sm text-muted-foreground'>
-                <LocalizedText text={'当前空间角色无上传权限。'} />
-              </p>
-            )}
-          </section>
+          </FormDialog>
 
           <section className={panel}>
             <div className='flex flex-wrap items-center justify-between gap-3'>

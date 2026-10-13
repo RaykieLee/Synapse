@@ -56,9 +56,10 @@ def terminate_process_tree(process):
 
 
 def main():
-    build = subprocess.run([PNPM, "build"], cwd=WEB)
-    if build.returncode:
-        return build.returncode
+    if os.environ.get("F14B_SKIP_BUILD") != "1":
+        build = subprocess.run([PNPM, "build"], cwd=WEB)
+        if build.returncode:
+            return build.returncode
 
     with tempfile.TemporaryDirectory(prefix="synapse-f14b-") as temporary:
         temp = Path(temporary)

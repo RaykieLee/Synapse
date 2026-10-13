@@ -14,71 +14,99 @@ const setToken = async (token) => {
   if (token) await context.addCookies([{ name: 'synapse_access_token', value: token, url: seed.web }])
 }
 const memberRow = () => page.locator('tbody tr').filter({ hasText: 'f12d-member' })
-const roleSelect = () => page.getByLabel('f12d-member自定义角色')
-const waitRole = async (roleId) => page.waitForFunction(({ memberName, expected }) => {
-  const select = [...document.querySelectorAll('select[aria-label]')].find((node) => node.getAttribute('aria-label') === `${memberName}自定义角色`)
-  return select?.value === expected
-}, { memberName: 'f12d-member', expected: roleId })
-const selectRole = async (roleId) => {
-  await roleSelect().selectOption(roleId)
-  await waitRole(roleId)
+const customRoleButton = () => memberRow().locator('td').nth(2).getByRole('button').first()
+const customRoleDialog = () => page.getByRole('dialog', { name: '编辑自定义角色' })
+const customRoleSelect = () => customRoleDialog().getByLabel('自定义角色', { exact: true })
+const currentCustomRole = () => customRoleButton().innerText()
+const waitRole = async (roleName) => {
+  await memberRow().locator('td').nth(2).getByRole('button', { name: roleName, exact: true }).waitFor()
+}
+const openCustomRoleEditor = async () => {
+  await customRoleButton().click()
+  await customRoleDialog().waitFor()
+}
+const selectRole = async (roleId, roleName) => {
+  await openCustomRoleEditor()
+  await customRoleSelect().selectOption(roleId)
+  await customRoleDialog().getByRole('button', { name: '保存角色' }).click()
+  await customRoleDialog().waitFor({ state: 'hidden' })
+  await waitRole(roleName)
+}
+const confirmRevoke = async () => {
+  await memberRow().getByRole('button', { name: '撤销' }).click()
+  const dialog = page.getByRole('alertdialog', { name: '撤销自定义角色' })
+  await dialog.getByRole('button', { name: '确认撤销' }).click()
+  await dialog.waitFor({ state: 'hidden' })
 }
 const gotoTenant = async (tenantId, heading) => {
   await page.goto(`${seed.web}/tenants/${tenantId}`)
   await page.getByRole('heading', { name: heading }).waitFor()
-  await roleSelect().waitFor()
+  await customRoleButton().waitFor()
 }
-const tenantRowsLinkTo = (tenantName) => page.locator('tbody tr').filter({ hasText: tenantName }).getByRole('link', { name: '查看详情' })
+const tenantRowsLinkTo = (tenantName) => page.locator('tbody tr').filter({ hasText: tenantName }).getByRole('link', { name: tenantName, exact: true })
 const backToTenantList = async () => {
-  await page.getByRole('link', { name: /返回租户列表/ }).click()
+  await page.getByRole('link', { name: '租户管理' }).first().click()
   await page.getByRole('heading', { name: '租户管理' }).waitFor()
 }
 
 try {
   await setToken(seed.actor_token)
   await gotoTenant(seed.tenant_a_id, 'F12d Tenant Alpha')
-  const alphaSelect = roleSelect()
-  assert.equal(await alphaSelect.inputValue(), seed.alpha_reviewer_id, 'owner reads the existing Tenant A assignment')
-  const alphaOptions = await alphaSelect.locator('option').allTextContents()
+  assert.equal(await currentCustomRole(), 'Alpha Reviewer', 'owner reads the existing Tenant A assignment')
+
+  // Tenant-member role edits are also modal-driven, independently of the custom role.
+  const tenantRoleCell = memberRow().locator('td').nth(1)
+  await tenantRoleCell.getByRole('button', { name: '成员', exact: true }).click()
+  const tenantRoleDialog = page.getByRole('dialog', { name: '编辑成员角色' })
+  await tenantRoleDialog.waitFor()
+  assert.equal(await tenantRoleDialog.getByLabel('租户角色').inputValue(), 'member')
+  await tenantRoleDialog.getByRole('button', { name: '取消' }).click()
+  await tenantRoleDialog.waitFor({ state: 'hidden' })
+
+  await openCustomRoleEditor()
+  const alphaOptions = await customRoleSelect().locator('option').allTextContents()
   assert.ok(alphaOptions.includes('Alpha Reviewer'))
   assert.ok(alphaOptions.includes('Alpha Editor'))
   assert.ok(!alphaOptions.includes('Alpha Disabled'), 'disabled tenant role is absent from assignment choices')
   assert.ok(!alphaOptions.includes('Beta Auditor') && !alphaOptions.includes('Beta Editor'), 'Tenant B roles do not leak into Tenant A choices')
+  await customRoleDialog().getByRole('button', { name: '取消' }).click()
 
   // Tenant A owner replaces and revokes the assigned role through the UI.
-  await selectRole(seed.alpha_editor_id)
-  await selectRole(seed.alpha_reviewer_id)
-  await memberRow().getByRole('button', { name: '撤销' }).click()
-  await waitRole('')
+  await selectRole(seed.alpha_editor_id, 'Alpha Editor')
+  await selectRole(seed.alpha_reviewer_id, 'Alpha Reviewer')
+  await confirmRevoke()
+  await waitRole('未分配')
   assert.equal(await memberRow().getByRole('button', { name: '撤销' }).count(), 0)
-  await selectRole(seed.alpha_editor_id)
-  assert.equal(await memberRow().getByLabel('f12d-member角色').inputValue(), 'member', 'custom role assignment leaves the built-in tenant role unchanged')
+  await selectRole(seed.alpha_editor_id, 'Alpha Editor')
+  assert.equal((await tenantRoleCell.innerText()).trim(), '成员', 'custom role assignment leaves the built-in tenant role unchanged')
 
   // Same actor and same target user, but a different tenant-scoped cached assignment.
   await backToTenantList()
   await tenantRowsLinkTo('F12d Tenant Beta').click()
   await page.getByRole('heading', { name: 'F12d Tenant Beta' }).waitFor()
-  await roleSelect().waitFor()
-  assert.equal(await roleSelect().inputValue(), seed.beta_auditor_id, 'admin sees the distinct Tenant B assignment after SPA navigation')
-  const betaOptions = await roleSelect().locator('option').allTextContents()
+  await customRoleButton().waitFor()
+  assert.equal(await currentCustomRole(), 'Beta Auditor', 'admin sees the distinct Tenant B assignment after SPA navigation')
+  await openCustomRoleEditor()
+  const betaOptions = await customRoleSelect().locator('option').allTextContents()
   assert.ok(betaOptions.includes('Beta Auditor') && betaOptions.includes('Beta Editor'))
   assert.ok(!betaOptions.includes('Alpha Reviewer') && !betaOptions.includes('Alpha Editor'), 'Tenant A roles do not leak into Tenant B choices')
+  await customRoleDialog().getByRole('button', { name: '取消' }).click()
 
   // Built-in tenant admin on Tenant B can assign, replace and revoke as well.
-  await selectRole(seed.beta_editor_id)
-  await selectRole(seed.beta_auditor_id)
-  await memberRow().getByRole('button', { name: '撤销' }).click()
-  await waitRole('')
-  await selectRole(seed.beta_editor_id)
+  await selectRole(seed.beta_editor_id, 'Beta Editor')
+  await selectRole(seed.beta_auditor_id, 'Beta Auditor')
+  await confirmRevoke()
+  await waitRole('未分配')
+  await selectRole(seed.beta_editor_id, 'Beta Editor')
 
   await backToTenantList()
   await tenantRowsLinkTo('F12d Tenant Alpha').click()
   await page.getByRole('heading', { name: 'F12d Tenant Alpha' }).waitFor()
-  await roleSelect().waitFor()
-  assert.equal(await roleSelect().inputValue(), seed.alpha_editor_id, 'returning to Tenant A restores its own assignment rather than Tenant B state')
+  await customRoleButton().waitFor()
+  assert.equal(await currentCustomRole(), 'Alpha Editor', 'returning to Tenant A restores its own assignment rather than Tenant B state')
 
   // Race boundary: active options were loaded, then an administrator disables one in the real API.
-  // The stale option can trigger a request, which must be rejected and surfaced to the manager.
+  // The stale option remains only in the cached dialog; the server must reject and explain it.
   const disabledUpdate = await page.evaluate(async ({ tenantId, roleId }) => {
     const token = document.cookie.split('; ').find((value) => value.startsWith('synapse_access_token='))?.split('=').slice(1).join('=')
     const response = await fetch(`/api/v1/tenants/${tenantId}/roles/${roleId}`, {
@@ -88,23 +116,28 @@ try {
     return response.status
   }, { tenantId: seed.tenant_a_id, roleId: seed.alpha_reviewer_id })
   assert.equal(disabledUpdate, 200, 'owner disables the role through the tenant-role API')
-  await roleSelect().selectOption(seed.alpha_reviewer_id)
-  await page.getByRole('alert').filter({ hasText: 'RESOURCE_NOT_FOUND' }).waitFor()
-  assert.equal(await roleSelect().inputValue(), seed.alpha_editor_id, 'failed stale assignment leaves current role selected')
+  await openCustomRoleEditor()
+  await customRoleSelect().selectOption(seed.alpha_reviewer_id)
+  await customRoleDialog().getByRole('button', { name: '保存角色' }).click()
+  await customRoleDialog().getByRole('alert').filter({ hasText: 'RESOURCE_NOT_FOUND' }).waitFor()
+  assert.equal(await customRoleSelect().inputValue(), seed.alpha_reviewer_id, 'failed stale assignment stays visible for correction')
+  await customRoleDialog().getByRole('button', { name: '取消' }).click()
   await page.reload()
   await page.getByRole('heading', { name: 'F12d Tenant Alpha' }).waitFor()
-  await roleSelect().waitFor()
-  const reloadedOptions = await roleSelect().locator('option').evaluateAll((nodes) => nodes.map((node) => ({ value: node.value, text: node.textContent })))
+  await customRoleButton().waitFor()
+  await openCustomRoleEditor()
+  const reloadedOptions = await customRoleSelect().locator('option').evaluateAll((nodes) => nodes.map((node) => ({ value: node.value, text: node.textContent })))
   assert.ok(!reloadedOptions.some((option) => option.value === seed.alpha_reviewer_id), 'fresh options omit the now-disabled role')
-  assert.equal(await roleSelect().inputValue(), seed.alpha_editor_id)
+  assert.equal(await customRoleSelect().inputValue(), seed.alpha_editor_id)
+  await customRoleDialog().getByRole('button', { name: '取消' }).click()
 
-  // An ordinary active tenant member cannot read, assign, or revoke; the UI also remains read-only.
+  // A tenant member may read their own custom role, but cannot assign or revoke it.
   await setToken(seed.member_token)
   await page.goto(`${seed.web}/tenants/${seed.tenant_a_id}`)
   await page.getByRole('heading', { name: 'F12d Tenant Alpha' }).waitFor()
   await memberRow().waitFor()
-  assert.equal(await memberRow().getByText('需租户管理员读取').count(), 1)
-  assert.equal(await page.locator('select[aria-label="f12d-member自定义角色"]').count(), 0)
+  await memberRow().locator('td').nth(2).getByText('Alpha Editor').waitFor()
+  assert.equal(await memberRow().locator('td').nth(2).getByRole('button').count(), 0)
   const memberResponses = await page.evaluate(async ({ tenantId, memberId, roleId, token }) => {
     const base = `/api/v1/tenants/${tenantId}/members/${memberId}/custom-role`
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -114,7 +147,9 @@ try {
     const decode = async (response) => ({ status: response.status, body: response.status === 204 ? null : await response.json() })
     return Promise.all([decode(get), decode(put), decode(del)])
   }, { tenantId: seed.tenant_a_id, memberId: seed.member_id, roleId: seed.alpha_editor_id, token: seed.member_token })
-  for (const response of memberResponses) {
+  assert.equal(memberResponses[0].status, 200, 'a member can read their own custom role')
+  assert.equal(memberResponses[0].body.role.role_id, seed.alpha_editor_id)
+  for (const response of memberResponses.slice(1)) {
     assert.equal(response.status, 403)
     assert.equal(response.body.code, 'FORBIDDEN')
   }
@@ -122,7 +157,7 @@ try {
   // The same role assignment for Tenant B remains unchanged after Tenant A operations.
   await setToken(seed.actor_token)
   await gotoTenant(seed.tenant_b_id, 'F12d Tenant Beta')
-  assert.equal(await roleSelect().inputValue(), seed.beta_editor_id)
+  assert.equal(await currentCustomRole(), 'Beta Editor')
   console.log('F12d tenant member custom-role frontend verification passed')
 } finally {
   await browser.close()

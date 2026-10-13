@@ -34,15 +34,15 @@ const backToTenantList = async () => {
   })
 }
 const toTenantDetailFromMenus = async () => {
-  await page.getByRole('link', { name: /返回 F13b Tenant/ }).click()
+  await page.getByRole('link', { name: '返回', exact: true }).click()
   await page.getByRole('heading', { name: /F13b Tenant/ }).waitFor()
 }
 const toTenantList = async () => {
-  await page.getByRole('link', { name: /返回租户列表/ }).click()
+  await page.getByLabel('面包屑').getByRole('link', { name: '租户管理', exact: true }).click()
   await page.getByRole('heading', { name: '租户管理' }).waitFor()
 }
 const openTenantFromList = async (name) => {
-  await page.locator('tbody tr').filter({ hasText: name }).getByRole('link', { name: '查看详情' }).click()
+  await page.locator('tbody tr').filter({ hasText: name }).getByRole('link', { name, exact: true }).click()
   await page.getByRole('heading', { name }).waitFor()
 }
 
@@ -61,7 +61,7 @@ try {
   await page.getByRole('heading', { name: '编辑菜单' }).waitFor()
   await page.getByLabel('名称').fill('Alpha Leaf Updated')
   await page.getByLabel('路由地址').fill('/alpha-leaf-updated')
-  await page.getByRole('button', { name: '保存菜单' }).click()
+  await page.getByRole('button', { name: '保存菜单', exact: true }).click()
   await menuNode('Alpha Leaf Updated').waitFor()
   let leafNode = menuNode('Alpha Leaf Updated')
   await leafNode.getByRole('button', { name: '停用' }).click()
@@ -70,8 +70,8 @@ try {
   await leafNode.getByText(/启用/).waitFor()
 
   // Parent deletion with an active child is rejected by the server and shown to the owner.
-  page.once('dialog', (dialog) => dialog.accept())
   await menuNode('Alpha Root One').getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   await page.getByRole('alert').filter({ hasText: '请先删除或移动此菜单下的子菜单。' }).waitFor()
   assert.equal(await menuNode('Alpha Root One').count(), 1)
 
@@ -82,7 +82,7 @@ try {
   await page.getByLabel('排序').fill('50')
   await page.getByLabel('菜单类型').selectOption('M')
   await page.getByLabel('路由地址').fill('/alpha-added')
-  await page.getByRole('button', { name: '保存菜单' }).click()
+  await page.getByRole('button', { name: '创建菜单', exact: true }).click()
   await menuNode('Alpha Added Root').waitFor()
   const beforeOrder = (await rootsFromApi()).items.map((item) => item.menu_name)
   assert.deepEqual(beforeOrder, ['Alpha Root One', 'Alpha Root Two', 'Alpha Added Root'])
@@ -98,11 +98,11 @@ try {
   assert.deepEqual(afterOrder, ['Alpha Root One', 'Alpha Added Root', 'Alpha Root Two'])
 
   // Delete the leaf, then the now-leaf parent; each action is a soft delete.
-  page.once('dialog', (dialog) => dialog.accept())
   await menuNode('Alpha Leaf Updated').getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   await menuNode('Alpha Leaf Updated').waitFor({ state: 'detached' })
-  page.once('dialog', (dialog) => dialog.accept())
   await menuNode('Alpha Root One').getByRole('button', { name: '删除' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   await menuNode('Alpha Root One').waitFor({ state: 'detached' })
 
   const alphaFinal = (await rootsFromApi()).items
@@ -113,7 +113,7 @@ try {
   await toTenantDetailFromMenus()
   await toTenantList()
   await openTenantFromList('F13b Tenant Beta')
-  await page.getByRole('link', { name: '菜单管理' }).click()
+  await page.getByRole('main').getByRole('link', { name: '菜单管理', exact: true }).first().click()
   await page.getByRole('heading', { name: '租户菜单' }).waitFor()
   await menuNode('Beta Private Root').waitFor()
   assert.equal(await page.getByText('Alpha Added Root', { exact: true }).count(), 0, 'cached Alpha tree does not leak into Beta')
@@ -123,7 +123,7 @@ try {
   await page.getByRole('button', { name: '创建菜单' }).click()
   await page.getByLabel('名称').fill('Beta Admin Menu')
   await page.getByLabel('排序').fill('20')
-  await page.getByRole('button', { name: '保存菜单' }).click()
+  await page.getByRole('button', { name: '创建菜单', exact: true }).click()
   await menuNode('Beta Admin Menu').waitFor()
   const betaFinal = (await rootsFromApi()).items
   assert.deepEqual(betaFinal.map((item) => item.menu_name), ['Beta Private Root', 'Beta Admin Menu'])
@@ -133,7 +133,7 @@ try {
   await toTenantDetailFromMenus()
   await toTenantList()
   await openTenantFromList('F13b Tenant Alpha')
-  await page.getByRole('link', { name: '菜单管理' }).click()
+  await page.getByRole('main').getByRole('link', { name: '菜单管理', exact: true }).first().click()
   await page.getByRole('heading', { name: '租户菜单' }).waitFor()
   await menuNode('Alpha Added Root').waitFor()
   assert.equal(await page.getByText('Beta Private Root', { exact: true }).count(), 0)

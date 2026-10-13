@@ -1,6 +1,7 @@
 """Run F12b frontend build and browser acceptance against disposable API data."""
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -13,6 +14,21 @@ ROOT = Path(__file__).resolve().parents[4]
 API = ROOT / "apps" / "api"
 WEB = ROOT / "apps" / "web"
 PLAYWRIGHT = Path(__file__).with_name("f12b_tenant_roles_frontend.mjs")
+PNPM = shutil.which("pnpm") or shutil.which("pnpm.cmd") or "pnpm.cmd"
+NODE = shutil.which("node") or "node"
+
+
+def terminate_tree(process):
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
+        else:
+            process.terminate()
+    try:
+        process.wait(timeout=8)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
 
 
 def free_port():
@@ -36,7 +52,7 @@ def wait_url(url, process, timeout=30):
 
 
 def main():
-    build = subprocess.run(["pnpm", "build"], cwd=WEB, text=True)
+    build = subprocess.run([PNPM, "build"], cwd=WEB, text=True)
     if build.returncode:
         return build.returncode
 
@@ -44,11 +60,22 @@ def main():
         temporary_path = Path(temporary)
         database_url = f"sqlite:///{temporary_path / 'f12b.sqlite'}"
         env = os.environ.copy()
-        env["SYNAPSE_DATABASE_URL"] = database_url
-        env["SYNAPSE_JWT_SECRET"] = "f12b-verification-only-secret"
+        env.update({
+            "SYNAPSE_DATABASE_URL": database_url,
+            "SYNAPSE_JWT_SECRET": "f12b-verification-only-secret",
+            "SYNAPSE_AGENTSCOPE_ENABLED": "false",
+            "SYNAPSE_SCHEDULED_TASKS_ENABLED": "false",
+        })
         sys.path.insert(0, str(API))
-        os.environ.update({"SYNAPSE_DATABASE_URL": database_url,
-                           "SYNAPSE_JWT_SECRET": env["SYNAPSE_JWT_SECRET"]})
+        os.environ.update({
+            key: env[key]
+            for key in (
+                "SYNAPSE_DATABASE_URL",
+                "SYNAPSE_JWT_SECRET",
+                "SYNAPSE_AGENTSCOPE_ENABLED",
+                "SYNAPSE_SCHEDULED_TASKS_ENABLED",
+            )
+        })
 
         from alembic import command
         from alembic.config import Config
@@ -139,7 +166,8 @@ def main():
         )
         env["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{api_port}"
         web = subprocess.Popen(
-            ["pnpm", "dev", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"],
+            [NODE, str(WEB / "node_modules" / "vite" / "bin" / "vite.js"),
+             "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"],
             cwd=WEB, env=env, stdout=web_log, stderr=web_log,
         )
         seed["web"] = f"http://127.0.0.1:{web_port}"
@@ -153,18 +181,19 @@ def main():
             except Exception:
                 api_log.flush()
                 web_log.flush()
-                print("API server log:\n" + (temporary_path / "api.log").read_text(), file=sys.stderr)
-                print("Vite server log:\n" + (temporary_path / "vite.log").read_text(), file=sys.stderr)
+                print("API server log:\n" + (temporary_path / "api.log").read_text(encoding="utf-8", errors="replace"), file=sys.stderr)
+                print("Vite server log:\n" + (temporary_path / "vite.log").read_text(encoding="utf-8", errors="replace"), file=sys.stderr)
                 raise
             result = subprocess.run(["node", str(PLAYWRIGHT), str(seed_path)], cwd=WEB, env=env)
             return result.returncode
         finally:
-            web.terminate()
-            api.terminate()
-            web.wait(timeout=10)
-            api.wait(timeout=10)
+            terminate_tree(web)
+            terminate_tree(api)
             api_log.close()
             web_log.close()
+            get_engine().dispose()
+            get_session_factory.cache_clear()
+            get_engine.cache_clear()
 
 
 def datetime_now():

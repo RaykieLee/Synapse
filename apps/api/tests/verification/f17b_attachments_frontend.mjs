@@ -24,27 +24,41 @@ page.on('request', (request) => {
 
 const workspacePath = (id) => `/w/${id}/attachments`
 const attachmentUrl = (id, suffix = '') => `${seed.api}/workspaces/${id}/attachments${suffix}`
-const fileInput = page.locator('#workspace-attachment-file')
 const alertText = () => page.getByRole('alert').last().innerText()
 const fileRow = (filename, target = page) => target.locator('article').filter({ hasText: filename })
+const ensureUploadDialog = async (target = page) => {
+  let dialog = target
+    .getByRole('dialog')
+    .filter({ hasText: '单个文件最大 25 MiB' })
+  if (!(await dialog.isVisible().catch(() => false))) {
+    await target.getByRole('button', { name: '上传附件', exact: true }).first().click()
+    dialog = target
+      .getByRole('dialog')
+      .filter({ hasText: '单个文件最大 25 MiB' })
+    await dialog.waitFor()
+  }
+  return dialog
+}
 const deleteFromUi = async (row) => {
   const response = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/attachments/'))
   await row.getByRole('button', { name: '删除' }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: '确认删除' }).click()
   return response
 }
-const setFile = async (name, data, mimeType = 'text/plain') => {
-  await fileInput.setInputFiles({ name, mimeType, buffer: Buffer.isBuffer(data) ? data : Buffer.from(data) })
+const setFile = async (name, data, mimeType = 'text/plain', target = page) => {
+  const dialog = await ensureUploadDialog(target)
+  await dialog.locator('#workspace-attachment-file').setInputFiles({ name, mimeType, buffer: Buffer.isBuffer(data) ? data : Buffer.from(data) })
 }
 const uploadFromUi = async (filename, data, { mimeType = 'text/plain', scope = 'workspace', page: target = page } = {}) => {
   if (scope === 'personal') await target.getByRole('button', { name: '我的个人附件' }).click()
-  await target.locator('#workspace-attachment-file').setInputFiles({
+  const dialog = await ensureUploadDialog(target)
+  await dialog.locator('#workspace-attachment-file').setInputFiles({
     name: filename,
     mimeType,
     buffer: Buffer.isBuffer(data) ? data : Buffer.from(data),
   })
   const response = target.waitForResponse((r) => r.request().method() === 'POST' && /\/attachments(?:\?|$)/.test(r.url()))
-  await target.getByRole('button', { name: '上传附件' }).click()
+  await dialog.getByRole('button', { name: '上传附件', exact: true }).click()
   return response
 }
 
@@ -117,17 +131,12 @@ try {
   const tooLargeBody = await tooLargeResponse.json()
   assert.equal(tooLargeBody.code ?? tooLargeBody.detail?.code, 'FILE_TOO_LARGE')
 
-  // Switch through the actual upper-left selector. Pending files and old-scope
-  // rows must not follow the actor or be served from another Workspace cache.
+  // A route scope change while the upload dialog is open must discard its
+  // staged file and keep attachment results scoped to the new Workspace.
   await setFile('pending-a1.txt', 'must clear on scope switch')
-  await page.getByText(/待上传：pending-a1\.txt/).waitFor()
-  await page.getByRole('button', { name: '选择工作区' }).click()
-  const picker = page.getByPlaceholder('搜索空间或租户…')
-  await picker.fill('Alpha Two')
-  await page.getByText('Alpha Two', { exact: true }).last().click()
-  await page.waitForURL(new RegExp(`/w/${seed.workspace_a2}$`))
-  await page.getByRole('heading', { name: 'Alpha Two', exact: true }).waitFor()
-  await page.getByRole('link', { name: '附件', exact: true }).first().click()
+  await page.locator('p').filter({ hasText: 'pending-a1.txt' }).waitFor()
+  await page.goto(`${seed.web}${workspacePath(seed.workspace_a2)}`)
+  await page.locator('main p').filter({ hasText: 'Alpha Two' }).first().waitFor()
   await page.getByRole('heading', { name: '附件', exact: true }).waitFor()
   await page.getByText('此 Workspace 暂无附件。').waitFor()
   assert.equal(await page.getByText(/待上传：/).count(), 0, 'pending file is cleared after changing Workspace')
@@ -138,13 +147,13 @@ try {
   assert.equal(createA2.status(), 201)
   const memberRow = fileRow('a2-member-file.txt')
   await memberRow.waitFor()
-  assert.equal(await memberRow.getByRole('button', { name: '删除' }).count(), 0)
+  const memberControls = memberRow.locator('button')
+  assert.equal(await memberControls.count(), 1, 'workspace member only has a download control')
+  assert.match(await memberControls.first().innerText(), /下载/)
   assert.equal(await fileRow('a1-shared.txt').count(), 0)
 
   // Search and tenant grouping in the switcher work, then the queried file set
   // is isolated to tenant B / Workspace B1.
-  await setFile('pending-a2.txt', 'also clear across tenant')
-  await page.getByText(/待上传：pending-a2\.txt/).waitFor()
   await page.getByRole('button', { name: '选择工作区' }).click()
   await page.getByText('F17b Tenant Beta', { exact: true }).waitFor()
   await page.getByPlaceholder('搜索空间或租户…').fill('Beta One')
@@ -159,7 +168,9 @@ try {
   assert.equal(createB.status(), 201)
   const adminRow = fileRow('b1-admin-file.txt')
   await adminRow.waitFor()
-  assert.equal(await adminRow.getByRole('button', { name: '删除' }).count(), 1, 'admin can delete workspace attachment')
+  const adminControls = adminRow.locator('button')
+  assert.equal(await adminControls.count(), 2, 'admin has download and delete controls')
+  assert.match(await adminControls.nth(1).innerText(), /删除/)
   const deleteB = deleteFromUi(adminRow)
   assert.equal((await deleteB).status(), 204)
   await adminRow.waitFor({ state: 'detached' })
@@ -190,14 +201,14 @@ try {
   await memberPage.reload()
   await memberPage.getByText('member-visible.txt', { exact: true }).waitFor()
   const memberVisibleRow = fileRow('member-visible.txt', memberPage)
-  assert.equal(await memberVisibleRow.getByRole('button', { name: '删除' }).count(), 0)
+  const sharedMemberControls = memberVisibleRow.locator('button')
+  assert.equal(await sharedMemberControls.count(), 1)
+  assert.match(await sharedMemberControls.first().innerText(), /下载/)
 
   // Select a file, revoke the membership server-side, then attempt upload. The
   // API's 403 must be shown; route revalidation falls back to an allowed B1.
-  await memberPage.locator('#workspace-attachment-file').setInputFiles({
-    name: 'revoke-pending.txt', mimeType: 'text/plain', buffer: Buffer.from('revoked'),
-  })
-  await memberPage.getByText(/待上传：revoke-pending\.txt/).waitFor()
+  await setFile('revoke-pending.txt', 'revoked', 'text/plain', memberPage)
+  await memberPage.locator('p').filter({ hasText: 'revoke-pending.txt' }).waitFor()
   const revoke = await fetch(`${new URL(seed.api).origin}/__verification/f17b/revoke-member`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ secret: seed.control_secret, workspace_id: seed.workspace_a1, user_id: seed.actor_b_id }),
@@ -205,7 +216,7 @@ try {
   assert.equal(revoke.status, 200)
   assert.equal((await revoke.json()).updated, 1)
   const deniedUpload = memberPage.waitForResponse((r) => r.request().method() === 'POST' && /\/attachments(?:\?|$)/.test(r.url()))
-  await memberPage.getByRole('button', { name: '上传附件' }).click()
+  await memberPage.getByRole('dialog').getByRole('button', { name: '上传附件', exact: true }).click()
   const denied = await deniedUpload
   assert.equal(denied.status(), 403)
   await memberPage.getByRole('alert').waitFor()

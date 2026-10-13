@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+import shutil
 import socket
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,12 +21,29 @@ pytestmark = [
 ]
 
 ROOT = Path(__file__).resolve().parents[4]
+PNPM = shutil.which("pnpm") or shutil.which("pnpm.cmd") or "pnpm.cmd"
 
 
 def _port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+def _terminate_tree(process: subprocess.Popen) -> None:
+    if process.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                capture_output=True,
+            )
+        else:
+            process.terminate()
+    try:
+        process.wait(timeout=8)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
 
 
 def _wait(url: str, process: subprocess.Popen, log: Path, timeout: float = 40) -> None:
@@ -51,7 +70,7 @@ def test_f19b_scheduled_task_runs_frontend_real_browser(tmp_path, monkeypatch):
     monkeypatch.setenv("SYNAPSE_JWT_SECRET", "F19b-verification-only-secret-change-me")
     monkeypatch.setenv("SYNAPSE_SCHEDULED_TASKS_ENABLED", "false")
     monkeypatch.setenv("SYNAPSE_AGENTSCOPE_REDIS_HOST", "127.0.0.1")
-    monkeypatch.setenv("SYNAPSE_AGENTSCOPE_REDIS_PORT", "6380")
+    monkeypatch.setenv("SYNAPSE_AGENTSCOPE_REDIS_PORT", os.environ.get("F19B_REDIS_PORT", "6380"))
     monkeypatch.setenv("SYNAPSE_AGENTSCOPE_STORAGE_REDIS_DB", "9")
     monkeypatch.setenv("SYNAPSE_AGENTSCOPE_BUS_REDIS_DB", "10")
     monkeypatch.setenv("SYNAPSE_AGENTSCOPE_WORKSPACE_PATH", str(tmp_path / "workspaces"))
@@ -121,25 +140,25 @@ def test_f19b_scheduled_task_runs_frontend_real_browser(tmp_path, monkeypatch):
     api_log, web_log = tmp_path / "api.log", tmp_path / "web.log"
     api_file, web_file = api_log.open("w"), web_log.open("w")
     api_env = os.environ.copy()
-    api = subprocess.Popen([str(api_dir / ".venv/bin/uvicorn"), "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", str(api_port)], cwd=api_dir, env=api_env, stdout=api_file, stderr=subprocess.STDOUT)
+    api = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", str(api_port)], cwd=api_dir, env=api_env, stdout=api_file, stderr=subprocess.STDOUT)
     web_env = os.environ.copy(); web_env["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{api_port}"
-    web = subprocess.Popen(["pnpm", "exec", "vite", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=web_dir, env=web_env, stdout=web_file, stderr=subprocess.STDOUT)
-    build = subprocess.run(["pnpm", "build"], cwd=web_dir, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
+    web = subprocess.Popen([PNPM, "exec", "vite", "--host", "127.0.0.1", "--port", str(web_port), "--strictPort"], cwd=web_dir, env=web_env, stdout=web_file, stderr=subprocess.STDOUT)
+    build = subprocess.run([PNPM, "build"], cwd=web_dir, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
     build_output = build.stdout
     try:
         _wait(f"http://127.0.0.1:{api_port}/api/v1/health", api, api_log)
         _wait(f"http://127.0.0.1:{web_port}", web, web_log)
         env = os.environ.copy(); env.update({"WEB_BASE_URL": f"http://127.0.0.1:{web_port}", "TENANT_A_ID": tenant_a_id, "TENANT_B_ID": tenant_b_id})
         env["TASK_A_ID"] = task_a_id
-        browser = subprocess.run(["pnpm", "exec", "node", "tests/verification/f19b_task_runs.mjs"], cwd=web_dir, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
+        browser = subprocess.run([PNPM, "exec", "node", "tests/verification/f19b_task_runs.mjs"], cwd=web_dir, env=env, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
         assert browser.returncode == 0, f"Playwright failed:\n{browser.stdout}\nAPI:\n{api_log.read_text(errors='replace')}\nVite:\n{web_log.read_text(errors='replace')}"
         assert "F19b Playwright assertions passed" in browser.stdout
     finally:
         for process in (web, api):
-            process.terminate()
-        for process in (web, api):
-            try: process.wait(timeout=8)
-            except subprocess.TimeoutExpired: process.kill(); process.wait(timeout=5)
+            _terminate_tree(process)
         api_file.close(); web_file.close()
+        get_engine().dispose()
+        get_session_factory.cache_clear()
+        get_engine.cache_clear()
 
     assert build.returncode == 0, f"pnpm build failed (browser E2E still completed):\n{build_output}"

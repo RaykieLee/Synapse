@@ -1,10 +1,14 @@
 import type { SubmitEvent } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
+import { setLocale } from '@/lib/i18n'
 import { ConfirmDialog } from './confirm-dialog'
 
 describe('ConfirmDialog', () => {
+  beforeEach(() => setLocale('en'))
+  afterEach(() => setLocale('en'))
+
   it('renders title, description, and default buttons', async () => {
     const { getByRole, getByText } = await render(
       <ConfirmDialog

@@ -7,7 +7,9 @@ import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
+import { FormDialog } from '@/components/form-dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useLocale } from '@/lib/i18n'
 
 const rolesRoute = getRouteApi('/_authenticated/tenants/$tenantId/roles')
@@ -146,6 +148,7 @@ export function TenantRolesPage() {
     {draft && <RoleEditor
       draft={draft}
       pending={save.isPending}
+      error={error}
       onChange={setDraft}
       onCancel={() => setDraft(null)}
       onSave={() => save.mutate(draft)}
@@ -192,9 +195,10 @@ function toDraft(role: TenantRole): RoleDraft {
   return { role_id: role.role_id, role_name: role.role_name, role_key: role.role_key, role_sort: role.role_sort, status: role.status, permissions: [...role.permissions], remark: role.remark ?? '' }
 }
 
-function RoleEditor({ draft, pending, onChange, onCancel, onSave }: {
+function RoleEditor({ draft, pending, error, onChange, onCancel, onSave }: {
   draft: RoleDraft
   pending: boolean
+  error: string
   onChange: (next: RoleDraft) => void
   onCancel: () => void
   onSave: () => void
@@ -207,13 +211,23 @@ function RoleEditor({ draft, pending, onChange, onCancel, onSave }: {
     else selected.add(permission)
     set('permissions', [...selected])
   }
-  return <form className={`${panel} space-y-4`} onSubmit={(event) => { event.preventDefault(); onSave() }}>
-    <h2 className="font-semibold">{draft.role_id ? <LocalizedText text={"编辑角色"} /> : <LocalizedText text={"创建角色"} />}</h2>
+  return <FormDialog
+    open
+    onOpenChange={(open) => { if (!open) onCancel() }}
+    title={draft.role_id ? <LocalizedText text={"编辑角色"} /> : <LocalizedText text={"创建角色"} />}
+    formAriaLabel={draft.role_id ? '编辑角色' : '创建角色'}
+    description="配置角色基础信息，并选择可授予该角色的租户权限。"
+    error={error}
+    submitLabel={draft.role_id ? <LocalizedText text={"保存角色"} /> : <LocalizedText text={"创建角色"} />}
+    pending={pending}
+    disabled={!draft.role_name.trim() || !draft.role_key.trim()}
+    onSubmit={onSave}
+    onCancel={onCancel}
+  >
     <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-sm"><span><LocalizedText text={"角色名称"} /></span><Input autoFocus required maxLength={30} className={`${input} w-full`} value={draft.role_name} onChange={(event) => set('role_name', event.target.value)} /></label><label className="space-y-1 text-sm"><span><LocalizedText text={"角色标识"} /></span><Input required maxLength={64} pattern="[a-z][a-z0-9_]{0,63}" className={`${input} w-full`} value={draft.role_key} onChange={(event) => set('role_key', event.target.value)} /><span className="block text-xs text-muted-foreground"><LocalizedText text={"小写字母开头，仅含小写字母、数字和下划线"} /></span></label><label className="space-y-1 text-sm"><span><LocalizedText text={"排序"} /></span><Input type="number" min={0} className={`${input} w-full`} value={draft.role_sort} onChange={(event) => set('role_sort', Number(event.target.value))} /></label><label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={`${input} w-full`} value={draft.status} onChange={(event) => set('status', event.target.value as RolePayload['status'])}><option value="active"><LocalizedText text={"启用"} /></option><option value="disabled"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label></div>
     <fieldset><legend className="mb-2 text-sm font-medium"><LocalizedText text={"租户授权集合"} /></legend><div className="grid gap-2 sm:grid-cols-2">{permissions.map((permission) => <label key={permission.key} className="flex items-center gap-2 rounded-md border p-3 text-sm"><Input type="checkbox" checked={draft.permissions.includes(permission.key)} onChange={() => togglePermission(permission.key)} /><span>{isEnglish ? permission.labelEn : permission.label}</span><code className="ml-auto text-xs text-muted-foreground">{permission.key}</code></label>)}</div></fieldset>
     <label className="block space-y-1 text-sm"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={3} className="w-full rounded-md border bg-background p-3" value={draft.remark ?? ''} onChange={(event) => set('remark', event.target.value)} /></label>
-    <div className="flex gap-2"><button className={primary} disabled={pending || !draft.role_name.trim() || !draft.role_key.trim()}>{pending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存角色"} />}</button><button type="button" className={button} onClick={onCancel}><LocalizedText text={"取消"} /></button></div>
-  </form>
+  </FormDialog>
 }
 
 function permissionLabel(key: string, isEnglish: boolean) {
@@ -274,8 +288,12 @@ function RoleMenuEditor({ tenantId, actorId, membershipVersion, role, onCancel, 
     setSelected(checked ? [...new Set([...selectedIds, menuId])] : selectedIds.filter((id) => id !== menuId))
   }
   return <>
-    <section className={`${panel} space-y-4`}>
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">{role.role_name} <LocalizedText text={" · 菜单授权"} /></h2><p className="mt-1 text-sm text-muted-foreground">{isEnglish ? 'Only enabled menus in this tenant can be selected. Disabled or deleted historical grants are view-only and will be removed when saved.' : '仅当前租户启用菜单可勾选。停用或已删除的历史授权仅供查看；保存时会从授权集合中移除。'}</p></div><button type="button" className={button} onClick={onCancel}><LocalizedText text={"关闭"} /></button></header>
+    <Dialog open onOpenChange={(open) => { if (!open) onCancel() }}>
+      <DialogContent className="max-h-[min(85vh,44rem)] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{role.role_name} <LocalizedText text={" · 菜单授权"} /></DialogTitle>
+          <DialogDescription>{isEnglish ? 'Only enabled menus in this tenant can be selected. Disabled or deleted historical grants are view-only and will be removed when saved.' : '仅当前租户启用菜单可勾选。停用或已删除的历史授权仅供查看；保存时会从授权集合中移除。'}</DialogDescription>
+        </DialogHeader>
     {menuTree.isLoading || roleMenus.isLoading ? <p className="py-5 text-sm text-muted-foreground"><LocalizedText text={"正在加载菜单授权…"} /></p> : menuTree.isError ? <ErrorBox message={errorText(menuTree.error)} /> : roleMenus.isError ? <ErrorBox message={errorText(roleMenus.error)} /> : <>
       {historical.length > 0 && <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3"><h3 className="text-sm font-medium">{isEnglish ? 'Historical grants that cannot be selected again' : '不可重新勾选的历史授权'}</h3><ul className="space-y-1 text-sm text-muted-foreground">{historical.map((menuId) => {
         const menu = menuById.get(menuId)
@@ -284,7 +302,8 @@ function RoleMenuEditor({ tenantId, actorId, membershipVersion, role, onCancel, 
       {menuTree.data?.items.length ? <div className="max-h-[55vh] space-y-2 overflow-auto rounded-md border p-3">{menuTree.data.items.map((menu) => <MenuGrantNode key={menu.menu_id} menu={menu} depth={0} selected={selectedIds} onToggle={toggleMenu} isEnglish={isEnglish} />)}</div> : <p className="rounded-md border p-5 text-center text-sm text-muted-foreground"><LocalizedText text={"当前租户没有可配置菜单"} /></p>}
       <div className="flex flex-wrap items-center gap-3"><button type="button" className={primary} disabled={!menuTree.data || !roleMenus.data || save.isPending} onClick={saveMenuGrants}>{save.isPending ? <LocalizedText text={"保存中…"} /> : <LocalizedText text={"保存授权"} />}</button><span className="text-sm text-muted-foreground"><LocalizedText text={"已选 "} />{selectedIds.length} <LocalizedText text={" 个启用菜单"} /></span></div>
     </>}
-    </section>
+      </DialogContent>
+    </Dialog>
     <AlertDialog open={confirmPrune} onOpenChange={(open) => { if (!save.isPending) setConfirmPrune(open) }}>
       <AlertDialogContent>
         <AlertDialogHeader>

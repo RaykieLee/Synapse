@@ -1,5 +1,18 @@
+import * as React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
+import { Button } from '@/components/ui/button'
+import { FormDialog } from '@/components/form-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import type { Member } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import type { TenantRoleRecord } from '../types'
@@ -36,6 +49,11 @@ export function MemberCustomRoleCell({
   const locale = useLocale()
   const t = useLocaleText()
   const client = useQueryClient()
+  const [editorOpen, setEditorOpen] = React.useState(false)
+  const [editorError, setEditorError] = React.useState('')
+  const [roleId, setRoleId] = React.useState('')
+  const [revokeOpen, setRevokeOpen] = React.useState(false)
+  const [revokeError, setRevokeError] = React.useState('')
   const canAssign =
     member.status === 'active' && member.tenant_role === 'member'
   const assignment = useQuery({
@@ -78,10 +96,15 @@ export function MemberCustomRoleCell({
         { method: 'PUT', body: JSON.stringify({ role_id: roleId }) }
       ),
     onSuccess: async () => {
+      setEditorError('')
       onError('')
       await invalidate()
     },
-    onError: (cause) => onError(errorText(cause)),
+    onError: (cause) => {
+      const message = errorText(cause)
+      setEditorError(message)
+      onError(message)
+    },
   })
   const revoke = useMutation({
     mutationFn: () =>
@@ -89,10 +112,16 @@ export function MemberCustomRoleCell({
         method: 'DELETE',
       }),
     onSuccess: async () => {
+      setRevokeError('')
+      setRevokeOpen(false)
       onError('')
       await invalidate()
     },
-    onError: (cause) => onError(errorText(cause)),
+    onError: (cause) => {
+      const message = errorText(cause)
+      setRevokeError(message)
+      onError(message)
+    },
   })
 
   if (!canAssign) {
@@ -134,30 +163,28 @@ export function MemberCustomRoleCell({
   const selected = assignment.data?.role?.role_id ?? ''
   return (
     <div className='flex flex-wrap items-center gap-2'>
-      <LocalizedNativeSelect
-        aria-label={`${member.user_name} ${t('自定义角色')}`}
-        className='h-8 max-w-44 rounded-md border bg-background px-2 text-xs shadow-xs'
-        value={selected}
+      <Button
+        variant='ghost'
+        size='sm'
+        className='h-8 px-2 text-xs'
         disabled={assign.isPending || revoke.isPending}
-        onChange={(event) => {
-          if (event.target.value) assign.mutate(event.target.value)
+        onClick={() => {
+          setEditorError('')
+          setRoleId(selected)
+          setEditorOpen(true)
         }}
       >
-        <option value=''>
-          {assignment.data?.role ? <LocalizedText text={"选择其他角色…"} /> : <LocalizedText text={"未分配"} />}
-        </option>
-        {roles.map((role) => (
-          <option key={role.role_id} value={role.role_id}>
-            {role.role_name}
-          </option>
-        ))}
-      </LocalizedNativeSelect>
+        {assignment.data?.role?.role_name ?? t('未分配')}
+      </Button>
       {assignment.data?.role ? (
         <button
           type='button'
           className='text-xs text-destructive underline-offset-4 hover:underline disabled:opacity-50'
           disabled={assign.isPending || revoke.isPending}
-          onClick={() => revoke.mutate()}
+          onClick={() => {
+            setRevokeError('')
+            setRevokeOpen(true)
+          }}
         >
           <LocalizedText text={'撤销'} />
         </button>
@@ -165,6 +192,81 @@ export function MemberCustomRoleCell({
       {assign.isPending || revoke.isPending ? (
         <span className='text-xs text-muted-foreground'><LocalizedText text={"保存中…"} /></span>
       ) : null}
+      <FormDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        title={<LocalizedText text={'编辑自定义角色'} />}
+        formAriaLabel='编辑自定义角色'
+        description='为普通成员分配租户自定义角色；保存后权限立即生效。'
+        error={editorError}
+        submitLabel={<LocalizedText text={'保存角色'} />}
+        pending={assign.isPending}
+        disabled={!roleId}
+        onSubmit={() => {
+          if (roleId) assign.mutate(roleId, { onSuccess: () => setEditorOpen(false) })
+        }}
+        onCancel={() => { setEditorOpen(false); setEditorError('') }}
+      >
+        <div className='space-y-2'>
+          <label className='text-sm' htmlFor={`custom-role-${member.user_id}`}>
+            <LocalizedText text={'自定义角色'} />
+          </label>
+          <LocalizedNativeSelect
+            id={`custom-role-${member.user_id}`}
+            className='h-10 w-full rounded-md border bg-background px-3 text-sm'
+            value={roleId}
+            onChange={(event) => setRoleId(event.target.value)}
+          >
+            <option value=''>{assignment.data?.role ? t('选择其他角色…') : t('未分配')}</option>
+            {roles.map((role) => (
+              <option key={role.role_id} value={role.role_id}>
+                {role.role_name}
+              </option>
+            ))}
+          </LocalizedNativeSelect>
+        </div>
+      </FormDialog>
+      <AlertDialog
+        open={revokeOpen}
+        onOpenChange={(open) => {
+          if (revoke.isPending) return
+          setRevokeOpen(open)
+          if (!open) setRevokeError('')
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle><LocalizedText text={'撤销自定义角色'} /></AlertDialogTitle>
+            <AlertDialogDescription>
+              <LocalizedText text={'撤销后该成员的自定义角色权限会立即失效。确定继续吗？'} />
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {revokeError && (
+            <p role='alert' className='text-sm text-destructive'>
+              {revokeError}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revoke.isPending}>
+              <LocalizedText text={'取消'} />
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={revoke.isPending}
+              onClick={(event) => {
+                event.preventDefault()
+                setRevokeError('')
+                revoke.mutate()
+              }}
+            >
+              {revoke.isPending ? (
+                <LocalizedText text={'处理中…'} />
+              ) : (
+                <LocalizedText text={'确认撤销'} />
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
