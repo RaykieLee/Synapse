@@ -86,6 +86,12 @@ export function WorkspaceHome() {
           <LocalizedText text={"\n          智能体定义、会话和文件按当前 Workspace 作用域隔离。\n        "} /></p>
         <div className='mt-4 flex flex-wrap gap-2'>
           <Link
+            to='/w/$workspaceId/chat'
+            params={{ workspaceId: workspace.workspace_id }}
+          >
+            <Button variant='default'><LocalizedText text={'AI 对话'} /></Button>
+          </Link>
+          <Link
             to='/w/$workspaceId/agents'
             params={{ workspaceId: workspace.workspace_id }}
           >
@@ -108,6 +114,42 @@ export function WorkspaceHome() {
             params={{ workspaceId: workspace.workspace_id }}
           >
             <Button variant='outline'><LocalizedText text={"附件"} /></Button>
+          </Link>
+          <Link
+            to='/w/$workspaceId/knowledge'
+            params={{ workspaceId: workspace.workspace_id }}
+          >
+            <Button variant='outline'><LocalizedText text={'知识库'} /></Button>
+          </Link>
+          <Link
+            to='/w/$workspaceId/mcp'
+            params={{ workspaceId: workspace.workspace_id }}
+          >
+            <Button variant='outline'><LocalizedText text={'MCP'} /></Button>
+          </Link>
+          <Link
+            to='/w/$workspaceId/skills'
+            params={{ workspaceId: workspace.workspace_id }}
+          >
+            <Button variant='outline'><LocalizedText text={'Skills'} /></Button>
+          </Link>
+          <Link
+            to='/w/$workspaceId/credential'
+            params={{ workspaceId: workspace.workspace_id }}
+          >
+            <Button variant='outline'><LocalizedText text={'AgentScope 凭据'} /></Button>
+          </Link>
+          <Link
+            to='/w/$workspaceId/schedule'
+            params={{ workspaceId: workspace.workspace_id }}
+          >
+            <Button variant='outline'><LocalizedText text={'调度任务'} /></Button>
+          </Link>
+          <Link
+            to='/w/$workspaceId/channel'
+            params={{ workspaceId: workspace.workspace_id }}
+          >
+            <Button variant='outline'><LocalizedText text={'渠道'} /></Button>
           </Link>
         </div>
       </section>

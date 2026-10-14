@@ -3,18 +3,26 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Bell,
+  Bot,
+  Boxes,
   Building2,
   BookOpen,
+  Database,
   CalendarClock,
+  ClipboardCheck,
   FileText,
   Folder,
   FolderTree,
   Home,
   LayoutDashboard,
   Layers3,
+  KeyRound,
+  MessageSquare,
   Monitor,
   Palette,
+  Radio,
   Settings,
+  Sparkles,
   UserCog,
   Users,
   Wrench,
@@ -97,6 +105,33 @@ function workspaceSystemGroups(
         ...(isPlatformAdmin
           ? [{ title: '全局用户', url: '/users', icon: Users }]
           : []),
+      ],
+    },
+    {
+      title: 'AI 工作台',
+      items: [
+        { title: 'AI 对话', url: `/w/${workspaceId}/chat`, icon: Bot },
+        { title: '智能体', url: `/w/${workspaceId}/agents`, icon: Bot },
+        { title: '会话', url: `/w/${workspaceId}/sessions`, icon: MessageSquare },
+        {
+          title: 'AgentScope 凭据',
+          url: `/w/${workspaceId}/credential`,
+          icon: KeyRound,
+        },
+        {
+          title: '知识库',
+          url: `/w/${workspaceId}/knowledge`,
+          icon: Database,
+        },
+        { title: 'MCP', url: `/w/${workspaceId}/mcp`, icon: Boxes },
+        { title: 'Skills', url: `/w/${workspaceId}/skills`, icon: Sparkles },
+        { title: 'SOP 流程', url: `/w/${workspaceId}/sop`, icon: ClipboardCheck },
+        {
+          title: '调度任务',
+          url: `/w/${workspaceId}/schedule`,
+          icon: CalendarClock,
+        },
+        { title: '渠道', url: `/w/${workspaceId}/channel`, icon: Radio },
       ],
     },
     {

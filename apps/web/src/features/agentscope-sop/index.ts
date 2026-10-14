@@ -1,0 +1,1 @@
+export { AgentScopeSopPage } from './page'

@@ -26,10 +26,18 @@ const tenantPageTitles: Record<string, string> = {
 }
 
 const workspacePageTitles: Record<string, string> = {
+  chat: 'AI 对话',
   agents: '智能体',
   sessions: '会话',
   teams: '子智能体团队',
   models: '模型与凭据',
+  credential: 'AgentScope 凭据',
+  knowledge: '知识库',
+  mcp: 'MCP',
+  skills: 'Skills',
+  sop: 'SOP 流程',
+  schedule: '调度任务',
+  channel: '渠道',
   attachments: '附件',
   members: '成员',
   settings: '设置',

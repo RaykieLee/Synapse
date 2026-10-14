@@ -1,0 +1,1 @@
+export { AgentScopeCredentialPage } from './page'

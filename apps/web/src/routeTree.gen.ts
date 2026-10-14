@@ -13,6 +13,7 @@ import { Route as ClerkRouteRouteImport } from './routes/clerk/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as InviteAcceptRouteImport } from './routes/invite/accept'
+import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
@@ -45,10 +46,18 @@ import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenti
 import { Route as AuthenticatedWWorkspaceIdRouteRouteImport } from './routes/_authenticated/w/$workspaceId/route'
 import { Route as AuthenticatedWWorkspaceIdIndexRouteImport } from './routes/_authenticated/w/$workspaceId/index'
 import { Route as AuthenticatedWWorkspaceIdTeamsRouteImport } from './routes/_authenticated/w/$workspaceId/teams'
+import { Route as AuthenticatedWWorkspaceIdSopRouteImport } from './routes/_authenticated/w/$workspaceId/sop'
+import { Route as AuthenticatedWWorkspaceIdSkillsRouteImport } from './routes/_authenticated/w/$workspaceId/skills'
 import { Route as AuthenticatedWWorkspaceIdSettingsRouteImport } from './routes/_authenticated/w/$workspaceId/settings'
 import { Route as AuthenticatedWWorkspaceIdSessionsRouteImport } from './routes/_authenticated/w/$workspaceId/sessions'
+import { Route as AuthenticatedWWorkspaceIdScheduleRouteImport } from './routes/_authenticated/w/$workspaceId/schedule'
 import { Route as AuthenticatedWWorkspaceIdModelsRouteImport } from './routes/_authenticated/w/$workspaceId/models'
 import { Route as AuthenticatedWWorkspaceIdMembersRouteImport } from './routes/_authenticated/w/$workspaceId/members'
+import { Route as AuthenticatedWWorkspaceIdMcpRouteImport } from './routes/_authenticated/w/$workspaceId/mcp'
+import { Route as AuthenticatedWWorkspaceIdKnowledgeRouteImport } from './routes/_authenticated/w/$workspaceId/knowledge'
+import { Route as AuthenticatedWWorkspaceIdCredentialRouteImport } from './routes/_authenticated/w/$workspaceId/credential'
+import { Route as AuthenticatedWWorkspaceIdChatRouteImport } from './routes/_authenticated/w/$workspaceId/chat'
+import { Route as AuthenticatedWWorkspaceIdChannelRouteImport } from './routes/_authenticated/w/$workspaceId/channel'
 import { Route as AuthenticatedWWorkspaceIdAttachmentsRouteImport } from './routes/_authenticated/w/$workspaceId/attachments'
 import { Route as AuthenticatedWWorkspaceIdAgentsRouteImport } from './routes/_authenticated/w/$workspaceId/agents'
 import { Route as AuthenticatedTenantsTenantIdScheduledTasksRouteImport } from './routes/_authenticated/tenants/$tenantId/scheduled-tasks'
@@ -76,6 +85,11 @@ const InviteAcceptRoute = InviteAcceptRouteImport.update({
   id: '/invite/accept',
   path: '/invite/accept',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const errors503Route = errors503RouteImport.update({
   id: '/(errors)/503',
@@ -249,6 +263,18 @@ const AuthenticatedWWorkspaceIdTeamsRoute =
     path: '/teams',
     getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
   } as any)
+const AuthenticatedWWorkspaceIdSopRoute =
+  AuthenticatedWWorkspaceIdSopRouteImport.update({
+    id: '/sop',
+    path: '/sop',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
+const AuthenticatedWWorkspaceIdSkillsRoute =
+  AuthenticatedWWorkspaceIdSkillsRouteImport.update({
+    id: '/skills',
+    path: '/skills',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
 const AuthenticatedWWorkspaceIdSettingsRoute =
   AuthenticatedWWorkspaceIdSettingsRouteImport.update({
     id: '/settings',
@@ -261,6 +287,12 @@ const AuthenticatedWWorkspaceIdSessionsRoute =
     path: '/sessions',
     getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
   } as any)
+const AuthenticatedWWorkspaceIdScheduleRoute =
+  AuthenticatedWWorkspaceIdScheduleRouteImport.update({
+    id: '/schedule',
+    path: '/schedule',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
 const AuthenticatedWWorkspaceIdModelsRoute =
   AuthenticatedWWorkspaceIdModelsRouteImport.update({
     id: '/models',
@@ -271,6 +303,36 @@ const AuthenticatedWWorkspaceIdMembersRoute =
   AuthenticatedWWorkspaceIdMembersRouteImport.update({
     id: '/members',
     path: '/members',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
+const AuthenticatedWWorkspaceIdMcpRoute =
+  AuthenticatedWWorkspaceIdMcpRouteImport.update({
+    id: '/mcp',
+    path: '/mcp',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
+const AuthenticatedWWorkspaceIdKnowledgeRoute =
+  AuthenticatedWWorkspaceIdKnowledgeRouteImport.update({
+    id: '/knowledge',
+    path: '/knowledge',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
+const AuthenticatedWWorkspaceIdCredentialRoute =
+  AuthenticatedWWorkspaceIdCredentialRouteImport.update({
+    id: '/credential',
+    path: '/credential',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
+const AuthenticatedWWorkspaceIdChatRoute =
+  AuthenticatedWWorkspaceIdChatRouteImport.update({
+    id: '/chat',
+    path: '/chat',
+    getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
+  } as any)
+const AuthenticatedWWorkspaceIdChannelRoute =
+  AuthenticatedWWorkspaceIdChannelRouteImport.update({
+    id: '/channel',
+    path: '/channel',
     getParentRoute: () => AuthenticatedWWorkspaceIdRouteRoute,
   } as any)
 const AuthenticatedWWorkspaceIdAttachmentsRoute =
@@ -336,6 +398,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/setup': typeof AuthenticatedSetupRoute
   '/invite/accept': typeof InviteAcceptRoute
   '/w/$workspaceId': typeof AuthenticatedWWorkspaceIdRouteRouteWithChildren
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
@@ -362,10 +425,18 @@ export interface FileRoutesByFullPath {
   '/tenants/$tenantId/scheduled-tasks': typeof AuthenticatedTenantsTenantIdScheduledTasksRoute
   '/w/$workspaceId/agents': typeof AuthenticatedWWorkspaceIdAgentsRoute
   '/w/$workspaceId/attachments': typeof AuthenticatedWWorkspaceIdAttachmentsRoute
+  '/w/$workspaceId/channel': typeof AuthenticatedWWorkspaceIdChannelRoute
+  '/w/$workspaceId/chat': typeof AuthenticatedWWorkspaceIdChatRoute
+  '/w/$workspaceId/credential': typeof AuthenticatedWWorkspaceIdCredentialRoute
+  '/w/$workspaceId/knowledge': typeof AuthenticatedWWorkspaceIdKnowledgeRoute
+  '/w/$workspaceId/mcp': typeof AuthenticatedWWorkspaceIdMcpRoute
   '/w/$workspaceId/members': typeof AuthenticatedWWorkspaceIdMembersRoute
   '/w/$workspaceId/models': typeof AuthenticatedWWorkspaceIdModelsRoute
+  '/w/$workspaceId/schedule': typeof AuthenticatedWWorkspaceIdScheduleRoute
   '/w/$workspaceId/sessions': typeof AuthenticatedWWorkspaceIdSessionsRoute
   '/w/$workspaceId/settings': typeof AuthenticatedWWorkspaceIdSettingsRoute
+  '/w/$workspaceId/skills': typeof AuthenticatedWWorkspaceIdSkillsRoute
+  '/w/$workspaceId/sop': typeof AuthenticatedWWorkspaceIdSopRoute
   '/w/$workspaceId/teams': typeof AuthenticatedWWorkspaceIdTeamsRoute
   '/w/$workspaceId/': typeof AuthenticatedWWorkspaceIdIndexRoute
 }
@@ -381,6 +452,7 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/setup': typeof AuthenticatedSetupRoute
   '/invite/accept': typeof InviteAcceptRoute
   '/': typeof AuthenticatedIndexRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
@@ -407,10 +479,18 @@ export interface FileRoutesByTo {
   '/tenants/$tenantId/scheduled-tasks': typeof AuthenticatedTenantsTenantIdScheduledTasksRoute
   '/w/$workspaceId/agents': typeof AuthenticatedWWorkspaceIdAgentsRoute
   '/w/$workspaceId/attachments': typeof AuthenticatedWWorkspaceIdAttachmentsRoute
+  '/w/$workspaceId/channel': typeof AuthenticatedWWorkspaceIdChannelRoute
+  '/w/$workspaceId/chat': typeof AuthenticatedWWorkspaceIdChatRoute
+  '/w/$workspaceId/credential': typeof AuthenticatedWWorkspaceIdCredentialRoute
+  '/w/$workspaceId/knowledge': typeof AuthenticatedWWorkspaceIdKnowledgeRoute
+  '/w/$workspaceId/mcp': typeof AuthenticatedWWorkspaceIdMcpRoute
   '/w/$workspaceId/members': typeof AuthenticatedWWorkspaceIdMembersRoute
   '/w/$workspaceId/models': typeof AuthenticatedWWorkspaceIdModelsRoute
+  '/w/$workspaceId/schedule': typeof AuthenticatedWWorkspaceIdScheduleRoute
   '/w/$workspaceId/sessions': typeof AuthenticatedWWorkspaceIdSessionsRoute
   '/w/$workspaceId/settings': typeof AuthenticatedWWorkspaceIdSettingsRoute
+  '/w/$workspaceId/skills': typeof AuthenticatedWWorkspaceIdSkillsRoute
+  '/w/$workspaceId/sop': typeof AuthenticatedWWorkspaceIdSopRoute
   '/w/$workspaceId/teams': typeof AuthenticatedWWorkspaceIdTeamsRoute
   '/w/$workspaceId': typeof AuthenticatedWWorkspaceIdIndexRoute
 }
@@ -431,6 +511,7 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
+  '/_authenticated/setup': typeof AuthenticatedSetupRoute
   '/invite/accept': typeof InviteAcceptRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/w/$workspaceId': typeof AuthenticatedWWorkspaceIdRouteRouteWithChildren
@@ -458,10 +539,18 @@ export interface FileRoutesById {
   '/_authenticated/tenants/$tenantId/scheduled-tasks': typeof AuthenticatedTenantsTenantIdScheduledTasksRoute
   '/_authenticated/w/$workspaceId/agents': typeof AuthenticatedWWorkspaceIdAgentsRoute
   '/_authenticated/w/$workspaceId/attachments': typeof AuthenticatedWWorkspaceIdAttachmentsRoute
+  '/_authenticated/w/$workspaceId/channel': typeof AuthenticatedWWorkspaceIdChannelRoute
+  '/_authenticated/w/$workspaceId/chat': typeof AuthenticatedWWorkspaceIdChatRoute
+  '/_authenticated/w/$workspaceId/credential': typeof AuthenticatedWWorkspaceIdCredentialRoute
+  '/_authenticated/w/$workspaceId/knowledge': typeof AuthenticatedWWorkspaceIdKnowledgeRoute
+  '/_authenticated/w/$workspaceId/mcp': typeof AuthenticatedWWorkspaceIdMcpRoute
   '/_authenticated/w/$workspaceId/members': typeof AuthenticatedWWorkspaceIdMembersRoute
   '/_authenticated/w/$workspaceId/models': typeof AuthenticatedWWorkspaceIdModelsRoute
+  '/_authenticated/w/$workspaceId/schedule': typeof AuthenticatedWWorkspaceIdScheduleRoute
   '/_authenticated/w/$workspaceId/sessions': typeof AuthenticatedWWorkspaceIdSessionsRoute
   '/_authenticated/w/$workspaceId/settings': typeof AuthenticatedWWorkspaceIdSettingsRoute
+  '/_authenticated/w/$workspaceId/skills': typeof AuthenticatedWWorkspaceIdSkillsRoute
+  '/_authenticated/w/$workspaceId/sop': typeof AuthenticatedWWorkspaceIdSopRoute
   '/_authenticated/w/$workspaceId/teams': typeof AuthenticatedWWorkspaceIdTeamsRoute
   '/_authenticated/w/$workspaceId/': typeof AuthenticatedWWorkspaceIdIndexRoute
 }
@@ -481,6 +570,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/setup'
     | '/invite/accept'
     | '/w/$workspaceId'
     | '/errors/$error'
@@ -507,10 +597,18 @@ export interface FileRouteTypes {
     | '/tenants/$tenantId/scheduled-tasks'
     | '/w/$workspaceId/agents'
     | '/w/$workspaceId/attachments'
+    | '/w/$workspaceId/channel'
+    | '/w/$workspaceId/chat'
+    | '/w/$workspaceId/credential'
+    | '/w/$workspaceId/knowledge'
+    | '/w/$workspaceId/mcp'
     | '/w/$workspaceId/members'
     | '/w/$workspaceId/models'
+    | '/w/$workspaceId/schedule'
     | '/w/$workspaceId/sessions'
     | '/w/$workspaceId/settings'
+    | '/w/$workspaceId/skills'
+    | '/w/$workspaceId/sop'
     | '/w/$workspaceId/teams'
     | '/w/$workspaceId/'
   fileRoutesByTo: FileRoutesByTo
@@ -526,6 +624,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/setup'
     | '/invite/accept'
     | '/'
     | '/errors/$error'
@@ -552,10 +651,18 @@ export interface FileRouteTypes {
     | '/tenants/$tenantId/scheduled-tasks'
     | '/w/$workspaceId/agents'
     | '/w/$workspaceId/attachments'
+    | '/w/$workspaceId/channel'
+    | '/w/$workspaceId/chat'
+    | '/w/$workspaceId/credential'
+    | '/w/$workspaceId/knowledge'
+    | '/w/$workspaceId/mcp'
     | '/w/$workspaceId/members'
     | '/w/$workspaceId/models'
+    | '/w/$workspaceId/schedule'
     | '/w/$workspaceId/sessions'
     | '/w/$workspaceId/settings'
+    | '/w/$workspaceId/skills'
+    | '/w/$workspaceId/sop'
     | '/w/$workspaceId/teams'
     | '/w/$workspaceId'
   id:
@@ -575,6 +682,7 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/_authenticated/setup'
     | '/invite/accept'
     | '/_authenticated/'
     | '/_authenticated/w/$workspaceId'
@@ -602,10 +710,18 @@ export interface FileRouteTypes {
     | '/_authenticated/tenants/$tenantId/scheduled-tasks'
     | '/_authenticated/w/$workspaceId/agents'
     | '/_authenticated/w/$workspaceId/attachments'
+    | '/_authenticated/w/$workspaceId/channel'
+    | '/_authenticated/w/$workspaceId/chat'
+    | '/_authenticated/w/$workspaceId/credential'
+    | '/_authenticated/w/$workspaceId/knowledge'
+    | '/_authenticated/w/$workspaceId/mcp'
     | '/_authenticated/w/$workspaceId/members'
     | '/_authenticated/w/$workspaceId/models'
+    | '/_authenticated/w/$workspaceId/schedule'
     | '/_authenticated/w/$workspaceId/sessions'
     | '/_authenticated/w/$workspaceId/settings'
+    | '/_authenticated/w/$workspaceId/skills'
+    | '/_authenticated/w/$workspaceId/sop'
     | '/_authenticated/w/$workspaceId/teams'
     | '/_authenticated/w/$workspaceId/'
   fileRoutesById: FileRoutesById
@@ -655,6 +771,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/invite/accept'
       preLoaderRoute: typeof InviteAcceptRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/setup': {
+      id: '/_authenticated/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof AuthenticatedSetupRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/(errors)/503': {
       id: '/(errors)/503'
@@ -880,6 +1003,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceIdTeamsRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
     }
+    '/_authenticated/w/$workspaceId/sop': {
+      id: '/_authenticated/w/$workspaceId/sop'
+      path: '/sop'
+      fullPath: '/w/$workspaceId/sop'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdSopRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
+    '/_authenticated/w/$workspaceId/skills': {
+      id: '/_authenticated/w/$workspaceId/skills'
+      path: '/skills'
+      fullPath: '/w/$workspaceId/skills'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdSkillsRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
     '/_authenticated/w/$workspaceId/settings': {
       id: '/_authenticated/w/$workspaceId/settings'
       path: '/settings'
@@ -894,6 +1031,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceIdSessionsRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
     }
+    '/_authenticated/w/$workspaceId/schedule': {
+      id: '/_authenticated/w/$workspaceId/schedule'
+      path: '/schedule'
+      fullPath: '/w/$workspaceId/schedule'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdScheduleRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
     '/_authenticated/w/$workspaceId/models': {
       id: '/_authenticated/w/$workspaceId/models'
       path: '/models'
@@ -906,6 +1050,41 @@ declare module '@tanstack/react-router' {
       path: '/members'
       fullPath: '/w/$workspaceId/members'
       preLoaderRoute: typeof AuthenticatedWWorkspaceIdMembersRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
+    '/_authenticated/w/$workspaceId/mcp': {
+      id: '/_authenticated/w/$workspaceId/mcp'
+      path: '/mcp'
+      fullPath: '/w/$workspaceId/mcp'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdMcpRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
+    '/_authenticated/w/$workspaceId/knowledge': {
+      id: '/_authenticated/w/$workspaceId/knowledge'
+      path: '/knowledge'
+      fullPath: '/w/$workspaceId/knowledge'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdKnowledgeRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
+    '/_authenticated/w/$workspaceId/credential': {
+      id: '/_authenticated/w/$workspaceId/credential'
+      path: '/credential'
+      fullPath: '/w/$workspaceId/credential'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdCredentialRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
+    '/_authenticated/w/$workspaceId/chat': {
+      id: '/_authenticated/w/$workspaceId/chat'
+      path: '/chat'
+      fullPath: '/w/$workspaceId/chat'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdChatRouteImport
+      parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
+    }
+    '/_authenticated/w/$workspaceId/channel': {
+      id: '/_authenticated/w/$workspaceId/channel'
+      path: '/channel'
+      fullPath: '/w/$workspaceId/channel'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceIdChannelRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceIdRouteRoute
     }
     '/_authenticated/w/$workspaceId/attachments': {
@@ -993,10 +1172,18 @@ const AuthenticatedSettingsRouteRouteWithChildren =
 interface AuthenticatedWWorkspaceIdRouteRouteChildren {
   AuthenticatedWWorkspaceIdAgentsRoute: typeof AuthenticatedWWorkspaceIdAgentsRoute
   AuthenticatedWWorkspaceIdAttachmentsRoute: typeof AuthenticatedWWorkspaceIdAttachmentsRoute
+  AuthenticatedWWorkspaceIdChannelRoute: typeof AuthenticatedWWorkspaceIdChannelRoute
+  AuthenticatedWWorkspaceIdChatRoute: typeof AuthenticatedWWorkspaceIdChatRoute
+  AuthenticatedWWorkspaceIdCredentialRoute: typeof AuthenticatedWWorkspaceIdCredentialRoute
+  AuthenticatedWWorkspaceIdKnowledgeRoute: typeof AuthenticatedWWorkspaceIdKnowledgeRoute
+  AuthenticatedWWorkspaceIdMcpRoute: typeof AuthenticatedWWorkspaceIdMcpRoute
   AuthenticatedWWorkspaceIdMembersRoute: typeof AuthenticatedWWorkspaceIdMembersRoute
   AuthenticatedWWorkspaceIdModelsRoute: typeof AuthenticatedWWorkspaceIdModelsRoute
+  AuthenticatedWWorkspaceIdScheduleRoute: typeof AuthenticatedWWorkspaceIdScheduleRoute
   AuthenticatedWWorkspaceIdSessionsRoute: typeof AuthenticatedWWorkspaceIdSessionsRoute
   AuthenticatedWWorkspaceIdSettingsRoute: typeof AuthenticatedWWorkspaceIdSettingsRoute
+  AuthenticatedWWorkspaceIdSkillsRoute: typeof AuthenticatedWWorkspaceIdSkillsRoute
+  AuthenticatedWWorkspaceIdSopRoute: typeof AuthenticatedWWorkspaceIdSopRoute
   AuthenticatedWWorkspaceIdTeamsRoute: typeof AuthenticatedWWorkspaceIdTeamsRoute
   AuthenticatedWWorkspaceIdIndexRoute: typeof AuthenticatedWWorkspaceIdIndexRoute
 }
@@ -1006,13 +1193,25 @@ const AuthenticatedWWorkspaceIdRouteRouteChildren: AuthenticatedWWorkspaceIdRout
     AuthenticatedWWorkspaceIdAgentsRoute: AuthenticatedWWorkspaceIdAgentsRoute,
     AuthenticatedWWorkspaceIdAttachmentsRoute:
       AuthenticatedWWorkspaceIdAttachmentsRoute,
+    AuthenticatedWWorkspaceIdChannelRoute:
+      AuthenticatedWWorkspaceIdChannelRoute,
+    AuthenticatedWWorkspaceIdChatRoute: AuthenticatedWWorkspaceIdChatRoute,
+    AuthenticatedWWorkspaceIdCredentialRoute:
+      AuthenticatedWWorkspaceIdCredentialRoute,
+    AuthenticatedWWorkspaceIdKnowledgeRoute:
+      AuthenticatedWWorkspaceIdKnowledgeRoute,
+    AuthenticatedWWorkspaceIdMcpRoute: AuthenticatedWWorkspaceIdMcpRoute,
     AuthenticatedWWorkspaceIdMembersRoute:
       AuthenticatedWWorkspaceIdMembersRoute,
     AuthenticatedWWorkspaceIdModelsRoute: AuthenticatedWWorkspaceIdModelsRoute,
+    AuthenticatedWWorkspaceIdScheduleRoute:
+      AuthenticatedWWorkspaceIdScheduleRoute,
     AuthenticatedWWorkspaceIdSessionsRoute:
       AuthenticatedWWorkspaceIdSessionsRoute,
     AuthenticatedWWorkspaceIdSettingsRoute:
       AuthenticatedWWorkspaceIdSettingsRoute,
+    AuthenticatedWWorkspaceIdSkillsRoute: AuthenticatedWWorkspaceIdSkillsRoute,
+    AuthenticatedWWorkspaceIdSopRoute: AuthenticatedWWorkspaceIdSopRoute,
     AuthenticatedWWorkspaceIdTeamsRoute: AuthenticatedWWorkspaceIdTeamsRoute,
     AuthenticatedWWorkspaceIdIndexRoute: AuthenticatedWWorkspaceIdIndexRoute,
   }
@@ -1054,6 +1253,7 @@ const AuthenticatedTenantsTenantIdRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
+  AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedWWorkspaceIdRouteRoute: typeof AuthenticatedWWorkspaceIdRouteRouteWithChildren
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
@@ -1068,6 +1268,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
+  AuthenticatedSetupRoute: AuthenticatedSetupRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedWWorkspaceIdRouteRoute:
     AuthenticatedWWorkspaceIdRouteRouteWithChildren,
