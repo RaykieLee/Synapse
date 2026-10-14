@@ -1,4 +1,8 @@
-import { ArrowDownIcon, ArrowUpIcon, CaretSortIcon } from '@radix-ui/react-icons'
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CaretSortIcon,
+} from '@radix-ui/react-icons'
 import { type Column } from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -24,7 +28,7 @@ export function DataTableColumnHeader<TData, TValue>({
         type='button'
         variant='ghost'
         size='sm'
-        className='-ml-2 h-8 gap-1.5 px-2'
+        className='-ml-2 h-8 min-w-0 gap-1.5 px-2 font-medium'
         onClick={column.getToggleSortingHandler()}
         aria-label={`${title}, sort`}
       >

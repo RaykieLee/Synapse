@@ -10,7 +10,7 @@ describe('DataTableSkeletonRows', () => {
     setLocale('zh-CN')
   })
 
-  it('renders three compact placeholder rows by default', async () => {
+  it('renders ten compact placeholder rows by default', async () => {
     await render(
       <table>
         <tbody>
@@ -20,7 +20,7 @@ describe('DataTableSkeletonRows', () => {
     )
 
     const rows = document.querySelectorAll('tbody > tr')
-    expect(rows).toHaveLength(3)
+    expect(rows).toHaveLength(10)
     rows.forEach((row) => {
       expect(row.querySelectorAll('td')).toHaveLength(4)
       expect(row.className).toContain('h-10')
@@ -28,5 +28,22 @@ describe('DataTableSkeletonRows', () => {
     expect(document.querySelector('[role="status"]')?.textContent).toContain(
       'Loading'
     )
+  })
+
+  it('preserves responsive column visibility while loading', async () => {
+    await render(
+      <table>
+        <tbody>
+          <DataTableSkeletonRows
+            columnCount={3}
+            cellClassNames={[undefined, 'hidden xl:table-cell', undefined]}
+          />
+        </tbody>
+      </table>
+    )
+
+    expect(
+      document.querySelector('tbody tr td:nth-child(2)')?.className
+    ).toContain('hidden')
   })
 })

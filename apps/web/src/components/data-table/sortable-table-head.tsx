@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import { ArrowDown, ArrowDownUp, ArrowUp } from 'lucide-react'
+import { useLocaleText } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { TableHead } from '@/components/ui/table'
 import { LocalizedText } from '@/components/localized-text'
-import { useLocaleText } from '@/lib/i18n'
 import type { TableSortState } from './sorting'
 
 export function SortableTableHead({
@@ -47,7 +47,7 @@ export function SortableTableHead({
         type='button'
         variant='ghost'
         size='sm'
-        className='-ml-2 h-8 gap-1.5 px-2 font-medium'
+        className='-ml-2 h-8 min-w-0 gap-1.5 px-2 font-medium'
         title={t(
           direction === 'asc'
             ? '当前升序，点击切换为降序'
