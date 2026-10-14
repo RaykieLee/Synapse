@@ -1,16 +1,9 @@
 import * as React from 'react'
-import { MoreHorizontal, RotateCcw } from 'lucide-react'
-import { LocalizedNativeSelect } from '@/components/localized-native-select'
-import { DetailDialog } from '@/components/detail-dialog'
+import { Info, MoreHorizontal, RotateCcw } from 'lucide-react'
 import type { Member, MemberRole } from '@/api/tenants'
+import { useLocaleText } from '@/lib/i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
@@ -19,6 +12,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import {
   Table,
@@ -34,10 +33,11 @@ import {
   sortRows,
   type TableSortState,
 } from '@/components/data-table'
+import { DetailDialog } from '@/components/detail-dialog'
+import { LocalizedNativeSelect } from '@/components/localized-native-select'
+import { LocalizedText } from '@/components/localized-text'
 import { formatDateTime, tenantText } from '../types'
 import { EmptyState } from './shared'
-import { LocalizedText } from '@/components/localized-text'
-import { useLocaleText } from '@/lib/i18n'
 
 const statusStyles: Record<Member['status'], string> = {
   active:
@@ -112,41 +112,98 @@ export function MemberTable({
       <Table>
         <TableHeader>
           <TableRow className='bg-muted/35 hover:bg-muted/35'>
-            <SortableTableHead label={<LocalizedText text='成员' />} sortKey='member' sorting={sorting} onSortingChange={setSorting} className='ps-4' />
-            <SortableTableHead label={<LocalizedText text='角色' />} sortKey='role' sorting={sorting} onSortingChange={setSorting} />
-            <TableHead><LocalizedText text={"自定义角色"} /></TableHead>
-            <SortableTableHead label={<LocalizedText text='状态' />} sortKey='status' sorting={sorting} onSortingChange={setSorting} />
-            <SortableTableHead label={<LocalizedText text='加入时间' />} sortKey='joined' sorting={sorting} onSortingChange={setSorting} className='hidden xl:table-cell' />
+            <SortableTableHead
+              label={<LocalizedText text='成员' />}
+              sortKey='member'
+              sorting={sorting}
+              onSortingChange={setSorting}
+              className='ps-4'
+            />
+            <SortableTableHead
+              label={<LocalizedText text='角色' />}
+              sortKey='role'
+              sorting={sorting}
+              onSortingChange={setSorting}
+            />
+            <TableHead>
+              <LocalizedText text='自定义角色' />
+            </TableHead>
+            <SortableTableHead
+              label={<LocalizedText text='状态' />}
+              sortKey='status'
+              sorting={sorting}
+              onSortingChange={setSorting}
+            />
+            <SortableTableHead
+              label={<LocalizedText text='加入时间' />}
+              sortKey='joined'
+              sorting={sorting}
+              onSortingChange={setSorting}
+              className='hidden xl:table-cell'
+            />
             {canManage ? (
-              <TableHead className='w-20 pe-4 text-end'><LocalizedText text={"管理"} /></TableHead>
+              <TableHead className='w-20 pe-4 text-end'>
+                <LocalizedText text={'管理'} />
+              </TableHead>
             ) : null}
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
-            <DataTableSkeletonRows columnCount={columnCount} />
+            <DataTableSkeletonRows
+              columnCount={columnCount}
+              cellClassNames={[
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'hidden xl:table-cell',
+                undefined,
+              ]}
+            />
           ) : sortedMembers.length ? (
             sortedMembers.map((member) => (
               <TableRow key={member.user_id} className='group'>
                 <TableCell className='max-w-64 ps-4'>
                   <div className='space-y-0.5'>
-                    <p className='font-medium'>
-                      {member.nick_name || member.user_name}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>
-                      {member.email || member.user_name}
-                    </p>
-                    <DetailDialog
-                      trigger={<LocalizedText text={"技术信息"} />}
-                      title={<LocalizedText text={"成员技术信息"} />}
-                      description={member.nick_name || member.user_name}
-                      triggerClassName='mt-1 h-auto px-0 py-0 text-xs text-muted-foreground underline'
-                    >
-                      <div className='space-y-2 text-sm'>
-                        <p><LocalizedText text={"账号 ID："} /><code className='break-all'>{member.user_id}</code></p>
-                        <Button size='sm' variant='outline' onClick={() => navigator.clipboard.writeText(member.user_id)}><LocalizedText text={"复制 ID"} /></Button>
-                      </div>
-                    </DetailDialog>
+                    <div className='flex min-w-0 items-center gap-1'>
+                      <p className='min-w-0 truncate font-medium'>
+                        {member.nick_name || member.user_name}
+                        <span className='text-xs font-normal text-muted-foreground'>
+                          {' · '}
+                          {member.email || member.user_name}
+                        </span>
+                      </p>
+                      <DetailDialog
+                        trigger={
+                          <>
+                            <Info className='size-3.5' aria-hidden='true' />
+                            <span className='sr-only'>
+                              <LocalizedText text='技术信息' />
+                            </span>
+                          </>
+                        }
+                        title={<LocalizedText text='成员技术信息' />}
+                        description={member.nick_name || member.user_name}
+                        triggerClassName='size-6 shrink-0 p-0 text-muted-foreground hover:text-foreground'
+                      >
+                        <div className='space-y-2 text-sm'>
+                          <p>
+                            <LocalizedText text='账号 ID：' />
+                            <code className='break-all'>{member.user_id}</code>
+                          </p>
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            onClick={() =>
+                              navigator.clipboard.writeText(member.user_id)
+                            }
+                          >
+                            <LocalizedText text='复制 ID' />
+                          </Button>
+                        </div>
+                      </DetailDialog>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -154,7 +211,9 @@ export function MemberTable({
                     <Button
                       variant='ghost'
                       size='sm'
-                      onClick={() => setRoleTarget({ member, role: member.tenant_role })}
+                      onClick={() =>
+                        setRoleTarget({ member, role: member.tenant_role })
+                      }
                     >
                       {tenantText[member.tenant_role]}
                     </Button>
@@ -177,12 +236,22 @@ export function MemberTable({
                   <TableCell className='pe-4'>
                     {member.tenant_role === 'owner' ? (
                       <span className='text-xs text-muted-foreground'>
-                        <LocalizedText text={"\n                        受保护\n                      "} /></span>
+                        <LocalizedText
+                          text={
+                            '\n                        受保护\n                      '
+                          }
+                        />
+                      </span>
                     ) : member.status === 'active' ? (
                       <MemberRowActions
                         member={member}
                         onStatusConfirm={(status) =>
-                          setStatusTarget({ member, status, action: status === 'suspended' ? 'suspend' : 'remove' })
+                          setStatusTarget({
+                            member,
+                            status,
+                            action:
+                              status === 'suspended' ? 'suspend' : 'remove',
+                          })
                         }
                       />
                     ) : member.status === 'removed' ||
@@ -190,11 +259,23 @@ export function MemberTable({
                       <Button
                         variant='ghost'
                         size='sm'
-                        onClick={() => setStatusTarget({ member, status: 'active', action: 'reactivate' })}
+                        onClick={() =>
+                          setStatusTarget({
+                            member,
+                            status: 'active',
+                            action: 'reactivate',
+                          })
+                        }
                       >
-                        <RotateCcw className='size-4' /> <LocalizedText text={" 重新加入\n                      "} /></Button>
+                        <RotateCcw className='size-4' />{' '}
+                        <LocalizedText
+                          text={' 重新加入\n                      '}
+                        />
+                      </Button>
                     ) : (
-                      <span className='text-xs text-muted-foreground'><LocalizedText text={"—"} /></span>
+                      <span className='text-xs text-muted-foreground'>
+                        <LocalizedText text={'—'} />
+                      </span>
                     )}
                   </TableCell>
                 ) : null}
@@ -220,7 +301,9 @@ export function MemberTable({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle><LocalizedText text={'编辑成员角色'} /></DialogTitle>
+            <DialogTitle>
+              <LocalizedText text={'编辑成员角色'} />
+            </DialogTitle>
             <DialogDescription>
               {roleTarget?.member.nick_name || roleTarget?.member.user_name}
               <LocalizedText text={' · 角色变化会立即影响租户权限。'} />
@@ -232,7 +315,9 @@ export function MemberTable({
             </p>
           )}
           <div className='space-y-2'>
-            <Label htmlFor='member-role'><LocalizedText text={'租户角色'} /></Label>
+            <Label htmlFor='member-role'>
+              <LocalizedText text={'租户角色'} />
+            </Label>
             <LocalizedNativeSelect
               id='member-role'
               className='h-10 w-full rounded-md border bg-background px-3 text-sm'
@@ -240,14 +325,22 @@ export function MemberTable({
               value={roleTarget?.role ?? 'member'}
               onChange={(event) =>
                 setRoleTarget((current) =>
-                  current ? { ...current, role: event.target.value as MemberRole } : current,
+                  current
+                    ? { ...current, role: event.target.value as MemberRole }
+                    : current
                 )
               }
             >
-              <option value='member'><LocalizedText text={'成员'} /></option>
-              <option value='admin'><LocalizedText text={'管理员'} /></option>
+              <option value='member'>
+                <LocalizedText text={'成员'} />
+              </option>
+              <option value='admin'>
+                <LocalizedText text={'管理员'} />
+              </option>
               {currentRole === 'owner' ? (
-                <option value='owner'><LocalizedText text={'所有者'} /></option>
+                <option value='owner'>
+                  <LocalizedText text={'所有者'} />
+                </option>
               ) : null}
             </LocalizedNativeSelect>
           </div>
@@ -319,7 +412,9 @@ export function MemberTable({
               <LocalizedText text={'取消'} />
             </Button>
             <Button
-              variant={statusTarget?.action === 'remove' ? 'destructive' : 'default'}
+              variant={
+                statusTarget?.action === 'remove' ? 'destructive' : 'default'
+              }
               disabled={mutationPending}
               onClick={async () => {
                 if (!statusTarget) return
@@ -331,7 +426,7 @@ export function MemberTable({
                   else
                     await onStatusChange(
                       statusTarget.member,
-                      statusTarget.status,
+                      statusTarget.status
                     )
                   setStatusTarget(null)
                 } catch {
@@ -367,7 +462,8 @@ function MemberRowActions({
         size='sm'
         onClick={() => onStatusConfirm('suspended')}
       >
-        <LocalizedText text={"\n        暂停\n      "} /></Button>
+        <LocalizedText text={'\n        暂停\n      '} />
+      </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -384,7 +480,8 @@ function MemberRowActions({
             variant='destructive'
             onClick={() => onStatusConfirm('removed')}
           >
-            <LocalizedText text={"\n            移除成员\n          "} /></DropdownMenuItem>
+            <LocalizedText text={'\n            移除成员\n          '} />
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

@@ -1,8 +1,8 @@
 import * as React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LocalizedNativeSelect } from '@/components/localized-native-select'
-import { Button } from '@/components/ui/button'
-import { FormDialog } from '@/components/form-dialog'
+import type { Member } from '@/api/tenants'
+import { ApiProblem, api } from '@/lib/api'
+import { useLocale, useLocaleText } from '@/lib/i18n'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,11 +13,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import type { Member } from '@/api/tenants'
-import { ApiProblem, api } from '@/lib/api'
-import type { TenantRoleRecord } from '../types'
+import { Button } from '@/components/ui/button'
+import { FormDialog } from '@/components/form-dialog'
+import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { LocalizedText } from '@/components/localized-text'
-import { useLocale, useLocaleText } from '@/lib/i18n'
+import type { MemberCustomRoleResponse, TenantRoleRecord } from '../types'
+import { memberCustomRoleQueryOptions } from './member-custom-role-query'
 
 function errorText(error: unknown) {
   if (error instanceof ApiProblem)
@@ -56,22 +57,15 @@ export function MemberCustomRoleCell({
   const [revokeError, setRevokeError] = React.useState('')
   const canAssign =
     member.status === 'active' && member.tenant_role === 'member'
-  const assignment = useQuery({
-    queryKey: [
-      'synapse',
+  const assignment = useQuery(
+    memberCustomRoleQueryOptions({
       actorId,
       tenantId,
-      'personal',
-      'member-custom-role',
       membershipVersion,
-      member.user_id,
-    ],
-    enabled: canAssign,
-    queryFn: () =>
-      api<{ user_id: string; role: TenantRoleRecord | null }>(
-        `/tenants/${tenantId}/members/${member.user_id}/custom-role`
-      ),
-  })
+      userId: member.user_id,
+      enabled: canAssign,
+    })
+  )
   const invalidate = async () => {
     await client.invalidateQueries({
       queryKey: [
@@ -91,7 +85,7 @@ export function MemberCustomRoleCell({
   }
   const assign = useMutation({
     mutationFn: (roleId: string) =>
-      api<{ user_id: string; role: TenantRoleRecord | null }>(
+      api<MemberCustomRoleResponse>(
         `/tenants/${tenantId}/members/${member.user_id}/custom-role`,
         { method: 'PUT', body: JSON.stringify({ role_id: roleId }) }
       ),
@@ -136,19 +130,25 @@ export function MemberCustomRoleCell({
     return <span className='text-xs text-muted-foreground'>{reason}</span>
   }
   if (assignment.isLoading || (canManage && rolesLoading)) {
-    return <span className='text-xs text-muted-foreground'><LocalizedText text={"加载中…"} /></span>
+    return (
+      <span className='text-xs text-muted-foreground'>
+        <LocalizedText text={'加载中…'} />
+      </span>
+    )
   }
   if (assignment.isError) {
     return (
       <span role='alert' className='text-xs text-destructive'>
-        <LocalizedText text={"\n        读取失败："} />{errorText(assignment.error)}
+        <LocalizedText text={'\n        读取失败：'} />
+        {errorText(assignment.error)}
       </span>
     )
   }
   if (canManage && rolesError) {
     return (
       <span role='alert' className='text-xs text-destructive'>
-        <LocalizedText text={"\n        角色列表加载失败："} />{rolesError}
+        <LocalizedText text={'\n        角色列表加载失败：'} />
+        {rolesError}
       </span>
     )
   }
@@ -190,7 +190,9 @@ export function MemberCustomRoleCell({
         </button>
       ) : null}
       {assign.isPending || revoke.isPending ? (
-        <span className='text-xs text-muted-foreground'><LocalizedText text={"保存中…"} /></span>
+        <span className='text-xs text-muted-foreground'>
+          <LocalizedText text={'保存中…'} />
+        </span>
       ) : null}
       <FormDialog
         open={editorOpen}
@@ -203,9 +205,13 @@ export function MemberCustomRoleCell({
         pending={assign.isPending}
         disabled={!roleId}
         onSubmit={() => {
-          if (roleId) assign.mutate(roleId, { onSuccess: () => setEditorOpen(false) })
+          if (roleId)
+            assign.mutate(roleId, { onSuccess: () => setEditorOpen(false) })
         }}
-        onCancel={() => { setEditorOpen(false); setEditorError('') }}
+        onCancel={() => {
+          setEditorOpen(false)
+          setEditorError('')
+        }}
       >
         <div className='space-y-2'>
           <label className='text-sm' htmlFor={`custom-role-${member.user_id}`}>
@@ -217,7 +223,9 @@ export function MemberCustomRoleCell({
             value={roleId}
             onChange={(event) => setRoleId(event.target.value)}
           >
-            <option value=''>{assignment.data?.role ? t('选择其他角色…') : t('未分配')}</option>
+            <option value=''>
+              {assignment.data?.role ? t('选择其他角色…') : t('未分配')}
+            </option>
             {roles.map((role) => (
               <option key={role.role_id} value={role.role_id}>
                 {role.role_name}
@@ -236,9 +244,13 @@ export function MemberCustomRoleCell({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle><LocalizedText text={'撤销自定义角色'} /></AlertDialogTitle>
+            <AlertDialogTitle>
+              <LocalizedText text={'撤销自定义角色'} />
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              <LocalizedText text={'撤销后该成员的自定义角色权限会立即失效。确定继续吗？'} />
+              <LocalizedText
+                text={'撤销后该成员的自定义角色权限会立即失效。确定继续吗？'}
+              />
             </AlertDialogDescription>
           </AlertDialogHeader>
           {revokeError && (

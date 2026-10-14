@@ -25,6 +25,7 @@ import {
 } from '@/api/tenants'
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiProblem, api } from '@/lib/api'
+import { useLocale, useLocaleText } from '@/lib/i18n'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +44,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { DetailDialog } from '@/components/detail-dialog'
+import { LocalizedText } from '@/components/localized-text'
 import { CreateTenantDialog } from './components/create-tenant-dialog'
 import { InvitationPanel } from './components/invitation-panel'
 import { MemberCustomRoleCell } from './components/member-custom-role'
@@ -63,9 +66,6 @@ import {
   type TenantColumn,
 } from './components/tenant-table'
 import { tenantText, type TenantRoleRecord } from './types'
-import { LocalizedText } from '@/components/localized-text'
-import { DetailDialog } from '@/components/detail-dialog'
-import { useLocale, useLocaleText } from '@/lib/i18n'
 
 const tenantsRoute = getRouteApi('/_authenticated/tenants/')
 
@@ -103,7 +103,9 @@ export function Tenants() {
   const [lastQuery, setLastQuery] = useState(query)
   const [createOpen, setCreateOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<Tenant | null>(null)
-  const [batchDialog, setBatchDialog] = useState<TenantBatchTarget[] | null>(null)
+  const [batchDialog, setBatchDialog] = useState<TenantBatchTarget[] | null>(
+    null
+  )
   const [batchProgress, setBatchProgress] = useState<{
     completed: number
     total: number
@@ -113,7 +115,9 @@ export function Tenants() {
     succeeded: number
     failed: number
   } | null>(null)
-  const [batchFailures, setBatchFailures] = useState<Record<string, TenantBatchFailure>>({})
+  const [batchFailures, setBatchFailures] = useState<
+    Record<string, TenantBatchFailure>
+  >({})
   const [error, setError] = useState('')
   if (query !== lastQuery) {
     setLastQuery(query)
@@ -197,13 +201,13 @@ export function Tenants() {
   const pageTenants = tenants.data?.items ?? []
   const hasFilters = Boolean(
     query ||
-      status ||
-      validity ||
-      slug ||
-      createdFrom ||
-      createdTo ||
-      updatedFrom ||
-      expiresBefore
+    status ||
+    validity ||
+    slug ||
+    createdFrom ||
+    createdTo ||
+    updatedFrom ||
+    expiresBefore
   )
   const hasOutOfRangePage = Boolean(tenants.data) && page > pages
   useEffect(() => {
@@ -222,7 +226,8 @@ export function Tenants() {
     : ''
   const selectedTenants = admin
     ? pageTenants.filter(
-        (tenant) => selectedIds.has(tenant.tenant_id) && tenant.status !== 'archived'
+        (tenant) =>
+          selectedIds.has(tenant.tenant_id) && tenant.status !== 'archived'
       )
     : []
   const suspendTargets = selectedTenants
@@ -250,9 +255,17 @@ export function Tenants() {
     let completed = 0
     let succeeded = 0
     let failed = 0
-    setBatchProgress({ completed, total: targets.length, currentName: targets[0].tenant.name })
+    setBatchProgress({
+      completed,
+      total: targets.length,
+      currentName: targets[0].tenant.name,
+    })
     for (const target of targets) {
-      setBatchProgress({ completed, total: targets.length, currentName: target.tenant.name })
+      setBatchProgress({
+        completed,
+        total: targets.length,
+        currentName: target.tenant.name,
+      })
       try {
         await updateTenant(target.tenant.tenant_id, { status: target.status })
         succeeded += 1
@@ -328,7 +341,9 @@ export function Tenants() {
                 setCreateOpen(true)
               }}
             >
-              <Plus className='size-4' /> <LocalizedText text={" 创建租户\n            "} /></Button>
+              <Plus className='size-4' />{' '}
+              <LocalizedText text={' 创建租户\n            '} />
+            </Button>
           ) : null
         }
       />
@@ -422,126 +437,153 @@ export function Tenants() {
         ) : null}
         {!tenants.isError || tenants.data ? (
           <div className='overflow-hidden rounded-md border'>
-          {admin && (selectedIds.size > 0 || batchProgress || visibleBatchFailures.length > 0 || batchSummary) ? (
-            <div className='space-y-3 border-b bg-muted/20 px-4 py-3'>
-              <div className='flex flex-wrap items-center gap-2'>
-                <span className='text-sm text-muted-foreground' aria-live='polite'>
-                  {isEnglish
-                    ? `${selectedTenants.length} selectable tenant(s) selected on this page`
-                    : `当前页已选择 ${selectedTenants.length} 个可操作租户`}
-                </span>
-                {suspendTargets.length > 0 ? (
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    disabled={Boolean(batchProgress)}
-                    onClick={() => setBatchDialog(suspendTargets)}
+            {admin &&
+            (selectedIds.size > 0 ||
+              batchProgress ||
+              visibleBatchFailures.length > 0 ||
+              batchSummary) ? (
+              <div className='space-y-3 border-b bg-muted/20 px-4 py-3'>
+                <div className='flex flex-wrap items-center gap-2'>
+                  <span
+                    className='text-sm text-muted-foreground'
+                    aria-live='polite'
                   >
-                    {isEnglish ? `Suspend selected (${suspendTargets.length})` : `停用所选（${suspendTargets.length}）`}
-                  </Button>
-                ) : null}
-                {enableTargets.length > 0 ? (
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    disabled={Boolean(batchProgress)}
-                    onClick={() => setBatchDialog(enableTargets)}
-                  >
-                    {isEnglish ? `Enable selected (${enableTargets.length})` : `启用所选（${enableTargets.length}）`}
-                  </Button>
-                ) : null}
-                {visibleBatchFailures.length > 0 && retryTargets.length > 0 ? (
-                  <Button
-                    size='sm'
-                    variant='ghost'
-                    disabled={Boolean(batchProgress)}
-                    onClick={() => void runTenantBatch(retryTargets)}
-                  >
-                    <RotateCcw className='size-4' />
-                    {isEnglish ? `Retry failed (${retryTargets.length})` : `重试失败项（${retryTargets.length}）`}
-                  </Button>
-                ) : null}
-                {batchProgress ? (
-                  <span className='flex items-center gap-2 text-sm text-muted-foreground' role='status' aria-live='polite'>
-                    <LoaderCircle className='size-4 animate-spin' />
                     {isEnglish
-                      ? `Updating ${Math.min(batchProgress.completed + 1, batchProgress.total)}/${batchProgress.total}: ${batchProgress.currentName}`
-                      : `正在更新 ${Math.min(batchProgress.completed + 1, batchProgress.total)}/${batchProgress.total}：${batchProgress.currentName}`}
+                      ? `${selectedTenants.length} selectable tenant(s) selected on this page`
+                      : `当前页已选择 ${selectedTenants.length} 个可操作租户`}
                   </span>
-                ) : null}
-                {batchSummary && !batchProgress ? (
-                  <span className='text-sm' role='status' aria-live='polite'>
-                    {isEnglish
-                      ? `Completed: ${batchSummary.succeeded} succeeded, ${batchSummary.failed} failed.`
-                      : `处理完成：成功 ${batchSummary.succeeded} 项，失败 ${batchSummary.failed} 项。`}
-                  </span>
+                  {suspendTargets.length > 0 ? (
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      disabled={Boolean(batchProgress)}
+                      onClick={() => setBatchDialog(suspendTargets)}
+                    >
+                      {isEnglish
+                        ? `Suspend selected (${suspendTargets.length})`
+                        : `停用所选（${suspendTargets.length}）`}
+                    </Button>
+                  ) : null}
+                  {enableTargets.length > 0 ? (
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      disabled={Boolean(batchProgress)}
+                      onClick={() => setBatchDialog(enableTargets)}
+                    >
+                      {isEnglish
+                        ? `Enable selected (${enableTargets.length})`
+                        : `启用所选（${enableTargets.length}）`}
+                    </Button>
+                  ) : null}
+                  {visibleBatchFailures.length > 0 &&
+                  retryTargets.length > 0 ? (
+                    <Button
+                      size='sm'
+                      variant='ghost'
+                      disabled={Boolean(batchProgress)}
+                      onClick={() => void runTenantBatch(retryTargets)}
+                    >
+                      <RotateCcw className='size-4' />
+                      {isEnglish
+                        ? `Retry failed (${retryTargets.length})`
+                        : `重试失败项（${retryTargets.length}）`}
+                    </Button>
+                  ) : null}
+                  {batchProgress ? (
+                    <span
+                      className='flex items-center gap-2 text-sm text-muted-foreground'
+                      role='status'
+                      aria-live='polite'
+                    >
+                      <LoaderCircle className='size-4 animate-spin' />
+                      {isEnglish
+                        ? `Updating ${Math.min(batchProgress.completed + 1, batchProgress.total)}/${batchProgress.total}: ${batchProgress.currentName}`
+                        : `正在更新 ${Math.min(batchProgress.completed + 1, batchProgress.total)}/${batchProgress.total}：${batchProgress.currentName}`}
+                    </span>
+                  ) : null}
+                  {batchSummary && !batchProgress ? (
+                    <span className='text-sm' role='status' aria-live='polite'>
+                      {isEnglish
+                        ? `Completed: ${batchSummary.succeeded} succeeded, ${batchSummary.failed} failed.`
+                        : `处理完成：成功 ${batchSummary.succeeded} 项，失败 ${batchSummary.failed} 项。`}
+                    </span>
+                  ) : null}
+                </div>
+                {visibleBatchFailures.length > 0 ? (
+                  <div
+                    className='rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm'
+                    role='alert'
+                    aria-live='polite'
+                  >
+                    <p className='mb-1 font-medium'>
+                      {isEnglish
+                        ? 'Some tenant updates failed. Failed items remain selected and can be retried.'
+                        : '部分租户更新失败。失败项仍保持选中，可以重试。'}
+                    </p>
+                    <ul className='space-y-1 text-muted-foreground'>
+                      {visibleBatchFailures.map((failure) => (
+                        <li key={failure.tenant.tenant_id}>
+                          <span className='font-medium text-foreground'>
+                            {failure.tenant.name}
+                          </span>
+                          {' — '}
+                          {failure.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
               </div>
-              {visibleBatchFailures.length > 0 ? (
-                <div className='rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm' role='alert' aria-live='polite'>
-                  <p className='mb-1 font-medium'>
-                    {isEnglish ? 'Some tenant updates failed. Failed items remain selected and can be retried.' : '部分租户更新失败。失败项仍保持选中，可以重试。'}
-                  </p>
-                  <ul className='space-y-1 text-muted-foreground'>
-                    {visibleBatchFailures.map((failure) => (
-                      <li key={failure.tenant.tenant_id}>
-                        <span className='font-medium text-foreground'>{failure.tenant.name}</span>
-                        {' — '}{failure.message}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <TenantTable
-            tenants={pageTenants}
-            isAdmin={admin}
-            loading={tenants.isLoading}
-            hasFilters={hasFilters}
-            selectedIds={selectedIds}
-            onSelectionChange={(ids) => {
-              setSelectedIds(ids)
-              setBatchSummary(null)
-            }}
-            selectionDisabled={Boolean(batchProgress)}
-            visibleColumns={visibleColumns}
-            onStatusChange={(tenant) =>
-              mutation.mutate({
-                id: tenant.tenant_id,
-                body: {
-                  status: tenant.status === 'active' ? 'suspended' : 'active',
-                },
-              })
-            }
-            onArchive={setArchiveTarget}
-          />
-          <TablePager
-            page={page}
-            pages={pages}
-            total={total}
-            pageSize={pageSize}
-            selectedCount={selectedIds.size}
-            disabled={Boolean(batchProgress)}
-            onClearSelection={() => {
-              setSelectedIds(new Set())
-              setBatchSummary(null)
-            }}
-            onPageChange={(nextPage) =>
-              void navigate({
-                search: (previous) => ({ ...previous, page: nextPage }),
-              })
-            }
-            onPageSizeChange={(size) =>
-              void navigate({
-                search: (previous) => ({
-                  ...previous,
-                  pageSize: size as 10 | 20 | 30 | 50,
-                  page: 1,
-                }),
-              })
-            }
-          />
+            ) : null}
+            <TenantTable
+              tenants={pageTenants}
+              isAdmin={admin}
+              loading={tenants.isLoading}
+              hasFilters={hasFilters}
+              selectedIds={selectedIds}
+              onSelectionChange={(ids) => {
+                setSelectedIds(ids)
+                setBatchSummary(null)
+              }}
+              selectionDisabled={Boolean(batchProgress)}
+              visibleColumns={visibleColumns}
+              onStatusChange={(tenant) =>
+                mutation.mutate({
+                  id: tenant.tenant_id,
+                  body: {
+                    status: tenant.status === 'active' ? 'suspended' : 'active',
+                  },
+                })
+              }
+              onArchive={setArchiveTarget}
+            />
+            <TablePager
+              page={page}
+              pages={pages}
+              total={total}
+              pageSize={pageSize}
+              selectedCount={selectedIds.size}
+              disabled={Boolean(batchProgress)}
+              onClearSelection={() => {
+                setSelectedIds(new Set())
+                setBatchSummary(null)
+              }}
+              onPageChange={(nextPage) =>
+                void navigate({
+                  search: (previous) => ({ ...previous, page: nextPage }),
+                })
+              }
+              onPageSizeChange={(size) =>
+                void navigate({
+                  search: (previous) => ({
+                    ...previous,
+                    pageSize: size as 10 | 20 | 30 | 50,
+                    page: 1,
+                  }),
+                })
+              }
+            />
           </div>
         ) : null}
       </section>
@@ -553,22 +595,31 @@ export function Tenants() {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {batchDialog?.[0]?.status === 'suspended'
-                ? (isEnglish ? 'Suspend selected tenants?' : '确认批量停用租户？')
-                : (isEnglish ? 'Enable selected tenants?' : '确认批量启用租户？')}
+                ? isEnglish
+                  ? 'Suspend selected tenants?'
+                  : '确认批量停用租户？'
+                : isEnglish
+                  ? 'Enable selected tenants?'
+                  : '确认批量启用租户？'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {batchDialog?.[0]?.status === 'suspended'
-                ? (isEnglish
-                    ? 'Suspending a tenant disables access to that tenant and its Workspaces for all members. This action applies to the tenants listed below.'
-                    : '停用后，该租户及其下属 Workspace 对所有成员不可访问。此操作将应用于以下租户。')
-                : (isEnglish
-                    ? 'These tenants will become active for existing members. Workspace memberships that were separately revoked or suspended will not be restored.'
-                    : '这些租户将对现有成员恢复启用。已单独撤销或停用的 Workspace 成员授权不会自动恢复。')}
+                ? isEnglish
+                  ? 'Suspending a tenant disables access to that tenant and its Workspaces for all members. This action applies to the tenants listed below.'
+                  : '停用后，该租户及其下属 Workspace 对所有成员不可访问。此操作将应用于以下租户。'
+                : isEnglish
+                  ? 'These tenants will become active for existing members. Workspace memberships that were separately revoked or suspended will not be restored.'
+                  : '这些租户将对现有成员恢复启用。已单独撤销或停用的 Workspace 成员授权不会自动恢复。'}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <ul className='max-h-48 space-y-1 overflow-y-auto rounded-md border p-3 text-sm' aria-label={isEnglish ? 'Tenants affected' : '受影响的租户'}>
+          <ul
+            className='max-h-48 space-y-1 overflow-y-auto rounded-md border p-3 text-sm'
+            aria-label={isEnglish ? 'Tenants affected' : '受影响的租户'}
+          >
             {(batchDialog ?? []).slice(0, 5).map(({ tenant }) => (
-              <li key={tenant.tenant_id} className='truncate'>{tenant.name}</li>
+              <li key={tenant.tenant_id} className='truncate'>
+                {tenant.name}
+              </li>
             ))}
             {(batchDialog?.length ?? 0) > 5 ? (
               <li className='pt-1 text-muted-foreground'>
@@ -590,8 +641,12 @@ export function Tenants() {
               }}
             >
               {batchDialog?.[0]?.status === 'suspended'
-                ? (isEnglish ? 'Suspend tenants' : '确认停用')
-                : (isEnglish ? 'Enable tenants' : '确认启用')}
+                ? isEnglish
+                  ? 'Suspend tenants'
+                  : '确认停用'
+                : isEnglish
+                  ? 'Enable tenants'
+                  : '确认启用'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -602,14 +657,23 @@ export function Tenants() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle><LocalizedText text={"归档租户"} /></AlertDialogTitle>
+            <AlertDialogTitle>
+              <LocalizedText text={'归档租户'} />
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              <LocalizedText text={"\n              确定归档租户“"} />{archiveTarget?.name}
-              <LocalizedText text={"\n              ”吗？归档后租户进入终态，无法重新启用。\n            "} /></AlertDialogDescription>
+              <LocalizedText text={'\n              确定归档租户“'} />
+              {archiveTarget?.name}
+              <LocalizedText
+                text={
+                  '\n              ”吗？归档后租户进入终态，无法重新启用。\n            '
+                }
+              />
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setArchiveTarget(null)}>
-              <LocalizedText text={"\n              取消\n            "} /></AlertDialogCancel>
+              <LocalizedText text={'\n              取消\n            '} />
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (archiveTarget)
@@ -620,7 +684,8 @@ export function Tenants() {
                 setArchiveTarget(null)
               }}
             >
-              <LocalizedText text={"\n              确认归档\n            "} /></AlertDialogAction>
+              <LocalizedText text={'\n              确认归档\n            '} />
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -744,7 +809,9 @@ export function TenantDetail() {
   })
   if (tenant.isLoading) {
     return (
-      <main className='p-6 text-sm text-muted-foreground'><LocalizedText text={"正在加载租户…"} /></main>
+      <main className='p-6 text-sm text-muted-foreground'>
+        <LocalizedText text={'正在加载租户…'} />
+      </main>
     )
   }
   if (tenant.isError) {
@@ -817,14 +884,23 @@ export function TenantDetail() {
         }
       />
       <DetailDialog
-        trigger={<LocalizedText text={"技术信息"} />}
-        title={<LocalizedText text={"租户技术信息"} />}
+        trigger={<LocalizedText text={'技术信息'} />}
+        title={<LocalizedText text={'租户技术信息'} />}
         description={item.name}
         triggerClassName='h-auto px-0 text-xs text-muted-foreground underline'
       >
         <div className='space-y-2 text-sm'>
-          <p><LocalizedText text={"租户 ID："} /><code className='break-all'>{item.tenant_id}</code></p>
-          <Button size='sm' variant='outline' onClick={() => navigator.clipboard.writeText(item.tenant_id)}><LocalizedText text={"复制 ID"} /></Button>
+          <p>
+            <LocalizedText text={'租户 ID：'} />
+            <code className='break-all'>{item.tenant_id}</code>
+          </p>
+          <Button
+            size='sm'
+            variant='outline'
+            onClick={() => navigator.clipboard.writeText(item.tenant_id)}
+          >
+            <LocalizedText text={'复制 ID'} />
+          </Button>
         </div>
       </DetailDialog>
       <section className='grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]'>
@@ -841,8 +917,12 @@ export function TenantDetail() {
         {canManage && item.status === 'active' ? (
           <Card>
             <CardHeader className='pb-3'>
-              <CardTitle className='text-base'><LocalizedText text={"快捷配置"} /></CardTitle>
-              <CardDescription><LocalizedText text={"租户级配置入口"} /></CardDescription>
+              <CardTitle className='text-base'>
+                <LocalizedText text={'快捷配置'} />
+              </CardTitle>
+              <CardDescription>
+                <LocalizedText text={'租户级配置入口'} />
+              </CardDescription>
             </CardHeader>
             <CardContent className='grid gap-1 text-sm'>
               {managementLinks.map((link) => (
@@ -852,7 +932,9 @@ export function TenantDetail() {
                   className='flex items-center justify-between rounded-md px-3 py-2 transition-colors hover:bg-muted'
                 >
                   {link.label}
-                  <span aria-hidden='true'><LocalizedText text={"→"} /></span>
+                  <span aria-hidden='true'>
+                    <LocalizedText text={'→'} />
+                  </span>
                 </a>
               ))}
             </CardContent>
@@ -864,9 +946,16 @@ export function TenantDetail() {
         <section className={panelClass}>
           <div className='flex flex-wrap items-center justify-between gap-3 p-5 pb-4'>
             <div>
-              <h2 className='text-lg font-semibold'><LocalizedText text={"租户成员"} /></h2>
+              <h2 className='text-lg font-semibold'>
+                <LocalizedText text={'租户成员'} />
+              </h2>
               <p className='mt-1 text-sm text-muted-foreground'>
-                <LocalizedText text={"\n                通过邮箱邀请已有账号加入。接受邀请后不会自动加入任何 Workspace。\n              "} /></p>
+                <LocalizedText
+                  text={
+                    '\n                通过邮箱邀请已有账号加入。接受邀请后不会自动加入任何 Workspace。\n              '
+                  }
+                />
+              </p>
             </div>
           </div>
           <MemberTable
@@ -930,9 +1019,16 @@ export function TenantDetail() {
       {canManage && item.status === 'active' ? (
         <section className={panelClass}>
           <div className='p-5 pb-4'>
-            <h2 className='text-lg font-semibold'><LocalizedText text={"邀请链接"} /></h2>
+            <h2 className='text-lg font-semibold'>
+              <LocalizedText text={'邀请链接'} />
+            </h2>
             <p className='mt-1 text-sm text-muted-foreground'>
-              <LocalizedText text={"\n              收件人使用已有 Synapse\n              账号登录后接受邀请。租户管理员只能邀请为成员。\n            "} /></p>
+              <LocalizedText
+                text={
+                  '\n              收件人使用已有 Synapse\n              账号登录后接受邀请。租户管理员只能邀请为成员。\n            '
+                }
+              />
+            </p>
           </div>
           <div className='px-5 pb-5'>
             <InvitationPanel
