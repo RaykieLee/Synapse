@@ -1,0 +1,106 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      SYNAPSE_ENV: ${SYNAPSE_ENV:-production}
+      SYNAPSE_DEBUG: ${SYNAPSE_DEBUG:-false}
+      SYNAPSE_API_PREFIX: /api/v1
+      SYNAPSE_DATABASE_URL: sqlite:////data/synapse/synapse.db
+      SYNAPSE_JWT_SECRET: ${SYNAPSE_JWT_SECRET:-local-only-change-me}
+      SYNAPSE_ATTACHMENTS_STORAGE_PATH: /data/attachments
+      SYNAPSE_AGENTSCOPE_REDIS_HOST: redis
+      SYNAPSE_AGENTSCOPE_REDIS_PORT: "6379"
+      SYNAPSE_AGENTSCOPE_STORAGE_REDIS_DB: "1"
+      SYNAPSE_AGENTSCOPE_BUS_REDIS_DB: "2"
+      SYNAPSE_AGENTSCOPE_WORKSPACE_PATH: /data/agentscope/workspaces
+      SYNAPSE_AGENTSCOPE_BLOB_PATH: /data/agentscope/blobs
+      SYNAPSE_AGENTSCOPE_QDRANT_URL: http://qdrant:6333
+      SYNAPSE_AGENTSCOPE_KNOWLEDGE_ENABLED: ${SYNAPSE_AGENTSCOPE_KNOWLEDGE_ENABLED:-true}
+      SYNAPSE_AGENTSCOPE_HUBS_ENABLED: ${SYNAPSE_AGENTSCOPE_HUBS_ENABLED:-false}
+      SYNAPSE_AGENTSCOPE_SCHEDULER_ENABLED: ${SYNAPSE_AGENTSCOPE_SCHEDULER_ENABLED:-true}
+      SYNAPSE_AGENTSCOPE_CHANNEL_ENABLED: ${SYNAPSE_AGENTSCOPE_CHANNEL_ENABLED:-false}
+      SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY: ${SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY:-w2Fxk_ivW4sfH3Br4XUllFqiL30p0g3XPxGKqBmkN6k=}
+      SYNAPSE_SCHEDULED_TASKS_ENABLED: ${SYNAPSE_SCHEDULED_TASKS_ENABLED:-true}
+    volumes:
+      - synapse-api-data:/data
+    ports:
+      - "${SYNAPSE_API_PORT:-8010}:8010"
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8010/api/v1/health", timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    ports:
+      - "${SYNAPSE_WEB_PORT:-5173}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - --quiet
+        - http://127.0.0.1/
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - synapse-redis-data:/data
+    ports:
+      - "127.0.0.1:${SYNAPSE_REDIS_PUBLISH_PORT:-16382}:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - synapse-qdrant-data:/qdrant/storage
+    ports:
+      - "127.0.0.1:${SYNAPSE_QDRANT_PUBLISH_PORT:-16334}:6333"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        # Qdrant's image has no curl/wget; 6333 is 18BD in /proc/net/tcp.
+        - grep -q "00000000:18BD " /proc/net/tcp
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  synapse-api-data:
+  synapse-redis-data:
+  synapse-qdrant-data:

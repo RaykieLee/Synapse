@@ -28,3 +28,15 @@
 ```
 
 详细范围、目录、技术方案及阶段验收见 [集成计划](docs/integration-plan.md)。
+
+## Docker 部署
+
+项目提供 API、Web、Redis 和 Qdrant 的 Compose 部署方式。首次部署会自动执行数据库迁移，但不会自动创建默认账号：
+
+```powershell
+Copy-Item .env.docker.example .env.docker
+docker compose --env-file .env.docker up -d --build
+docker compose --env-file .env.docker exec api python -m app.cli.create_platform_admin
+```
+
+完整配置、持久化目录、端口和 AgentScope 开关见 [Docker 部署说明](docs/docker-deployment.md)。
