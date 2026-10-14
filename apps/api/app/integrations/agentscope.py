@@ -1,4 +1,5 @@
 """Construct the AgentScope ASGI sub-application for Synapse embedding."""
+from functools import wraps
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
@@ -6,10 +7,95 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
 from app.auth.errors import install_error_handlers
 from app.core.config import Settings
 from app.integrations.agentscope_gateway import AgentScopeWorkspaceGateway
-from app.integrations.agentscope_session_scope import WorkspaceSessionStorage
+from app.integrations.agentscope_session_scope import (
+    WorkspaceSessionStorage,
+    bind_agentscope_context,
+    reset_agentscope_context,
+    resolve_knowledge_resource_context,
+)
 from app.integrations.agentscope_wakeup import install_scoped_wakeup_runtime
 from app.integrations.agentscope_workspace_scope import ScopedLocalWorkspaceManager
 from app.tenancy.context import WorkspaceContext
+
+
+def _build_optional_agentscope_components(
+    settings: Settings,
+    scoped_storage: Any,
+) -> dict[str, Any]:
+    """Build optional AgentScope components from explicit local settings.
+
+    The defaults stay disabled so unit tests and deployments without the
+    external services retain the previous startup behavior. The local demo
+    enables these components through ``apps/api/.env``.
+    """
+    components: dict[str, Any] = {
+        "knowledge_base_manager": None,
+        "blob_store": None,
+        "mcp_hubs": None,
+        "skill_hubs": None,
+        "channels": None,
+        "enable_index_worker": False,
+        "enable_channel_worker": False,
+        "enable_scheduler": settings.agentscope_scheduler_enabled,
+    }
+
+    if settings.agentscope_knowledge_enabled:
+        from agentscope.app.rag.blob_store import LocalBlobStore
+        from agentscope.app.rag.knowledge_base_manager import (
+            CollectionPerKbManager,
+        )
+        from agentscope.rag import QdrantStore
+
+        if settings.agentscope_qdrant_url:
+            vector_store = QdrantStore(url=settings.agentscope_qdrant_url)
+        elif settings.agentscope_qdrant_path:
+            vector_store = QdrantStore(path=str(settings.agentscope_qdrant_path))
+        else:
+            raise RuntimeError(
+                "AgentScope knowledge is enabled but no Qdrant URL or path "
+                "is configured",
+            )
+
+        components["knowledge_base_manager"] = CollectionPerKbManager(
+            storage=scoped_storage,
+            vector_store=vector_store,
+        )
+        components["blob_store"] = LocalBlobStore(
+            root_dir=settings.agentscope_blob_path,
+        )
+        components["enable_index_worker"] = True
+
+    if settings.agentscope_hubs_enabled:
+        from agentscope.app.hub import ClawSkillHub, GitHubMCPHub
+
+        github_token = (
+            settings.agentscope_github_token.get_secret_value()
+            if settings.agentscope_github_token
+            else None
+        )
+        clawhub_token = (
+            settings.agentscope_clawhub_token.get_secret_value()
+            if settings.agentscope_clawhub_token
+            else None
+        )
+        components["mcp_hubs"] = [GitHubMCPHub(api_token=github_token)]
+        components["skill_hubs"] = [ClawSkillHub(api_token=clawhub_token)]
+
+    if settings.agentscope_channel_enabled:
+        from agentscope.app.channel import (
+            DingTalkChannel,
+            DiscordChannel,
+            FeishuChannel,
+        )
+
+        components["channels"] = [
+            DingTalkChannel,
+            DiscordChannel,
+            FeishuChannel,
+        ]
+        components["enable_channel_worker"] = True
+
+    return components
 
 
 def _authenticated_agentscope_user_id(request: Request) -> str:
@@ -40,6 +126,41 @@ def _install_scoped_credential_runtime_resolution() -> None:
     ResourceAccessService._synapse_credential_runtime = True
 
 
+def _install_scoped_index_runtime() -> None:
+    """Restore Workspace context around AgentScope's background index worker."""
+    from agentscope.app._service import IndexWorker
+
+    if getattr(IndexWorker, "_synapse_workspace_scope", False):
+        return
+
+    original_process = IndexWorker.process
+
+    @wraps(original_process)
+    async def process(
+        self: Any,
+        user_id: str,
+        knowledge_base_id: str,
+        document_id: str,
+    ) -> Any:
+        context = resolve_knowledge_resource_context(user_id, knowledge_base_id)
+        if context is None:
+            # Fail closed for stale, foreign, or legacy unscoped records.
+            return None
+        token = bind_agentscope_context(context)
+        try:
+            return await original_process(
+                self,
+                user_id=user_id,
+                knowledge_base_id=knowledge_base_id,
+                document_id=document_id,
+            )
+        finally:
+            reset_agentscope_context(token)
+
+    IndexWorker.process = process
+    IndexWorker._synapse_workspace_scope = True
+
+
 def create_agentscope_app(settings: Settings) -> FastAPI:
     """Build AgentScope with persistent local workdirs and Redis backends.
 
@@ -48,6 +169,7 @@ def create_agentscope_app(settings: Settings) -> FastAPI:
     classes remain separate work.
     """
     install_scoped_wakeup_runtime()
+    _install_scoped_index_runtime()
     from agentscope.app import create_app as create_agent_service
     from agentscope.app._service import AgentView
     from agentscope.app.deps import get_current_user_id, get_storage
@@ -81,13 +203,15 @@ def create_agentscope_app(settings: Settings) -> FastAPI:
     workspace_manager = ScopedLocalWorkspaceManager(
         LocalWorkspaceManager(basedir=str(settings.agentscope_workspace_path)),
     )
+    optional_components = _build_optional_agentscope_components(
+        settings,
+        scoped_storage,
+    )
     app = create_agent_service(
         storage=scoped_storage,
         message_bus=message_bus,
         workspace_manager=workspace_manager,
-        enable_index_worker=False,
-        enable_channel_worker=False,
-        enable_scheduler=False,
+        **optional_components,
         download_secret=(
             settings.agentscope_download_secret.get_secret_value()
             if settings.agentscope_download_secret

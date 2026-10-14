@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     agentscope_storage_redis_db: int = 1
     agentscope_bus_redis_db: int = 2
     agentscope_workspace_path: Path = Path("./var/agentscope/workspaces")
+    agentscope_blob_path: Path = Path("./var/agentscope/blobs")
+    agentscope_qdrant_url: str | None = None
+    agentscope_qdrant_path: Path | None = None
+    agentscope_knowledge_enabled: bool = False
+    agentscope_hubs_enabled: bool = False
+    agentscope_scheduler_enabled: bool = False
+    agentscope_channel_enabled: bool = False
+    agentscope_github_token: SecretStr | None = None
+    agentscope_clawhub_token: SecretStr | None = None
     agentscope_download_secret: SecretStr | None = None
     agentscope_credential_encryption_key: SecretStr | None = None
     agentscope_enabled: bool = True

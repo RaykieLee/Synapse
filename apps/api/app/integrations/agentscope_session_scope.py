@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from contextvars import ContextVar, Token
 from uuid import uuid4
 from typing import Any
@@ -38,6 +39,73 @@ def reset_agentscope_context(token: Token[WorkspaceContext | None]) -> None:
 
 def current_agentscope_context() -> WorkspaceContext | None:
     return _workspace_context.get()
+
+
+_KNOWLEDGE_SCOPE_RE = re.compile(
+    r"^synapse-kb-t(?P<tenant_id>\d+)-w(?P<workspace_id>\d+)-u(?P<actor_user_id>\d+)-",
+)
+
+
+def resolve_knowledge_resource_context(
+    user_id: str,
+    knowledge_base_id: str,
+) -> WorkspaceContext | None:
+    """Resolve and validate a background indexing resource scope.
+
+    HTTP requests get their context from ``X-Workspace-ID``. Index workers
+    receive only the server-created resource identifiers, so they derive the
+    same context from the encoded namespace and re-check membership before
+    touching storage.
+    """
+    match = _KNOWLEDGE_SCOPE_RE.match(knowledge_base_id)
+    if match is None or str(match.group("actor_user_id")) != str(user_id):
+        return None
+
+    from sqlalchemy import select
+
+    from app.database.session import get_session_factory
+    from app.models.tenant import Tenant, TenantMember, Workspace, WorkspaceMember
+
+    tenant_id = int(match.group("tenant_id"))
+    workspace_id = int(match.group("workspace_id"))
+    actor_user_id = int(match.group("actor_user_id"))
+    with get_session_factory()() as db:
+        tenant = db.get(Tenant, tenant_id)
+        workspace = db.get(Workspace, workspace_id)
+        if (
+            tenant is None
+            or workspace is None
+            or workspace.tenant_id != tenant.tenant_id
+            or tenant.status != "active"
+            or workspace.status != "active"
+        ):
+            return None
+        tenant_member = db.scalar(
+            select(TenantMember).where(
+                TenantMember.tenant_id == tenant_id,
+                TenantMember.user_id == actor_user_id,
+                TenantMember.status == "active",
+            ),
+        )
+        workspace_member = db.scalar(
+            select(WorkspaceMember).where(
+                WorkspaceMember.tenant_id == tenant_id,
+                WorkspaceMember.workspace_id == workspace_id,
+                WorkspaceMember.user_id == actor_user_id,
+                WorkspaceMember.status == "active",
+            ),
+        )
+        if tenant_member is None or workspace_member is None:
+            return None
+        return WorkspaceContext(
+            actor_user_id=actor_user_id,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
+            tenant_role=tenant_member.tenant_role,
+            workspace_role=workspace_member.workspace_role,
+            permission_set=frozenset(),
+            membership_version=tenant.membership_version,
+        )
 
 
 class WorkspaceSessionStorage:
@@ -483,15 +551,198 @@ class WorkspaceSessionStorage:
                 user_id, scoped_kb, scoped_doc, processing_node,
             )
 
+    def _sop_prefix(self) -> str:
+        context = _workspace_context.get()
+        if context is None:
+            raise RuntimeError("AgentScope SOP access requires a verified Workspace context")
+        return (
+            f"synapse-sop-t{context.tenant_id}-w{context.workspace_id}-"
+            f"u{context.actor_user_id}-"
+        )
+
+    def _sop_owner_id(self) -> str:
+        context = _workspace_context.get()
+        if context is None:
+            raise RuntimeError("AgentScope SOP access requires a verified Workspace context")
+        return (
+            f"synapse-sop-owner-t{context.tenant_id}-"
+            f"w{context.workspace_id}-u{context.actor_user_id}"
+        )
+
+    def _sop_id(self, value: str, *, allow_new: bool = False) -> str | None:
+        prefix = self._sop_prefix()
+        if value.startswith(prefix):
+            return value
+        if value.startswith("synapse-sop-t"):
+            return None
+        return f"{prefix}{value}" if allow_new else None
+
+    def _sop_run_prefix(self) -> str:
+        context = _workspace_context.get()
+        if context is None:
+            raise RuntimeError("AgentScope SOP run access requires a verified Workspace context")
+        return (
+            f"synapse-sop-run-t{context.tenant_id}-w{context.workspace_id}-"
+            f"u{context.actor_user_id}-"
+        )
+
+    def _sop_run_id(self, value: str, *, allow_new: bool = False) -> str | None:
+        prefix = self._sop_run_prefix()
+        if value.startswith(prefix):
+            return value
+        if value.startswith("synapse-sop-run-t"):
+            return None
+        return f"{prefix}{value}" if allow_new else None
+
+    def _assert_sop_actor(self, user_id: str) -> None:
+        context = _workspace_context.get()
+        if context is None:
+            raise RuntimeError("AgentScope SOP access requires a verified Workspace context")
+        if str(context.actor_user_id) != str(user_id):
+            raise HTTPException(status_code=404, detail={"code": "RESOURCE_NOT_FOUND"})
+
+    def _assert_sop_sessions(self, sessions: dict[str, str]) -> None:
+        """Reject run records that refer to another Workspace's sessions."""
+        session_prefix = self._prefix()
+        for session_id in sessions.values():
+            if not session_id.startswith(session_prefix):
+                raise ValueError("SOP run contains a session from another Workspace")
+
+    def _public_sop_record(self, record: Any, user_id: str) -> Any:
+        return record.model_copy(update={"user_id": str(user_id)})
+
+    async def upsert_sop(self, user_id: str, record: Any) -> Any:
+        self._assert_sop_actor(user_id)
+        scoped_id = self._sop_id(record.id, allow_new=True)
+        if scoped_id is None:
+            raise ValueError("SOP belongs to another Workspace")
+        record.id = scoped_id
+        record.user_id = str(user_id)
+        stored = await self._storage.upsert_sop(
+            self._sop_owner_id(),
+            record.model_copy(update={"user_id": self._sop_owner_id()}),
+        )
+        return self._public_sop_record(stored, user_id)
+
+    async def get_sop(self, user_id: str, sop_id: str) -> Any:
+        self._assert_sop_actor(user_id)
+        scoped_id = self._sop_id(sop_id)
+        if scoped_id is None:
+            return None
+        record = await self._storage.get_sop(self._sop_owner_id(), scoped_id)
+        return self._public_sop_record(record, user_id) if record is not None else None
+
+    async def list_sops(self, user_id: str) -> list[Any]:
+        self._assert_sop_actor(user_id)
+        prefix = self._sop_prefix()
+        records = await self._storage.list_sops(self._sop_owner_id())
+        return [
+            self._public_sop_record(record, user_id)
+            for record in records
+            if record.id.startswith(prefix)
+        ]
+
+    async def delete_sop(self, user_id: str, sop_id: str) -> bool:
+        self._assert_sop_actor(user_id)
+        scoped_id = self._sop_id(sop_id)
+        if scoped_id is None:
+            return False
+        return await self._storage.delete_sop(self._sop_owner_id(), scoped_id)
+
+    async def upsert_sop_run(self, user_id: str, record: Any) -> Any:
+        self._assert_sop_actor(user_id)
+        scoped_sop_id = self._sop_id(record.sop_id, allow_new=True)
+        scoped_run_id = self._sop_run_id(record.id, allow_new=True)
+        if scoped_sop_id is None:
+            raise ValueError("SOP belongs to another Workspace")
+        if scoped_run_id is None:
+            raise ValueError("SOP run belongs to another Workspace")
+        self._assert_sop_sessions(record.sessions)
+        record.id = scoped_run_id
+        record.sop_id = scoped_sop_id
+        record.user_id = str(user_id)
+        stored = await self._storage.upsert_sop_run(
+            self._sop_owner_id(),
+            record.model_copy(update={"user_id": self._sop_owner_id()}),
+        )
+        return self._public_sop_record(stored, user_id)
+
+    async def get_sop_run(self, user_id: str, sop_run_id: str) -> Any:
+        self._assert_sop_actor(user_id)
+        scoped_id = self._sop_run_id(sop_run_id)
+        if scoped_id is None:
+            return None
+        record = await self._storage.get_sop_run(self._sop_owner_id(), scoped_id)
+        return self._public_sop_record(record, user_id) if record is not None else None
+
+    async def list_sop_runs(
+        self,
+        user_id: str,
+        sop_id: str | None = None,
+        phase: Any = None,
+    ) -> list[Any]:
+        self._assert_sop_actor(user_id)
+        scoped_sop_id = self._sop_id(sop_id) if sop_id is not None else None
+        if sop_id is not None and scoped_sop_id is None:
+            return []
+        prefix = self._sop_run_prefix()
+        records = await self._storage.list_sop_runs(
+            self._sop_owner_id(),
+            sop_id=scoped_sop_id,
+            phase=phase,
+        )
+        return [
+            self._public_sop_record(record, user_id)
+            for record in records
+            if record.id.startswith(prefix)
+            and record.sop_id.startswith(self._sop_prefix())
+        ]
+
+    async def update_sop_run(
+        self,
+        user_id: str,
+        sop_run_id: str,
+        state: Any,
+        sessions: dict[str, str] | None = None,
+    ) -> None:
+        self._assert_sop_actor(user_id)
+        scoped_id = self._sop_run_id(sop_run_id)
+        if scoped_id is None:
+            raise KeyError(f"SOP run {sop_run_id!r} not found.")
+        if sessions is not None:
+            self._assert_sop_sessions(sessions)
+        await self._storage.update_sop_run(
+            self._sop_owner_id(),
+            scoped_id,
+            state,
+            sessions=sessions,
+        )
+
+    async def delete_sop_run(self, user_id: str, sop_run_id: str) -> bool:
+        self._assert_sop_actor(user_id)
+        scoped_id = self._sop_run_id(sop_run_id)
+        if scoped_id is None:
+            return False
+        return await self._storage.delete_sop_run(self._sop_owner_id(), scoped_id)
+
     async def list_knowledge_documents_with_expired_lease(self, now: Any = None) -> list[Any]:
-        prefix = self._knowledge_base_prefix()
+        # The AgentScope sweeper runs without an HTTP Workspace context. The
+        # raw storage method already scans its global document index; filter
+        # that result to Synapse-created namespaces and let the scoped worker
+        # derive/validate the context before processing each task.
         docs = await self._storage.list_knowledge_documents_with_expired_lease(now)
-        return [doc for doc in docs if doc.knowledge_base_id.startswith(prefix)]
+        return [
+            doc for doc in docs
+            if doc.knowledge_base_id.startswith("synapse-kb-t")
+        ]
 
     async def list_knowledge_documents_pending_since(self, threshold: Any) -> list[Any]:
-        prefix = self._knowledge_base_prefix()
+        # See ``list_knowledge_documents_with_expired_lease`` above.
         docs = await self._storage.list_knowledge_documents_pending_since(threshold)
-        return [doc for doc in docs if doc.knowledge_base_id.startswith(prefix)]
+        return [
+            doc for doc in docs
+            if doc.knowledge_base_id.startswith("synapse-kb-t")
+        ]
 
     async def upsert_agent(self, user_id: str, agent_record: Any) -> str:
         agent_id = self._agent_id(agent_record.id, allow_new=True)
@@ -531,6 +782,9 @@ class WorkspaceSessionStorage:
             "chat_model_config": self._scope_credential_config(config.chat_model_config),
             "fallback_chat_model_config": self._scope_credential_config(config.fallback_chat_model_config),
             "tts_model_config": self._scope_credential_config(config.tts_model_config),
+            "realtime_model_config": self._scope_credential_config(
+                getattr(config, "realtime_model_config", None),
+            ),
         })
         knowledge_config = getattr(config, "knowledge_config", None)
         if knowledge_config is not None:
