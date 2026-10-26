@@ -172,6 +172,12 @@ docker compose --env-file .env.docker down
 
 配置开关、端口及持久化细节见 [Docker 部署说明](docs/docker-deployment.md)。
 
+### 自动部署
+
+推送到 `main` 后，GitHub Actions 会先运行 API 测试和前端 lint/build，再构建 API 与 Web 镜像，通过 SSH 直传服务器，并以健康检查通过作为发布成功条件。流水线包含失败回滚；生产密钥只保存在服务器 `/opt/synapse/.env.docker`。
+
+完整配置、手动触发、查看日志和回滚说明见 [GitHub Actions 自动部署](docs/github-actions-deployment.md)。
+
 ### 本地开发
 
 前端使用 Node.js 22 与 pnpm 9，后端使用 Python 与 uv。Docker API 镜像采用 Python 3.13，本地 Python 最低版本为 3.11。

@@ -27,7 +27,7 @@ services:
     volumes:
       - synapse-api-data:/data
     ports:
-      - "${SYNAPSE_API_PORT:-8010}:8010"
+      - "127.0.0.1:${SYNAPSE_API_PORT:-8010}:8010"
     depends_on:
       redis:
         condition: service_healthy
