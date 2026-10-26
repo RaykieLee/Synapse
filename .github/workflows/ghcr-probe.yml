@@ -30,8 +30,16 @@ jobs:
       - name: Push probe image
         env:
           IMAGE_OWNER: ${{ vars.GHCR_OWNER || 'raykiele' }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
           set -euo pipefail
           docker pull hello-world:latest
-          docker tag hello-world:latest "ghcr.io/${IMAGE_OWNER}/synapse-api:actions-probe"
-          docker push "ghcr.io/${IMAGE_OWNER}/synapse-api:actions-probe"
+          image="ghcr.io/${IMAGE_OWNER}/synapse-actions-probe:${GITHUB_RUN_ID}"
+          docker build \
+            --label "org.opencontainers.image.source=${SOURCE_URL}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag "${image}" \
+            - <<'EOF'
+          FROM hello-world:latest
+          EOF
+          docker push "${image}"
