@@ -4,11 +4,11 @@
 
 1. 后端测试：`uv sync --frozen --extra dev`、`pytest -q`。
 2. 前端检查：`pnpm install --frozen-lockfile`、`pnpm lint`、`pnpm build`。
-3. 镜像构建：在 GitHub Actions 构建 API 和 Web 镜像，并推送到 GitHub Container Registry（GHCR）。
-4. 发布传输：通过 SSH 标准输入向服务器传递本次运行的短期 `GITHUB_TOKEN`，服务器临时登录 GHCR 并拉取镜像。
-5. 远端发布：启动 Compose、等待健康检查；失败时恢复上一版本的 Compose 配置和镜像，临时 Docker 登录信息随后自动删除。
+3. 镜像构建：在 GitHub Actions 构建 API 和 Web 镜像，并连同 Redis、Qdrant 打包为压缩镜像包。
+4. 发布传输：通过 SSH 上传镜像包，服务器校验后一次性 `docker load`。
+5. 远端发布：启动 Compose、等待健康检查；失败时恢复上一版本的 Compose 配置和镜像，成功加载后删除远端镜像包。
 
-采用“Actions 构建、GHCR 分发、服务器拉取运行”而不是让服务器现场构建，是因为构建依赖和缓存由 GitHub 托管，服务器只承担运行职责。Redis 和 Qdrant 仍由服务器直接从 Docker Hub 拉取。
+采用“Actions 构建、SSH 分发、服务器加载运行”而不是让服务器现场构建，是因为构建依赖和缓存由 GitHub 托管，服务器只承担运行职责。该路径不依赖 GHCR；首次约 40 分钟，后续命中 Actions 构建缓存后会明显缩短。
 
 ## GitHub Secrets
 
@@ -24,9 +24,7 @@
 
 不要使用登录密码作为流水线凭据。部署用户需要能执行 `sudo docker compose`，且仓库不允许把 `.env.docker`、私钥或服务器密码写入 Git。
 
-GHCR 登录不需要额外创建长期 Secret。工作流使用本次 Actions 运行自动生成的 `GITHUB_TOKEN` 推送镜像，并在发布阶段通过 SSH 将它传给远端脚本。远端只把它写入权限为 `700` 的临时 `DOCKER_CONFIG`，发布结束或失败时删除，不写入 `/opt/synapse/.env.docker`。
-
-镜像 owner 默认取 GitHub 仓库 owner；如果组织迁移后需要覆盖，可在仓库 `Settings > Secrets and variables > Actions > Variables` 中设置 `GHCR_OWNER`。该值应使用 GHCR 接受的命名空间，不能包含 `ghcr.io/` 前缀。
+当前个人账号的 GHCR 在全新包名、个人 OAuth Token、经典 PAT 和 Actions `GITHUB_TOKEN` 下均实测返回 `owner not found` 或 `permission_denied`，因此流水线默认不把 GHCR 作为生产发布的硬依赖。迁移到组织命名空间或 GHCR 状态恢复后，可另开改动切回 Registry 拉取模式。
 
 ## 服务器初始化
 
@@ -79,7 +77,7 @@ sudo docker compose \
   -f /opt/synapse/docker-compose.yml up -d --no-build --wait
 ```
 
-如果上一版本镜像已经不在服务器本地，而 GHCR package 仍是私有状态，需要先使用有 `read:packages` 权限的 GitHub token 临时执行 `docker login ghcr.io` 再拉取。正常自动发布不需要人工登录。
+上一版本的 API 和 Web 镜像已保留在服务器本地，自动回滚不依赖 Registry。Redis 与 Qdrant 使用标准镜像，若服务器本地缺失会从 Docker Hub 拉取。
 
 发布数据使用 Docker named volumes 持久化；不要执行 `docker compose down -v`，除非明确要删除数据库、附件、Redis 和 Qdrant 数据。
 

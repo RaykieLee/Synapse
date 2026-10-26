@@ -3,7 +3,6 @@ set -Eeuo pipefail
 
 release_dir="${1:?release directory is required}"
 image_tag="${2:?image tag is required}"
-ghcr_username="${3:-}"
 base_dir="/opt/synapse"
 state_dir="${base_dir}/state"
 current_env="${state_dir}/current.env"
@@ -18,14 +17,9 @@ compose=(
   --env-file "${base_dir}/.env.docker"
   --env-file "${new_env}"
 )
-release_compose_files=(-f "${release_compose}")
-docker_config_dir=""
 compose_tmp=""
 
 cleanup() {
-  if [[ -n "${docker_config_dir}" ]]; then
-    rm -rf "${docker_config_dir}"
-  fi
   if [[ -n "${compose_tmp}" ]]; then
     rm -f "${compose_tmp}"
   fi
@@ -40,6 +34,10 @@ if [[ ! -r "${release_compose}" || ! -r "${release_dir}/release.env" ]]; then
   echo "Incomplete release bundle in ${release_dir}" >&2
   exit 1
 fi
+if [[ ! -r "${release_dir}/synapse-images.tar.gz" ]]; then
+  echo "Missing image bundle in ${release_dir}" >&2
+  exit 1
+fi
 mkdir -p "${state_dir}"
 if [[ -s "${current_env}" ]]; then
   cp "${current_env}" "${previous_env}"
@@ -50,21 +48,8 @@ fi
 
 cp "${release_dir}/release.env" "${new_env}"
 
-if [[ -n "${ghcr_username}" ]]; then
-  IFS= read -r ghcr_token || true
-  if [[ -z "${ghcr_token}" ]]; then
-    echo "Missing GHCR token on standard input" >&2
-    exit 1
-  fi
-
-  docker_config_dir="$(mktemp -d)"
-  export DOCKER_CONFIG="${docker_config_dir}"
-  printf '%s' "${ghcr_token}" | docker login ghcr.io --username "${ghcr_username}" --password-stdin
-  unset ghcr_token
-fi
-
-echo "Pulling release images ${image_tag}"
-"${compose[@]}" "${release_compose_files[@]}" pull api web
+echo "Loading release images ${image_tag}"
+gzip -dc "${release_dir}/synapse-images.tar.gz" | docker load
 
 compose_tmp="$(mktemp "${base_dir}/.docker-compose.XXXXXX")"
 cp "${release_compose}" "${compose_tmp}"
@@ -92,5 +77,6 @@ if ! "${compose[@]}" "${compose_files[@]}" up -d --no-build --remove-orphans --w
 fi
 
 cp "${new_env}" "${current_env}"
+rm -f "${release_dir}/synapse-images.tar.gz"
 "${compose[@]}" "${compose_files[@]}" ps
 echo "Release ${image_tag} is healthy."
