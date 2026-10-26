@@ -81,7 +81,7 @@ jobs:
       contents: read
       packages: write
     env:
-      IMAGE_OWNER: ${{ vars.GHCR_OWNER || github.repository_owner }}
+      IMAGE_OWNER: ${{ vars.GHCR_OWNER || 'raykiele' }}
 
     steps:
       - name: Check out repository
