@@ -16,7 +16,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh api /user --jq '{login,type}'
           gh api "/repos/${GITHUB_REPOSITORY}" --jq '{owner:.owner.login,full_name,permissions}'
           gh api "/user/packages?package_type=container" --jq '.[]? | {name,visibility,owner:.owner.login}' || true
           gh api "/users/${GITHUB_REPOSITORY_OWNER}/packages/container/synapse-api" --jq '{name,visibility,owner:.owner.login}' || true
