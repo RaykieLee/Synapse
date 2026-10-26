@@ -80,6 +80,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      IMAGE_OWNER: ${{ vars.GHCR_OWNER || github.repository_owner }}
 
     steps:
       - name: Check out repository
@@ -118,7 +120,7 @@ jobs:
           context: .
           file: apps/api/Dockerfile
           push: true
-          tags: ghcr.io/raykiele/synapse-api:${{ github.sha }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/synapse-api:${{ github.sha }}
           cache-from: type=gha,scope=synapse-api
           cache-to: type=gha,mode=max,scope=synapse-api
 
@@ -129,7 +131,7 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: true
-          tags: ghcr.io/raykiele/synapse-web:${{ github.sha }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/synapse-web:${{ github.sha }}
           build-args: |
             VITE_API_BASE_URL=/api/v1
           cache-from: type=gha,scope=synapse-web
@@ -144,8 +146,8 @@ jobs:
           rm -rf release
           mkdir -p release
           cp docker-compose.deploy-host.yml scripts/deploy-remote.sh release/
-          printf 'SYNAPSE_API_IMAGE=ghcr.io/raykiele/synapse-api:%s\nSYNAPSE_WEB_IMAGE=ghcr.io/raykiele/synapse-web:%s\n' \
-            "${IMAGE_TAG}" "${IMAGE_TAG}" > release/release.env
+          printf 'SYNAPSE_API_IMAGE=ghcr.io/%s/synapse-api:%s\nSYNAPSE_WEB_IMAGE=ghcr.io/%s/synapse-web:%s\n' \
+            "${IMAGE_OWNER}" "${IMAGE_TAG}" "${IMAGE_OWNER}" "${IMAGE_TAG}" > release/release.env
           ls -lh release
 
       - name: Configure SSH

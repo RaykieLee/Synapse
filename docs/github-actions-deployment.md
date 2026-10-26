@@ -26,6 +26,8 @@
 
 GHCR 登录不需要额外创建长期 Secret。工作流使用本次 Actions 运行自动生成的 `GITHUB_TOKEN` 推送镜像，并在发布阶段通过 SSH 将它传给远端脚本。远端只把它写入权限为 `700` 的临时 `DOCKER_CONFIG`，发布结束或失败时删除，不写入 `/opt/synapse/.env.docker`。
 
+镜像 owner 默认取 GitHub 仓库 owner；如果组织迁移后需要覆盖，可在仓库 `Settings > Secrets and variables > Actions > Variables` 中设置 `GHCR_OWNER`。该值应使用 GHCR 接受的命名空间，不能包含 `ghcr.io/` 前缀。
+
 ## 服务器初始化
 
 服务器需要安装 Docker Engine 和 Docker Compose，并准备：
