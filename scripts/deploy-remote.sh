@@ -11,13 +11,16 @@ previous_compose="${state_dir}/previous-compose.yml"
 new_env="${state_dir}/release-${image_tag}.env"
 release_compose="${release_dir}/docker-compose.deploy-host.yml"
 compose_files=(-f "${base_dir}/docker-compose.yml")
-compose=(
-  docker compose
-  --project-directory "${base_dir}"
-  --env-file "${base_dir}/.env.docker"
-  --env-file "${new_env}"
-)
+compose_env="${new_env}"
 compose_tmp=""
+
+run_compose() {
+  docker compose \
+    --project-directory "${base_dir}" \
+    --env-file "${base_dir}/.env.docker" \
+    --env-file "${compose_env}" \
+    "$@"
+}
 
 cleanup() {
   if [[ -n "${compose_tmp}" ]]; then
@@ -41,6 +44,8 @@ fi
 mkdir -p "${state_dir}"
 if [[ -s "${current_env}" ]]; then
   cp "${current_env}" "${previous_env}"
+else
+  rm -f "${previous_env}" "${previous_compose}"
 fi
 if [[ -s "${base_dir}/docker-compose.yml" ]]; then
   cp "${base_dir}/docker-compose.yml" "${previous_compose}"
@@ -58,25 +63,25 @@ mv -f "${compose_tmp}" "${base_dir}/docker-compose.yml"
 compose_tmp=""
 
 echo "Starting release ${image_tag}"
-if ! "${compose[@]}" "${compose_files[@]}" up -d --no-build --remove-orphans --wait --wait-timeout 600; then
+if ! run_compose "${compose_files[@]}" up -d --no-build --remove-orphans --wait --wait-timeout 600; then
   echo "Release ${image_tag} failed health checks." >&2
-  "${compose[@]}" "${compose_files[@]}" ps || true
-  "${compose[@]}" "${compose_files[@]}" logs --tail=200 api web || true
+  run_compose "${compose_files[@]}" ps || true
+  run_compose "${compose_files[@]}" logs --tail=200 api web || true
 
   if [[ -s "${previous_env}" ]]; then
     echo "Rolling back to the previous release." >&2
-    cp "${previous_env}" "${current_env}"
+    compose_env="${previous_env}"
     if [[ -s "${previous_compose}" ]]; then
       cp "${previous_compose}" "${base_dir}/docker-compose.yml"
     fi
-    "${compose[@]}" "${compose_files[@]}" up -d --no-build --remove-orphans --wait --wait-timeout 600
+    run_compose "${compose_files[@]}" up -d --no-build --remove-orphans --wait --wait-timeout 600
   else
-    "${compose[@]}" "${compose_files[@]}" down --remove-orphans
+    run_compose "${compose_files[@]}" down --remove-orphans
   fi
   exit 1
 fi
 
 cp "${new_env}" "${current_env}"
 rm -f "${release_dir}/synapse-images.tar.gz"
-"${compose[@]}" "${compose_files[@]}" ps
+run_compose "${compose_files[@]}" ps
 echo "Release ${image_tag} is healthy."
