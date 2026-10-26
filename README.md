@@ -174,7 +174,7 @@ docker compose --env-file .env.docker down
 
 ### 自动部署
 
-推送到 `main` 后，GitHub Actions 会先运行 API 测试和前端 lint/build，再构建 API 与 Web 镜像，通过 SSH 直传服务器，并以健康检查通过作为发布成功条件。流水线包含失败回滚；生产密钥只保存在服务器 `/opt/synapse/.env.docker`。
+推送到 `main` 后，GitHub Actions 会先运行 API 测试和前端 lint/build，再构建 API 与 Web 镜像并推送到 GHCR。服务器通过 SSH 收到短期登录凭据后拉取指定提交的镜像，以健康检查通过作为发布成功条件。流水线包含失败回滚；生产密钥只保存在服务器 `/opt/synapse/.env.docker`。
 
 完整配置、手动触发、查看日志和回滚说明见 [GitHub Actions 自动部署](docs/github-actions-deployment.md)。
 

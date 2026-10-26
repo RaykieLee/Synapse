@@ -4,11 +4,11 @@
 
 1. 后端测试：`uv sync --frozen --extra dev`、`pytest -q`。
 2. 前端检查：`pnpm install --frozen-lockfile`、`pnpm lint`、`pnpm build`。
-3. 镜像构建：在 GitHub Actions 构建 API 和 Web 镜像。
-4. 发布传输：打包 API、Web、Redis 和 Qdrant 镜像，通过 SSH 上传服务器。
-5. 远端发布：加载镜像、启动 Compose、等待健康检查；失败时回滚上一版本。
+3. 镜像构建：在 GitHub Actions 构建 API 和 Web 镜像，并推送到 GitHub Container Registry（GHCR）。
+4. 发布传输：通过 SSH 标准输入向服务器传递本次运行的短期 `GITHUB_TOKEN`，服务器临时登录 GHCR 并拉取镜像。
+5. 远端发布：启动 Compose、等待健康检查；失败时恢复上一版本的 Compose 配置和镜像，临时 Docker 登录信息随后自动删除。
 
-采用“Actions 构建、SSH 直传”而不是让服务器现场构建，是因为当前生产服务器访问 GitHub 和 GHCR 的速度很慢，但以上传带宽和 Docker 本地加载方式可以稳定发布。
+采用“Actions 构建、GHCR 分发、服务器拉取运行”而不是让服务器现场构建，是因为构建依赖和缓存由 GitHub 托管，服务器只承担运行职责。Redis 和 Qdrant 仍由服务器直接从 Docker Hub 拉取。
 
 ## GitHub Secrets
 
@@ -24,12 +24,14 @@
 
 不要使用登录密码作为流水线凭据。部署用户需要能执行 `sudo docker compose`，且仓库不允许把 `.env.docker`、私钥或服务器密码写入 Git。
 
+GHCR 登录不需要额外创建长期 Secret。工作流使用本次 Actions 运行自动生成的 `GITHUB_TOKEN` 推送镜像，并在发布阶段通过 SSH 将它传给远端脚本。远端只把它写入权限为 `700` 的临时 `DOCKER_CONFIG`，发布结束或失败时删除，不写入 `/opt/synapse/.env.docker`。
+
 ## 服务器初始化
 
 服务器需要安装 Docker Engine 和 Docker Compose，并准备：
 
 ```bash
-sudo install -d -o ubuntu -o ubuntu -m 755 /opt/synapse /opt/synapse/releases
+sudo install -d -o ubuntu -g ubuntu -m 755 /opt/synapse /opt/synapse/releases
 install -m 600 .env.docker.example /opt/synapse/.env.docker
 ```
 
@@ -64,7 +66,7 @@ sudo docker compose \
 
 ## 回滚
 
-工作流在健康检查失败时会自动加载 `state/previous.env` 并回滚上一镜像。手动回滚：
+工作流在健康检查失败时会自动加载 `state/previous.env`、`state/previous-compose.yml` 并回滚上一镜像。手动回滚：
 
 ```bash
 sudo cp /opt/synapse/state/previous.env /opt/synapse/state/current.env
@@ -74,6 +76,8 @@ sudo docker compose \
   --env-file /opt/synapse/state/current.env \
   -f /opt/synapse/docker-compose.yml up -d --no-build --wait
 ```
+
+如果上一版本镜像已经不在服务器本地，而 GHCR package 仍是私有状态，需要先使用有 `read:packages` 权限的 GitHub token 临时执行 `docker login ghcr.io` 再拉取。正常自动发布不需要人工登录。
 
 发布数据使用 Docker named volumes 持久化；不要执行 `docker compose down -v`，除非明确要删除数据库、附件、Redis 和 Qdrant 数据。
 
