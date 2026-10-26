@@ -76,7 +76,7 @@ jobs:
     needs:
       - api-tests
       - web-build
-    timeout-minutes: 90
+    timeout-minutes: 180
 
     steps:
       - name: Check out repository
@@ -130,8 +130,6 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
-          docker pull redis:7-alpine
-          docker pull qdrant/qdrant:latest
 
           rm -rf release
           mkdir -p release
@@ -139,12 +137,12 @@ jobs:
           printf 'SYNAPSE_API_IMAGE=synapse-api:%s\nSYNAPSE_WEB_IMAGE=synapse-web:%s\n' \
             "${IMAGE_TAG}" "${IMAGE_TAG}" > release/release.env
 
+          # Only transfer the images built by this commit.
           docker save \
             "synapse-api:${IMAGE_TAG}" \
             "synapse-web:${IMAGE_TAG}" \
-            redis:7-alpine \
-            qdrant/qdrant:latest \
             | gzip -1 > release/synapse-images.tar.gz
+          sha256sum release/synapse-images.tar.gz > release/synapse-images.tar.gz.sha256
           ls -lh release
 
       - name: Configure SSH
@@ -169,10 +167,24 @@ jobs:
         run: |
           set -euo pipefail
           release_dir="${DEPLOY_PATH}/releases/${IMAGE_TAG}"
-          ssh_options=(-i "${HOME}/.ssh/synapse_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o ServerAliveInterval=30)
+          ssh_options=(-i "${HOME}/.ssh/synapse_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=6)
 
           ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "mkdir -p '${release_dir}'"
-          scp "${ssh_options[@]}" -r release/. "${DEPLOY_USER}@${DEPLOY_HOST}:${release_dir}/"
+          for attempt in 1 2 3 4; do
+            if rsync -av --partial --append-verify --timeout=120 \
+              -e "ssh ${ssh_options[*]}" \
+              release/ "${DEPLOY_USER}@${DEPLOY_HOST}:${release_dir}/"; then
+              break
+            fi
+            if [[ "${attempt}" -eq 4 ]]; then
+              echo "::error::Release upload failed after ${attempt} attempts."
+              exit 1
+            fi
+            echo "Upload attempt ${attempt} failed; resuming in $((attempt * 10)) seconds."
+            sleep $((attempt * 10))
+          done
+          ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cd '${release_dir}' && sha256sum -c synapse-images.tar.gz.sha256"
 
       - name: Activate release
         if: steps.deploy-path.outputs.safe == 'true'

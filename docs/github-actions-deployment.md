@@ -4,11 +4,13 @@
 
 1. 后端测试：`uv sync --frozen --extra dev`、`pytest -q`。
 2. 前端检查：`pnpm install --frozen-lockfile`、`pnpm lint`、`pnpm build`。
-3. 镜像构建：在 GitHub Actions 构建 API 和 Web 镜像，并连同 Redis、Qdrant 打包为压缩镜像包。
-4. 发布传输：通过 SSH 上传镜像包，服务器校验后一次性 `docker load`。
-5. 远端发布：启动 Compose、等待健康检查；失败时恢复上一版本的 Compose 配置和镜像，成功加载后删除远端镜像包。
+3. 镜像构建：在 GitHub Actions Runner 上构建 API 和 Web 镜像，只把本次提交生成的两个应用镜像打包为压缩镜像包。
+4. 发布传输：通过 SSH 和 `rsync` 分块上传；中断后使用 `--append-verify` 续传并在远端校验 SHA-256。
+5. 远端发布：加载镜像、启动 Compose、等待健康检查；失败时恢复上一版本的 Compose 配置和镜像，成功加载后删除远端镜像包。
 
-采用“Actions 构建、SSH 分发、服务器加载运行”而不是让服务器现场构建，是因为构建依赖和缓存由 GitHub 托管，服务器只承担运行职责。该路径不依赖 GHCR；首次约 40 分钟，后续命中 Actions 构建缓存后会明显缩短。
+采用“GitHub 构建、SSH 分发、服务器加载运行”而不是让服务器现场构建：构建依赖和缓存由 GitHub 托管，服务器只承担运行职责，因此服务器不需要拉取源码或安装 Node/Python 构建工具。当前路径不依赖 GHCR；首次通常约 40 到 50 分钟，后续命中 Actions 构建缓存后会明显缩短。部署任务最多运行 180 分钟。
+
+镜像包上传步骤最多尝试 4 次。单次传输 120 秒没有数据进展会主动断开，下一次从已收到的字节继续，不会重新传输整个约 300 MB 的镜像包。
 
 ## GitHub Secrets
 
@@ -77,7 +79,7 @@ sudo docker compose \
   -f /opt/synapse/docker-compose.yml up -d --no-build --wait
 ```
 
-上一版本的 API 和 Web 镜像已保留在服务器本地，自动回滚不依赖 Registry。Redis 与 Qdrant 使用标准镜像，若服务器本地缺失会从 Docker Hub 拉取。
+上一版本的 API 和 Web 镜像已保留在服务器本地，自动回滚不依赖 Registry。Redis 与 Qdrant 使用标准镜像；发布脚本会先检查本地镜像，只有缺失的首次部署才从 Docker Hub 拉取，已有镜像不会触发联网拉取。
 
 发布数据使用 Docker named volumes 持久化；不要执行 `docker compose down -v`，除非明确要删除数据库、附件、Redis 和 Qdrant 数据。
 
