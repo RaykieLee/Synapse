@@ -129,7 +129,14 @@ cd Synapse
 Copy-Item .env.docker.example .env.docker
 ```
 
-在 `.env.docker` 中设置自己的 `SYNAPSE_JWT_SECRET` 和 `SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY`。加密密钥需要有效的 Fernet key，并应在后续重启和升级时保持稳定。
+在 `.env.docker` 中设置自己的 `SYNAPSE_JWT_SECRET` 和 `SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY`。两个值都不能保留示例占位符；JWT 密钥建议使用至少 32 字节的随机值，加密密钥必须是有效的 Fernet key，并应在后续重启和升级时保持稳定。可用以下命令生成：
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+已有加密凭据时不要直接替换 Fernet key，应先解密并用新 key 重新加密；JWT key 轮换会使现有登录会话失效，用户需要重新登录。
 
 ```powershell
 docker compose --env-file .env.docker up -d --build

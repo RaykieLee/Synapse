@@ -52,8 +52,6 @@ export type TenantInvitationMembership = {
 }
 
 export type TenantInvitationRegisterResult = {
-  access_token: string
-  token_type: 'bearer'
   user: AuthUser
   tenant: TenantInvitationMembership
 }

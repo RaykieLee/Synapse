@@ -8,7 +8,7 @@
 
 密码采用带随机盐的 scrypt。首登时接受旧 Synapt bcrypt `$2a$`、`$2b$`、`$2y$` 密文并在密码验证成功后升级为 scrypt。登录令牌是 HS256 JWT，包含字符串 `sub`、`ver`、`iat`、`exp`、`jti`。每次认证都会检查用户 active 状态和 token version。登出及改密递增 `token_version`，立即撤销用户此前全部令牌；改密后需重新登录。
 
-密钥使用环境变量 `SYNAPSE_JWT_SECRET`。生产环境 `SYNAPSE_ENV=production`（或 `prod`）缺少密钥时签发/验证令牌报错，不生成隐式生产密钥。开发环境未设置时，进程启动期间生成随机临时密钥，重启会使旧令牌失效。可用 `SYNAPSE_JWT_TTL_MINUTES` 设置有效期，默认 60 分钟。认证接受 `Authorization: Bearer <token>`，也可使用 HttpOnly `synapse_session` Cookie。
+密钥使用环境变量 `SYNAPSE_JWT_SECRET`。生产环境 `SYNAPSE_ENV=production`（或 `prod`）缺少密钥、密钥不足 32 字节或仍使用示例占位符时，应用启动失败，不生成隐式生产密钥；`SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY` 同样必须存在、不能是占位符，并且必须是可解析的 Fernet key。开发环境未设置 JWT 密钥时，进程启动期间生成随机临时密钥，重启会使旧令牌失效。可用 `SYNAPSE_JWT_TTL_MINUTES` 设置有效期，默认 60 分钟。浏览器登录只通过 `Secure`、`HttpOnly`、`SameSite=Lax` 的 `synapse_session` Cookie 保持会话；API 客户端仍可用 `Authorization: Bearer <token>`，但令牌不返回给浏览器脚本。`SYNAPSE_AUTH_COOKIE_SECURE` 显式设置时优先于请求协议：HTTPS 部署设为 `true`，仅受信任的本地 HTTP 开发环境设 `false`；未设置时按请求 URL 或 `X-Forwarded-Proto` 是否为 HTTPS 自动判断。
 
 ## 接口
 
@@ -16,7 +16,7 @@ API 前缀 `/api/v1`。
 
 | 方法与路径 | 请求 | 成功响应 |
 | --- | --- | --- |
-| `POST /api/v1/auth/login` | JSON `{ "user_name": "...", "password": "..." }` | `{ "access_token": "...", "token_type": "bearer", "user": { ... } }`，同时设置 HttpOnly Cookie |
+| `POST /api/v1/auth/login` | JSON `{ "user_name": "...", "password": "..." }` | `{ "user": { ... } }`，设置 HttpOnly Cookie，不返回访问令牌 |
 | `POST /api/v1/auth/logout` | 认证令牌 | `204`；撤销此用户全部现存令牌并清除 Cookie |
 | `GET /api/v1/auth/me` | 认证令牌 | 当前用户摘要 |
 | `PATCH /api/v1/account/profile` | `{ "nick_name?", "email?", "phonenumber?", "sex?", "avatar?" }` | 更新后的用户摘要；额外字段拒绝 |

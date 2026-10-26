@@ -104,13 +104,11 @@ async function request(
     signal: callerSignal,
     ...requestInit
   } = init
-  const token = useAuthStore.getState().auth.accessToken
   const headers = new Headers(requestInit.headers)
   const multipart =
     typeof FormData !== 'undefined' && requestInit.body instanceof FormData
   if (requestInit.body && !multipart && !headers.has('Content-Type'))
     headers.set('Content-Type', 'application/json')
-  if (token) headers.set('Authorization', `Bearer ${token}`)
   const controller = new AbortController()
   let timedOut = false
   const timeoutId = window.setTimeout(() => {
@@ -155,6 +153,24 @@ async function request(
   if (response.status === 401) useAuthStore.getState().auth.reset()
   if (!response.ok) throw await problemFromResponse(response)
   return response
+}
+
+let sessionProbe: Promise<AuthUser> | null = null
+
+export async function restoreSession(): Promise<AuthUser> {
+  const cached = useAuthStore.getState().auth.user
+  if (cached) return cached
+  if (!sessionProbe) {
+    sessionProbe = api<AuthUser>('/auth/me')
+      .then((user) => {
+        useAuthStore.getState().auth.setUser(user)
+        return user
+      })
+      .finally(() => {
+        sessionProbe = null
+      })
+  }
+  return sessionProbe
 }
 
 export async function api<T>(

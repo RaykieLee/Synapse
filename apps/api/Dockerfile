@@ -24,9 +24,18 @@ RUN uv sync --frozen --no-dev
 
 FROM python:3.13-slim AS runtime
 
+ARG SYNAPSE_JWT_SECRET
+ARG SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH"
+
+# Clear the names in the runtime layer so the builder layer cannot expose
+# secrets inherited through Docker history. Compose injects the real values
+# only when the container starts.
+ENV SYNAPSE_JWT_SECRET=${SYNAPSE_JWT_SECRET} \
+    SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY=${SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY}
 
 RUN groupadd --system synapse \
     && useradd --system --gid synapse --create-home synapse \

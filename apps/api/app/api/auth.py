@@ -1,16 +1,18 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
 from app.auth.security import issue_token, password_hash, verify_password
+from app.core.config import get_settings
 from app.database.session import get_db
 from app.models.user import User
 
 router = APIRouter(tags=["auth"])
+SESSION_COOKIE = "synapse_session"
 
 
 class LoginInput(BaseModel):
@@ -38,8 +40,27 @@ def user_data(user: User) -> dict:
             "status": user.status, "platform_role": user.platform_role}
 
 
+def set_session_cookie(response: Response, request: Request, token: str) -> None:
+    """Set a browser session without exposing the bearer token to page scripts."""
+    settings = get_settings()
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+    if settings.auth_cookie_secure is not None:
+        secure = settings.auth_cookie_secure
+    else:
+        secure = request.url.scheme == "https" or forwarded_proto == "https"
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=settings.jwt_ttl_minutes * 60,
+        path="/",
+    )
+
+
 @router.post("/auth/login")
-def login(body: LoginInput, response: Response, db: Session = Depends(get_db)):
+def login(body: LoginInput, request: Request, response: Response, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.user_name == body.user_name, User.del_flag.is_(False)))
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, detail={"code": "INVALID_CREDENTIALS"})
@@ -49,8 +70,8 @@ def login(body: LoginInput, response: Response, db: Session = Depends(get_db)):
         user.password_hash = password_hash(body.password)
         db.commit()
     token = issue_token(user.user_id, user.token_version)
-    response.set_cookie("synapse_session", token, httponly=True, secure=True, samesite="lax", max_age=3600)
-    return {"access_token": token, "token_type": "bearer", "user": user_data(user)}
+    set_session_cookie(response, request, token)
+    return {"user": user_data(user)}
 
 
 @router.post("/auth/logout", status_code=204)
@@ -58,7 +79,7 @@ def logout(response: Response, user: User = Depends(get_current_user), db: Sessi
     user.token_version += 1
     user.updated_at = datetime.now(timezone.utc)
     db.commit()
-    response.delete_cookie("synapse_session")
+    response.delete_cookie(SESSION_COOKIE, path="/")
     response.status_code = 204
     return response
 
@@ -87,6 +108,6 @@ def change_password(body: PasswordInput, response: Response, user: User = Depend
     user.token_version += 1
     user.updated_at = datetime.now(timezone.utc)
     db.commit()
-    response.delete_cookie("synapse_session")
+    response.delete_cookie(SESSION_COOKIE, path="/")
     response.status_code = 204
     return response

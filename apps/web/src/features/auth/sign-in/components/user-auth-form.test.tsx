@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, type RenderResult } from 'vitest-browser-react'
 import { type Locator, userEvent } from 'vitest/browser'
 import { api, type AuthUser } from '@/lib/api'
+import { setLocale } from '@/lib/i18n'
 import { UserAuthForm } from './user-auth-form'
 
 const FORM_MESSAGES = {
@@ -23,13 +24,11 @@ const mockUser: AuthUser = {
 
 const navigate = vi.fn()
 const setUserMock = vi.fn()
-const setAccessTokenMock = vi.fn()
 
 vi.mock('@/stores/auth-store', () => ({
   useAuthStore: () => ({
     auth: {
       setUser: setUserMock,
-      setAccessToken: setAccessTokenMock,
     },
   }),
 }))
@@ -76,8 +75,8 @@ describe('UserAuthForm', () => {
 
     beforeEach(async () => {
       vi.clearAllMocks()
+      setLocale('zh-CN')
       vi.mocked(api).mockResolvedValue({
-        access_token: 'mock-access-token',
         user: mockUser,
       })
       screen = await render(<UserAuthForm />)
@@ -120,9 +119,6 @@ describe('UserAuthForm', () => {
           password: 'example-password',
         }),
       })
-      expect(setAccessTokenMock).toHaveBeenCalledOnce()
-      expect(setAccessTokenMock).toHaveBeenCalledWith('mock-access-token')
-
       await vi.waitFor(() =>
         expect(navigate).toHaveBeenCalledWith({ to: '/', replace: true })
       )
@@ -131,8 +127,8 @@ describe('UserAuthForm', () => {
 
   it('navigates to redirectTo when provided', async () => {
     vi.clearAllMocks()
+    setLocale('zh-CN')
     vi.mocked(api).mockResolvedValue({
-      access_token: 'mock-access-token',
       user: mockUser,
     })
 
@@ -149,7 +145,6 @@ describe('UserAuthForm', () => {
     await userEvent.click(getByRole('button', { name: '登录工作空间' }))
 
     await vi.waitFor(() => expect(setUserMock).toHaveBeenCalledOnce())
-    expect(setAccessTokenMock).toHaveBeenCalledOnce()
 
     await vi.waitFor(() =>
       expect(navigate).toHaveBeenCalledWith({

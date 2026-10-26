@@ -2112,7 +2112,6 @@ function SessionMessagesPanel({
     const connect = async () => {
       setStreamError('')
       setStreamConnected(false)
-      const token = useAuthStore.getState().auth.accessToken
       let response: Response
       try {
         response = await fetch(agentScopeStreamUrl(sessionId, agentId), {
@@ -2120,7 +2119,6 @@ function SessionMessagesPanel({
           headers: {
             Accept: 'text/event-stream',
             'X-Workspace-ID': workspace.workspace_id,
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           credentials: 'include',
           signal: controller.signal,

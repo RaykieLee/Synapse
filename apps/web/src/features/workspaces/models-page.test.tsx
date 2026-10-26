@@ -80,6 +80,7 @@ function installApiFixture(role: WorkspaceRole = 'owner') {
   const state = {
     role,
     membershipVersion: 3,
+    actorId: '1',
     credentials: { '11': [credential], '12': [] } as Record<
       string,
       Credential[]
@@ -94,7 +95,6 @@ function installApiFixture(role: WorkspaceRole = 'owner') {
       method: string
       workspaceId: string
       resource: string
-      authorization: string | null
       body?: Record<string, unknown>
     }[],
   }
@@ -152,13 +152,11 @@ function installApiFixture(role: WorkspaceRole = 'owner') {
         typeof init?.body === 'string'
           ? (JSON.parse(init.body) as Record<string, unknown>)
           : undefined
-      const authorization = new Headers(init?.headers).get('Authorization')
       state.requests.push({
         method,
         workspaceId,
         resource,
         body,
-        authorization,
       })
       if (method === 'GET') {
         if (state.listFailures[resource])
@@ -168,7 +166,7 @@ function installApiFixture(role: WorkspaceRole = 'owner') {
           if (workspaceId === '11' && state.credentialGate)
             await state.credentialGate
           return json(
-            authorization === 'Bearer fixture-actor-2'
+            state.actorId === '2'
               ? []
               : state.credentials[workspaceId]
           )
@@ -278,7 +276,6 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
       status: 'active',
       platform_role: 'user',
     })
-    useAuthStore.getState().auth.setAccessToken('fixture-actor-1')
   })
 
   afterEach(async () => {
@@ -761,7 +758,7 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
             user_id: '2',
             user_name: 'fixture-other-actor',
           })
-        useAuthStore.getState().auth.setAccessToken('fixture-actor-2')
+        fixture.actorId = '2'
       } else
         await router.navigate({
           to: '/w/$workspaceId/models',
@@ -832,7 +829,6 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
         fixture.requests.find((request) => request.method === method)
       ).toMatchObject({
         workspaceId: '11',
-        authorization: 'Bearer fixture-actor-1',
       })
       await expect
         .element(screen.getByRole('button', { name: '添加模型', exact: true }))

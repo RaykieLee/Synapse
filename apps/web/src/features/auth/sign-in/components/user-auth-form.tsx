@@ -98,14 +98,13 @@ export function UserAuthForm({
     setIsLoading(true)
     setLoginError('')
     try {
-      const result = await api<{ access_token: string; user: AuthUser }>(
+      const result = await api<{ user: AuthUser }>(
         '/auth/login',
         {
           method: 'POST',
           body: JSON.stringify(data),
         }
       )
-      auth.setAccessToken(result.access_token)
       auth.setUser(result.user)
       try {
         if (rememberUsername)

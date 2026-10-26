@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '@/stores/auth-store'
-import { api, apiBlob, ApiProblem } from './api'
+import { api, apiBlob, ApiProblem, restoreSession } from './api'
 
 beforeEach(() => {
-  useAuthStore.getState().auth.setAccessToken('test-token')
+  useAuthStore.getState().auth.reset()
 })
 
 afterEach(() => {
@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 describe('api request helpers', () => {
-  it('adds auth headers and parses JSON responses', async () => {
+  it('uses an HttpOnly session cookie without exposing a bearer token', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -25,9 +25,7 @@ describe('api request helpers', () => {
     await expect(api<{ ok: boolean }>('/health')).resolves.toEqual({ ok: true })
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(new Headers(init.headers).get('Authorization')).toBe(
-      'Bearer test-token'
-    )
+    expect(new Headers(init.headers).get('Authorization')).toBeNull()
     expect(init.credentials).toBe('include')
   })
 
@@ -77,14 +75,53 @@ describe('api request helpers', () => {
     })
   })
 
-  it('resets the auth session on unauthorized responses', async () => {
+  it('resets the auth state on unauthorized responses', async () => {
+    useAuthStore.getState().auth.setUser({
+      user_id: '1',
+      user_name: 'user',
+      nick_name: null,
+      email: null,
+      phonenumber: null,
+      sex: null,
+      avatar: null,
+      status: 'active',
+      platform_role: 'user',
+    })
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response('Unauthorized', { status: 401 }))
     )
 
     await expect(api('/private')).rejects.toMatchObject({ status: 401 })
-    expect(useAuthStore.getState().auth.accessToken).toBe('')
+    expect(useAuthStore.getState().auth.user).toBeNull()
+  })
+
+  it('restores the user from /auth/me with the cookie session', async () => {
+    const user = {
+      user_id: '7',
+      user_name: 'cookie-user',
+      nick_name: null,
+      email: null,
+      phonenumber: null,
+      sex: null,
+      avatar: null,
+      status: 'active',
+      platform_role: 'user',
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(user), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(restoreSession()).resolves.toEqual(user)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/auth/me')
+    expect(
+      (fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.credentials
+    ).toBe('include')
+    expect(useAuthStore.getState().auth.user).toEqual(user)
   })
 
   it('normalizes network failures', async () => {

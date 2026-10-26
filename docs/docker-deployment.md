@@ -15,6 +15,20 @@ SQLite 数据库、附件、AgentScope Workspace/blob 文件、Redis 和 Qdrant 
 
 ```powershell
 Copy-Item .env.docker.example .env.docker
+```
+
+`.env.docker.example` 中的两个密钥默认为空。启动前必须填写至少 32 字节的随机 JWT secret 和有效的 Fernet key：
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Compose 在变量缺失或为空时会拒绝启动。已有模型凭据时，轮换 Fernet key 前必须先完成解密后重加密；轮换 JWT key 会立即使现有浏览器和 API 会话失效。
+
+示例配置面向 `http://localhost`，因此显式设置 `SYNAPSE_AUTH_COOKIE_SECURE=false`。通过 HTTPS 暴露服务时，必须改为 `SYNAPSE_AUTH_COOKIE_SECURE=true`；若删除该变量，API 会根据请求或反向代理的 `X-Forwarded-Proto` 自动判断。
+
+```powershell
 docker compose --env-file .env.docker up -d --build
 ```
 
@@ -74,5 +88,5 @@ docker compose --env-file .env.docker down
 docker compose --env-file .env.docker down -v
 ```
 
-生产环境不要使用示例密钥；修改 `SYNAPSE_JWT_SECRET` 和 `SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY` 后再启动。
+生产环境不要使用示例密钥。`docker compose config` 可以帮助检查变量是否已设置，但不要把输出或 `.env.docker` 提交到 Git。
 

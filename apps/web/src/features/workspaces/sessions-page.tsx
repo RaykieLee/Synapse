@@ -968,7 +968,6 @@ function SessionMessagesPanel({
     const connect = async () => {
       setStreamError('')
       setStreamConnected(false)
-      const token = useAuthStore.getState().auth.accessToken
       const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '/api/v1').replace(/\/$/, '')
       let response: Response
       try {
@@ -977,7 +976,6 @@ function SessionMessagesPanel({
           headers: {
             Accept: 'text/event-stream',
             'X-Workspace-ID': workspace.workspace_id,
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           credentials: 'include',
           signal: controller.signal,

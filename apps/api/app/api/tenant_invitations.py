@@ -5,6 +5,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
+from app.api.auth import set_session_cookie
 from app.auth.dependencies import get_current_user
 from app.auth.errors import problem
 from app.auth.security import issue_token
@@ -105,17 +106,8 @@ def register_and_accept_invitation(
         int(result.user.user_id),
         result.token_version,
     )
-    response.set_cookie(
-        "synapse_session",
-        access_token,
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        max_age=3600,
-    )
+    set_session_cookie(response, request, access_token)
     return InvitationRegisterResponse(
-        access_token=access_token,
-        token_type="bearer",
         user=result.user,
         tenant=result.membership,
     )

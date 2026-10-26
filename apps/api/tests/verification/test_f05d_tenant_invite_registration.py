@@ -82,12 +82,16 @@ def test_f05d_invite_registration_and_acceptance(tmp_path, monkeypatch):
         assert payload["tenant"]["tenant_id"] == str(tenant_id)
         assert payload["tenant"]["tenant_role"] == "admin"
         assert payload["tenant"]["workspace_memberships_created"] == 0
-        assert "access_token" in payload and payload["token_type"] == "bearer"
+        assert "access_token" not in payload and "token_type" not in payload
         assert "synapse_session" in success.cookies
+        set_cookie = success.headers.get("set-cookie", "").lower()
+        assert "httponly" in set_cookie and "samesite=lax" in set_cookie
         login = api("post", "/api/v1/auth/login", json={
             "user_name": "new-f05d-member", "password": "safe-registration-password",
         })
         assert login.status_code == 200, login.text
+        assert "access_token" not in login.json()
+        assert "httponly" in login.headers.get("set-cookie", "").lower()
         with factory() as db:
             created_id = int(new_user["user_id"])
             membership = db.scalar(select(TenantMember).where(

@@ -103,8 +103,6 @@ class RegisteredTenantMembershipResponse(BaseModel):
 class InvitationRegisterResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    access_token: str
-    token_type: str
     user: RegisteredUserResponse
     tenant: RegisteredTenantMembershipResponse
 

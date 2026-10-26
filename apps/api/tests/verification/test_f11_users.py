@@ -1,5 +1,6 @@
 """F11 global-user administration verification with a disposable migrated SQLite DB."""
 import bcrypt
+import re
 
 from alembic import command
 from alembic.config import Config
@@ -15,6 +16,13 @@ def _assert_no_secret_fields(value):
     elif isinstance(value, list):
         for child in value:
             _assert_no_secret_fields(child)
+
+
+def _session_cookie(response) -> str:
+    set_cookie = response.headers.get("set-cookie", "")
+    match = re.search(r"(?:^|,\s*)synapse_session=([^;]+)", set_cookie)
+    assert match, set_cookie
+    return match.group(1)
 
 
 def test_f11_platform_user_management(tmp_path, monkeypatch):
@@ -121,8 +129,12 @@ def test_f11_platform_user_management(tmp_path, monkeypatch):
         # A normal account created with an explicit password can authenticate with it.
         login = req("post", "/api/v1/auth/login", json={"user_name": "victim-account", "password": "first-password-strong"})
         assert login.status_code == 200, login.text
-        victim_token = login.json()["access_token"]
-        assert req("get", "/api/v1/auth/me", headers={"Authorization": f"Bearer {victim_token}"}).status_code == 200
+        assert "access_token" not in login.json()
+        assert "httponly" in login.headers.get("set-cookie", "").lower()
+        victim_session = _session_cookie(login)
+        assert client.get(
+            "/api/v1/auth/me", headers={"Cookie": f"synapse_session={victim_session}"}
+        ).status_code == 200
 
         # Only supported profile fields/status can be updated; state transitions revoke old JWTs.
         updated = req("patch", f"/api/v1/users/{victim_id}", "platform-root", json={"nick_name": "Updated Victim", "sex": "2"})
@@ -134,21 +146,25 @@ def test_f11_platform_user_management(tmp_path, monkeypatch):
         assert req("patch", f"/api/v1/users/{victim_id}", "platform-root", json={}).status_code == 422
         disabled = req("patch", f"/api/v1/users/{victim_id}", "platform-root", json={"status": "disabled"})
         assert disabled.status_code == 200 and disabled.json()["status"] == "disabled"
-        assert req("get", "/api/v1/auth/me", headers={"Authorization": f"Bearer {victim_token}"}).status_code == 401
+        assert client.get(
+            "/api/v1/auth/me", headers={"Cookie": f"synapse_session={victim_session}"}
+        ).status_code == 401
         assert req("post", "/api/v1/auth/login", json={"user_name": "victim-account", "password": "first-password-strong"}).status_code == 403
         assert req("patch", f"/api/v1/users/{victim_id}", "platform-root", json={"status": "active"}).status_code == 200
 
         login_again = req("post", "/api/v1/auth/login", json={"user_name": "victim-account", "password": "first-password-strong"})
         assert login_again.status_code == 200
-        reset_old_token = login_again.json()["access_token"]
+        reset_session = _session_cookie(login_again)
         assert req("post", f"/api/v1/users/{victim_id}/reset-password", "platform-root", json={"new_password": "too-short"}).status_code == 422
         reset = req("post", f"/api/v1/users/{victim_id}/reset-password", "platform-root", json={"new_password": "replacement-password-strong"})
         assert reset.status_code == 204
-        assert req("get", "/api/v1/auth/me", headers={"Authorization": f"Bearer {reset_old_token}"}).status_code == 401
+        assert client.get(
+            "/api/v1/auth/me", headers={"Cookie": f"synapse_session={reset_session}"}
+        ).status_code == 401
         assert req("post", "/api/v1/auth/login", json={"user_name": "victim-account", "password": "first-password-strong"}).status_code == 401
         new_login = req("post", "/api/v1/auth/login", json={"user_name": "victim-account", "password": "replacement-password-strong"})
         assert new_login.status_code == 200, new_login.text
-        after_reset_token = new_login.json()["access_token"]
+        after_reset_session = _session_cookie(new_login)
 
         # Legacy bcrypt login is accepted and upgrades the stored hash to scrypt.
         legacy_login = req("post", "/api/v1/auth/login", json={"user_name": "legacy-bcrypt", "password": "legacy-password-strong"})
@@ -169,7 +185,9 @@ def test_f11_platform_user_management(tmp_path, monkeypatch):
             db.commit()
         deleted = req("delete", f"/api/v1/users/{victim_id}", "platform-root")
         assert deleted.status_code == 204
-        assert req("get", "/api/v1/auth/me", headers={"Authorization": f"Bearer {after_reset_token}"}).status_code == 401
+        assert client.get(
+            "/api/v1/auth/me", headers={"Cookie": f"synapse_session={after_reset_session}"}
+        ).status_code == 401
         assert req("get", f"/api/v1/users/{victim_id}", "platform-root").status_code == 404
         assert req("delete", f"/api/v1/users/{victim_id}", "platform-root").status_code == 404
         remaining = req("get", "/api/v1/users?search=victim-account", "platform-root").json()
