@@ -1,0 +1,38 @@
+name: GHCR permission probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show token capabilities
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api /user --jq '{login,type}'
+          gh api "/repos/${GITHUB_REPOSITORY}" --jq '{owner:.owner.login,full_name,permissions}'
+          gh api "/user/packages?package_type=container" --jq '.[]? | {name,visibility,owner:.owner.login}' || true
+          gh api "/users/${GITHUB_REPOSITORY_OWNER}/packages/container/synapse-api" --jq '{name,visibility,owner:.owner.login}' || true
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push probe image
+        env:
+          IMAGE_OWNER: ${{ vars.GHCR_OWNER || 'raykiele' }}
+        run: |
+          set -euo pipefail
+          docker pull hello-world:latest
+          docker tag hello-world:latest "ghcr.io/${IMAGE_OWNER}/synapse-api:actions-probe"
+          docker push "ghcr.io/${IMAGE_OWNER}/synapse-api:actions-probe"
