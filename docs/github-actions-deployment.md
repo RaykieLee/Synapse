@@ -5,28 +5,32 @@
 1. 后端测试：`uv sync --frozen --extra dev`、`pytest -q`。
 2. 前端检查：`pnpm install --frozen-lockfile`、`pnpm lint`、`pnpm build`。
 3. 镜像构建：在 GitHub Actions Runner 上构建 API 和 Web 镜像，只把本次提交生成的两个应用镜像打包为压缩镜像包。
-4. 发布传输：通过 SSH 和 `rsync` 分块上传；中断后使用 `--append-verify` 续传并在远端校验 SHA-256。
-5. 远端发布：加载镜像、启动 Compose、等待健康检查；失败时恢复上一版本的 Compose 配置和镜像，成功加载后删除远端镜像包。
+4. 发布产物：上传 `synapse-release-<commit>` Actions Artifact，保留 14 天；该产物包含镜像包、SHA-256、Compose 文件和发布脚本。
+5. 本机发布：在能访问 GitHub 和服务器且网络更稳定的机器上下载 Artifact，通过 SSH/`rsync` 分块上传，远端校验 SHA-256 后加载镜像并切换版本。
 
-采用“GitHub 构建、SSH 分发、服务器加载运行”而不是让服务器现场构建：构建依赖和缓存由 GitHub 托管，服务器只承担运行职责，因此服务器不需要拉取源码或安装 Node/Python 构建工具。当前路径不依赖 GHCR；首次通常约 40 到 50 分钟，后续命中 Actions 构建缓存后会明显缩短。部署任务最多运行 180 分钟。
+采用“GitHub 构建、本机分发、服务器加载运行”而不是让服务器现场构建：构建依赖和缓存由 GitHub 托管，服务器只承担运行职责，因此服务器不需要拉取源码或安装 Node/Python 构建工具。当前路径不依赖 GHCR。
 
-镜像包上传步骤最多尝试 4 次。单次传输 120 秒没有数据进展会主动断开，下一次从已收到的字节继续，不会重新传输整个约 300 MB 的镜像包。
+GitHub Runner 到服务器的跨境链路实测只有约 15 KiB/s，直接由 Actions 推送约 300 MB 镜像包需要数小时，因此发布不再绑定 Actions Job 时长。服务器仍不现场编译；发布机只负责搬运 GitHub 已构建并校验过的同一份产物。
 
-## GitHub Secrets
+## 本机发布
 
-在 GitHub 仓库 `Settings > Secrets and variables > Actions` 配置：
+先确认 Actions 运行成功，并取得提交 SHA：
 
-| Secret | 用途 | 示例 |
-| --- | --- | --- |
-| `DEPLOY_HOST` | 服务器 IP 或域名 | `43.138.192.8` |
-| `DEPLOY_USER` | SSH 用户 | `ubuntu` |
-| `DEPLOY_PATH` | 部署根目录 | `/opt/synapse` |
-| `DEPLOY_SSH_KEY` | 部署账号的私钥全文 | OpenSSH PEM |
-| `DEPLOY_KNOWN_HOSTS` | 服务器 SSH host key | `ssh-keyscan` 输出 |
+```powershell
+$sha = git rev-parse HEAD
+gh run list --workflow deploy.yml --repo RaykieLee/Synapse --limit 1
+gh run download --repo RaykieLee/Synapse --name "synapse-release-$sha" --dir ".artifacts\$sha"
+```
 
-不要使用登录密码作为流水线凭据。部署用户需要能执行 `sudo docker compose`，且仓库不允许把 `.env.docker`、私钥或服务器密码写入 Git。
+可直接在本仓库根目录运行：
 
-当前个人账号的 GHCR 在全新包名、个人 OAuth Token、经典 PAT 和 Actions `GITHUB_TOKEN` 下均实测返回 `owner not found` 或 `permission_denied`，因此流水线默认不把 GHCR 作为生产发布的硬依赖。迁移到组织命名空间或 GHCR 状态恢复后，可另开改动切回 Registry 拉取模式。
+```powershell
+.\scripts\deploy-local.ps1 -Commit $sha
+```
+
+脚本会下载对应 Actions Artifact、校验 SHA-256、上传到服务器、再次校验，最后调用远端发布脚本。Windows 自带 `scp` 无法断点续传，因此若上传中断，重新运行脚本即可重新尝试；服务器上的正式生产发布仍可通过 Linux 发布机的 `rsync --partial --append-verify` 完成。不要使用登录密码作为部署凭据。部署用户需要能执行 `sudo docker compose`，且仓库不允许把 `.env.docker`、私钥或服务器密码写入 Git。
+
+当前个人账号的 GHCR 在全新包名、个人 OAuth Token、经典 PAT 和 Actions `GITHUB_TOKEN` 下均实测返回 `owner not found` 或 `permission_denied`，因此流水线不把 GHCR 作为生产发布的硬依赖。迁移到组织命名空间或 GHCR 状态恢复后，可另开改动切回 Registry 拉取模式。
 
 ## 服务器初始化
 
@@ -55,6 +59,8 @@ git push origin main
 gh run list --workflow deploy.yml --repo RaykieLee/Synapse
 gh run watch --repo RaykieLee/Synapse
 ```
+
+Actions 成功表示测试、镜像构建和发布 Artifact 已就绪，不表示服务器已经切换版本。必须继续执行上面的本机发布命令，并确认服务器 `current.env` 指向新 SHA、四个容器健康后才算上线成功。
 
 服务器上的发布状态：
 
