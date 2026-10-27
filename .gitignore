@@ -34,3 +34,4 @@ storage/
 /storage/
 /uploads/
 apps/api/var/
+.artifacts/

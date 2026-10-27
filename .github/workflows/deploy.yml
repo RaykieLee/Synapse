@@ -124,7 +124,10 @@ jobs:
             "synapse-api:${IMAGE_TAG}" \
             "synapse-web:${IMAGE_TAG}" \
             | gzip -1 > release/synapse-images.tar.gz
-          sha256sum release/synapse-images.tar.gz > release/synapse-images.tar.gz.sha256
+          (
+            cd release
+            sha256sum synapse-images.tar.gz > synapse-images.tar.gz.sha256
+          )
           ls -lh release
 
       - name: Upload release artifact

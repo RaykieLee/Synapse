@@ -23,6 +23,7 @@ $artifactName = "synapse-release-$Commit"
 $artifactDir = Join-Path $PSScriptRoot "..\.artifacts\$Commit"
 $artifactDir = [IO.Path]::GetFullPath($artifactDir)
 $releaseDir = "$DeployPath/releases/$Commit"
+$releaseDir = $releaseDir -replace '\\', '/'
 $sshTarget = "$User@$HostName"
 $sshBase = @(
     "-i", $KeyPath,
