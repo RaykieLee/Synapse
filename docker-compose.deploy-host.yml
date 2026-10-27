@@ -48,7 +48,7 @@ services:
   web:
     image: ${SYNAPSE_WEB_IMAGE:?Set SYNAPSE_WEB_IMAGE in release.env}
     ports:
-      - "${SYNAPSE_WEB_PORT:-5173}:80"
+      - "${SYNAPSE_WEB_PORT:-80}:80"
     depends_on:
       api:
         condition: service_healthy

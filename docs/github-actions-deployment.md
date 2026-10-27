@@ -46,9 +46,9 @@ install -m 600 .env.docker.example /opt/synapse/.env.docker
 - `SYNAPSE_JWT_SECRET`：至少 32 字节随机值；
 - `SYNAPSE_AGENTSCOPE_CREDENTIAL_ENCRYPTION_KEY`：有效 Fernet key；
 - `SYNAPSE_AUTH_COOKIE_SECURE=true`：通过 HTTPS 访问时；
-- `SYNAPSE_WEB_PORT=5173`：Web 对公网暴露的端口。
+- `SYNAPSE_WEB_PORT=80`：Web 对公网暴露的端口。也可改为 `5173` 等端口，但必须同步放行云安全组。
 
-API、Redis 和 Qdrant 使用带 `127.0.0.1` 的端口绑定，不能直接暴露到公网。Web 由宿主机 Nginx、Caddy 或云负载均衡反向代理到 `127.0.0.1:5173`。
+API、Redis 和 Qdrant 使用带 `127.0.0.1` 的端口绑定，不能直接暴露到公网。当前生产部署由 Web 容器直接监听公网 `80`，并通过同容器 Nginx 将 `/api/` 转发到 API。若启用 HTTPS，应改用宿主机 Nginx/Caddy 或云负载均衡监听 `443`，再反向代理到 `127.0.0.1:5173` 或容器 `80`。
 
 ## 触发和查看
 
@@ -91,4 +91,4 @@ sudo docker compose \
 
 ## 公网 HTTPS
 
-当前 Compose 只负责应用容器，不终止 TLS。建议让宿主机 Nginx 或 Caddy 监听 80/443，并反向代理到 `127.0.0.1:5173`。如果云厂商已经在 80 端口做负载均衡，必须将后端目标指向服务器的 Web 端口，并确保安全组放行 `5173` 或只放行代理端口。
+当前 Compose 只负责应用容器，不终止 TLS。HTTP 部署由 Web 容器监听公网 `80`；需要 HTTPS 时，让宿主机 Nginx/Caddy 或云负载均衡监听 `443`，反向代理到 Web 容器（默认 `127.0.0.1:5173` 或容器 `80`），并将 `SYNAPSE_AUTH_COOKIE_SECURE=true`。如果云厂商已经在 80 端口做负载均衡，必须将后端目标指向服务器的 Web 端口，并确保安全组放行对应端口或只放行代理端口。
