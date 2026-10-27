@@ -7,7 +7,10 @@ param(
     [string]$User = "ubuntu",
     [string]$DeployPath = "/opt/synapse",
     [string]$KeyPath = "$HOME\.ssh\synapse_deploy_rsa",
-    [string]$Repo = "RaykieLee/Synapse"
+    [string]$Repo = "RaykieLee/Synapse",
+
+    # Reuse a previously downloaded image bundle when the app code is unchanged.
+    [string]$ImageBundlePath
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,16 +47,23 @@ if ($LASTEXITCODE -ne 0) {
     throw "Could not download Actions artifact $artifactName."
 }
 
-$imageBundle = Join-Path $artifactDir "synapse-images.tar.gz"
-$checksumFile = "$imageBundle.sha256"
-if (-not (Test-Path -LiteralPath $imageBundle) -or -not (Test-Path -LiteralPath $checksumFile)) {
+$downloadedBundle = Join-Path $artifactDir "synapse-images.tar.gz"
+$imageBundle = if ($ImageBundlePath) { [IO.Path]::GetFullPath($ImageBundlePath) } else { $downloadedBundle }
+$checksumFile = "$downloadedBundle.sha256"
+if (-not (Test-Path -LiteralPath $downloadedBundle) -or -not (Test-Path -LiteralPath $checksumFile)) {
     throw "Artifact is incomplete: $artifactDir"
+}
+if (-not (Test-Path -LiteralPath $imageBundle)) {
+    throw "Image bundle not found: $imageBundle"
 }
 
 $expectedHash = ((Get-Content -LiteralPath $checksumFile -TotalCount 1) -split '\s+')[0].ToLowerInvariant()
 $actualHash = (Get-FileHash -LiteralPath $imageBundle -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($expectedHash -ne $actualHash) {
-    throw "Artifact SHA-256 mismatch."
+    throw "Image bundle SHA-256 mismatch."
+}
+if ($ImageBundlePath) {
+    Copy-Item -LiteralPath $imageBundle -Destination $downloadedBundle -Force
 }
 
 Write-Host "Preparing $releaseDir on $sshTarget"
