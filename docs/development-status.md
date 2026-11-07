@@ -2,7 +2,7 @@
 
 目标：完成 integration-plan.md 全部明确范围。租户与 Workspace 为所有业务迁移的前置条件。
 
-用户要求：子智能体全部使用 gpt-6-luna / medium；每个任务只做一个功能或一个验证；每项验证由独立子智能体执行。主智能体负责协调、契约和进度记录。开发完成不等于验收通过。
+用户要求：子智能体全部使用 gpt-6-luna / high；每个任务只做一个功能或一个验证；每项验证由独立子智能体执行。主智能体负责协调、契约和进度记录。开发完成不等于验收通过。
 
 状态：待开始 → 开发中 → 待独立验收 → 通过；验证失败转回修复。外部运行条件不足的功能记为待实际验收，不记为通过。
 
@@ -15,6 +15,32 @@
 > 2026-10-13 F26b-backend、F27b-1、F32 第一阶段完成最新修复与独立复验：F26b WakeupDispatcher 增加 consuming lease 的 attempt-safe CAS 恢复、任意 spawn 失败回滚和有界 512 条启动恢复索引，聚焦测试 `12 passed`；F27b 控制面增加创建/更新授权、创建者保护、tenant/workspace 复合外键和数据库级单 active run 约束，聚焦测试 `6 passed`，全新 Alembic `0001 -> 0018` 升级通过；F32 endpoint DNS 解析失败改为 fail-closed，同时保留开发环境 localhost 放行，聚焦测试 `4 passed`。这些修复仍不等于 C 级真实 AgentScope model/tool 执行、真实团队 worker 或真实 provider connection；F27b 仍为 `durable_control_only`。当前 API 全量、compile/build/lint 结果仍以各复验报告为准，真实模型 provider、真实工具执行和登录后的双角色浏览器场景仍未宣称通过。详见 [F26b-backend 复验](verification/F26b-wakeup-workspace-context-reacceptance-20261013.md)、[F27b 复验](verification/F27b-team-orchestration-reacceptance-20261013.md)、[F32 复验](verification/F32-model-provider-custom-model-reacceptance-20261013.md)。
 
 > 2026-10-13 设置域交互收口：个人资料、账号密码、外观、显示和通知页面改为“当前设置摘要 + 编辑弹窗”，保留原有设置路由和提交语义；移动端摘要按钮改为纵向布局，设置侧栏移动端选择器改为直接受路由控制。当前已通过设置域 ESLint、前端构建和既有 5 个前端测试文件（47 项）；Display/Notifications 仍是模板演示提交，未接入持久化 API，未宣称真实设置保存验收。
+
+## 架构演进首批任务（2026-11-06）
+
+方向：按战略 DDD 和模块化单体逐步演进；此批先记录决策、建立依赖规则、梳理授权上下文 UX，再实施纯解析 seam。实现与独立验收分别委派。
+
+| ID | 任务 | 状态 | Orca dispatch / 后续门槛 |
+| --- | --- | --- | --- |
+| ARCH-ADR-001 | 记录战略 DDD、模块化单体、选择性战术 DDD、AgentScope ACL 决策及参考资料适配结论 | 已完成 | [ADR 0003](adr/0003-strategic-ddd-modular-monolith.md)；独立 worker `ctx_45c75fc3b068` 完成，协调者补充核对文章与四个模板的适配边界 |
+| ARCH-GUARD-001 | 增加模块依赖方向的自动架构守护 | 实现及新独立复验完成 | 初验 `4 passed` 发现包内 `tests` 路径漏检，已修复并加回归断言；新独立任务 `task_0105325e3749` / `ctx_22d19a96d6ff` 运行 `5 passed` 并成功结算；旧 follow-up `ctx_b9d3a1fc4749` 仍因 worker identity mismatch 未结算，不作为本次通过的依据；详见 [验收记录](verification/architecture-guard-acceptance-2026-11-06.md) |
+| ARCH-UX-001 | 评审授权上下文错误状态、切换、缓存、移动端与可访问性 | 已完成 | [UX 契约](ux/architecture-authorization-context.md)；独立 UX worker `ctx_3d8998734af0` 完成，供实现与后续独立验收使用 |
+| TENANCY-SEAM-001 | 将 Tenant/Workspace 上下文解析拆为框架无关 resolver 和 FastAPI adapter，保持现有 wire contract | 后端定向独立验收通过；前端 UX 与 adapter 全矩阵验收未完成 | 独立 verifier `ctx_378d05d02e65`；resolver + F06 定向测试 `9 passed, 2 warnings`；`RESOURCE_NOT_FOUND` 的 404 仅审查映射、未端到端覆盖；详见 [验收报告](verification/architecture-tenancy-seam-acceptance-2026-11-06.md) |
+| ARCH-VERIFY-001 | 独立验收授权上下文 seam 与依赖方向规则 | tenancy seam 定向验收通过；架构守护新独立复验通过 | tenancy 报告 `9 passed`；guard 新独立任务 `task_0105325e3749` 报告 `5 passed`；旧 follow-up `ctx_b9d3a1fc4749` 仍未结算；详见两份 `docs/verification/architecture-*-acceptance-2026-11-06.md` 报告 |
+
+### 架构演进下一步委派（2026-11-06）
+
+先收口授权上下文的前端状态与后端错误矩阵，再根据只读代码盘点选择一个有证据的上下文作为渐进迁移试点；不预先重排全仓目录。UX 设计、实现与独立验收由不同任务承担，测试/验收任务不得修复产品实现。
+
+| ID | 单一任务 | 状态 | Orca dispatch / 范围 |
+| --- | --- | --- | --- |
+| ARCH-MAP-001 | 盘点当前 API、服务、模型、schema、前端路由/feature 与候选上下文 | 完成：只读盘点 | `ctx_bd55c9baf7b8`；地图与风险证据见 [当前架构地图](architecture/current-architecture-map-2026-11-06.md)；上下文映射为待确认假设，须由产品负责人确认职责、数据归属与迁移试点 |
+| ARCH-UX-001-FOLLOWUP | 对照当前实现复核授权上下文 UX 契约 | 修订已重派，待回执 | 首次 follow-up `ctx_6ed66ab347d9` 发现 malformed path Workspace ID 应归 `404 RESOURCE_NOT_FOUND` 而非 `400 CONTEXT_MISMATCH`；后续 `task_ff797bfa4476` / `ctx_322f4ecfa215` 只修订 `docs/ux/architecture-authorization-context.md` 的映射表，不改产品代码或验收 |
+| ARCH-GUARD-001-REACCEPT | 对精确 `tests` 路径段回归断言及依赖守护作独立复验 | 完成：`5 passed` | `task_0105325e3749` / `ctx_22d19a96d6ff`；只读；旧 follow-up `ctx_b9d3a1fc4749` 仍未结算，但不影响本次新独立验收证据 |
+| TENANCY-SEAM-001-MATRIX | 补足 adapter 状态码/错误码矩阵的独立验收证据 | 首次复验失败，无结论；待重派 | `ctx_21ea990e900f` 报告 focused pytest 120 秒无输出后中止，未改文件、未产生验收结果；后续仍需覆盖端到端 `RESOURCE_NOT_FOUND` 404，且不得改产品实现 |
+| TENANCY-UX-IMPLEMENT-001 | 按已完成 UX 契约实现 Workspace 授权上下文前端状态与切换隔离 | 实现 worker 中断，无完成回执 | `ctx_f3cd826a904b` 因 Codex provider exited 中断；当前仅发现未接入的本地 WIP 文件，未作为完成实现提交；独立前端验收尚未派发 |
+
+本批新派发均请求 Orca 使用 `gpt-6-luna` / `high`。Codex transcript 曾报告该模型的本地 metadata 未找到并使用 fallback metadata；因此记录为“请求/Orca effective 配置为 Luna/high”，不把它夸大为可独立证明的实际推理后端身份。ARCH-MAP-001 已完成；首个 context-first 存量迁移任务仍待产品负责人确认上下文责任、数据归属与试点，再依次扩展边界测试、完成试点 UX/API 契约并单切片迁移，避免无依据地搬动目录或扩大范围。
 
 ## 功能任务
 
