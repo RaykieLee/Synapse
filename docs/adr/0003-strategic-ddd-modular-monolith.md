@@ -48,7 +48,7 @@ AgentScope 继续以内嵌方式运行在同一 FastAPI 进程中，并通过 Ag
 - [FastAPI Full Stack Template](https://github.com/fastapi/full-stack-fastapi-template)：适合作为 FastAPI、前后端联调、测试、CI 与部署基线的参考；当前后端仍按 API、core、CRUD、models 等技术职责组织，不提供有界上下文治理。其 SQLModel 与默认前端集成方式也不要求 Synapse 改变现有 SQLAlchemy/Alembic、Vite、TanStack Router/Query 技术选择。
 - [Vstorm Full-Stack AI Agent Template](https://github.com/vstorm-co/full-stack-ai-agent-template)：可参考 AI/RAG 集成、配置、观测性和项目生成器的工程实践；其架构文档采用 routes → services → repositories → database，且生成 Next.js、多种 AI 框架与向量库组合，不是 Synapse 的 DDD 蓝图，也不能替代“同一 FastAPI 进程内嵌 AgentScope”的集成约束。
 - [FastAPI Clean Architecture + DDD Template](https://github.com/BrunoTanabe/fastapi-clean-architecture-ddd-template)：四层模块、依赖向内、以 `Protocol` 表达应用端口和通过 fake 测用例，是最有价值的战术模式参考。模板为每个模块预置较完整骨架；其 README 也说明测试目录仍为空脚手架且 pytest 尚未加入依赖。因此只在存在业务不变量、可替换依赖或明确测试收益时选用对应模式，不强制所有上下文建立仓储、聚合或空层目录。
-- [FastAPI DDD Starter](https://github.com/EzyGang/fastapi-ddd-template)：适合快速了解 adapters/application/domain/core 的基础术语与依赖方向；公开结构主要展示 health 示例，作为成熟业务边界设计的证据较弱。仓库未声明可识别的 SPDX 许可证，故不复制其代码。
+- [FastAPI DDD Starter](https://github.com/EzyGang/fastapi-ddd-template)：README 明确展示 adapters/application/domain/core 的目录骨架，适合快速了解术语与依赖方向；但截至 2026-11-09，GitHub 页面显示仓库仅有一个提交、由 `EzyGang/fastapi-starter` 生成，且未见许可证声明。可作结构示意，不应仅凭 README 的 production-ready 描述认定其边界设计已经过成熟验证；许可证澄清前不复制代码。
 
 综合结论：采纳“先按业务上下文组织、以依赖规则守边界、渐进迁移”的思路；不采纳任何一个模板的整套目录、ORM、前端或 AI 运行时。涉及外部参考的实现须保留来源与许可证信息。
 
