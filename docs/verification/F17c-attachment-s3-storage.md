@@ -1,7 +1,7 @@
 # F17c S3-compatible 附件存储验收记录
 
 验收日期：2026-11-09
-结论：代码定向验证和独立验收通过；RustFS 部署有启动证据，但远端复查不完整；生产 Bucket、应用切换和附件数据迁移尚未完成。
+结论：代码定向验证、独立验收及共享 RustFS 的远端健康/网络复查通过；自动化 S3 客户端仍为模拟，未验证认证 Bucket/Object CRUD；生产 Bucket、Synapse API 切换和附件数据迁移尚未完成。
 
 ## 范围与契约
 
@@ -19,10 +19,10 @@
 | 独立后端验收 | 通过（代码与定向测试） | 独立验收者报告 S3 adapter、迁移顺序、保留源数据、RustFS 配置和测试通过。其 F17c 定向结果为 `5 passed, 1 warning in 5.38s`。未修改产品文件。 |
 | S3 测试真实性 | 模拟 | 自动化测试使用内存 S3 客户端替身；覆盖对象读写、迁移校验、错误脱敏及前缀盘点，不等于对实际 RustFS 的端到端 CRUD 验收。 |
 | 补丁格式 | 通过 | `git diff --check` 通过。 |
-| RustFS Compose 与部署配置 | 通过（共享部署日志证据） | 本地 `deploy/rustfs/docker-compose.yml` 与部署日志中的远端文件哈希一致；固定 RustFS `1.0.4`，S3 API/Console 仅绑定宿主机 `127.0.0.1:19000/19001`，数据挂载至 `/opt/synapse-rustfs/data`。 |
-| RustFS 部署状态 | 部分通过 | 部署终端记录 `synapse-rustfs` 为 `running/healthy`、重启数为 `0`，挂载到持久目录；日志记录服务器 `.env` 权限为 `0600`、数据目录权限为 `0750`。此为共享部署日志证据，未能在本轮重新实时确认；数据目录数值 UID/GID 是否为 `10001` 未核实。 |
-| 远端网络与健康复查 | 未验证 | 本地 Compose 将附件网络标记为 `internal: true`，但未取得服务器 `docker network inspect` 结果；S3/Console HTTP 探测及原 Synapse 容器部署后健康状态未完成核验。 |
-| Bucket 与生产切换 | 未执行 | 未创建或验收附件 Bucket，未向 Synapse API 配置 S3 凭据/网络，未切换新上传后端，也未迁移生产附件。当前应用仍应保持本地后端。 |
+| RustFS Compose 与部署配置 | 通过（共享基础设施） | 当前服务器由 `deploy/infra/docker-compose.yml` 管理 RustFS `1.0.4`；Compose 位于 `/opt/docker/dockercompose/infra`，数据目录为 `/opt/infra/RustFS/data`，S3 API/Console 分别仅绑定 `127.0.0.1:19000/19001`。旧的 `deploy/rustfs` 单独部署说明不代表当前容器名称或目录。 |
+| RustFS 部署状态 | 通过（实时只读） | Tabby MCP 于 `2026-11-09 18:01:03 +08:00` 检查到 `infra-rustfs` 为 `running/healthy`，并连接 `infra_backend` 和 `infra_access`；本次未读取或修改服务器密钥。数据目录数值 UID/GID 未核验。 |
+| 远端网络与健康复查 | 部分通过 | `infra_backend` 的 `Internal=true`，RustFS 在该网络具有 `rustfs` DNS alias；`infra_access` 为 `Internal=false`。S3 根端点未认证请求返回 HTTP 403，Console health 返回 HTTP 200。未执行认证后的 Bucket/Object CRUD，也未从 API 容器发起 S3 请求，因此只证明服务和监听端点可达，不是 S3 业务验收。 |
+| Bucket 与生产切换 | 未执行 | 未取得附件 Bucket、最小权限应用凭据及其验收证据；未为 Synapse API 配置 S3 网络/变量、切换新上传后端或迁移生产附件。当前 API 仍运行旧 release，不能把已部署 RustFS 等同于应用已经使用 S3。 |
 
 ## UX 事后评审
 
@@ -36,15 +36,15 @@
 
 以上 UI/运维体验缺口不在本次存储适配器的代码修改范围内，未擅自扩大改动；应单独分配 UX/API 契约及实现任务后验收。当前 F17c 不标记为完整通过。
 
-## 远端访问限制
+## 远端复查范围与局限
 
-已通过 Tabby MCP `http://127.0.0.1:3001/mcp` 成功列出会话与工具，并找到“腾讯云 2” SSH 配置。现有终端会话在部署后断开；重新打开配置返回 `Agent auth selected, but no running Agent process is found`，只读命令随之超时。Tabby MCP 本身可用，阻塞点是该 SSH 配置所依赖的本机 Agent 进程/会话。因此没有把先前部署日志当作本轮实时复验，也没有将生产迁移标记为完成。
+已通过 Tabby MCP `http://127.0.0.1:3001/mcp` 重连“腾讯云 2”并执行只读复查。RustFS 容器、共享网络与健康端点证据记录在上表；没有查看 `.env`、数据库内容、Bucket 清单或对象数据，也没有创建资源或改变服务配置。HTTP 403 是 S3 根端点未认证探测结果，不证明任何凭据、Bucket 或对象读写可用。API 到 RustFS 的认证连接、生产附件迁移与回滚仍待单独验收。
 
 ## 后续验收门槛
 
-1. 恢复 Tabby SSH Agent 或有效会话后，只读核验 RustFS 容器与 Compose 健康、两个 HTTP health endpoint、网络 `Internal` 标志、数据目录数值 UID/GID，以及 Synapse 原有容器的状态。
-2. 单独规划并创建附件 Bucket 与最小权限服务凭据；备份数据库和本地附件后，确认 API 容器到 `rustfs:9000` 的连通性。
-3. 先运行只读迁移预演并人工审阅对象数量；获准后再逐批 `--apply`，验证上传/下载/删除、授权隔离、对账结果和回滚路径。
+1. 核对数据卷权限/UID/GID，并以不泄露密钥的方式完成真实 RustFS 认证 Bucket/Object CRUD 与 API 容器连通性检查。
+2. 使用专用最小权限服务凭据准备附件 Bucket；备份数据库和本地附件，再部署启用 S3 的 API 版本并验证新上传、下载、删除及授权隔离。
+3. 先运行只读迁移预演并人工审阅对象数量；再逐批 `--apply`，核对 SHA-256、迁移计数、对账结果和回滚路径。
 4. 只有实际 RustFS CRUD、线上应用状态、数据迁移与回滚验收证据齐备后，才可将 F17c 更新为完整通过。
 
 ## 改动文件
