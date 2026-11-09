@@ -1,0 +1,143 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: infra-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-synapse}
+      POSTGRES_USER: ${POSTGRES_USER:-synapse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in /opt/infra/.env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      backend:
+        aliases:
+          - postgres
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: infra-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:${REDIS_PUBLISH_PORT:-16382}:6379"
+    networks:
+      backend:
+        aliases:
+          - redis
+      access:
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  qdrant:
+    image: ${QDRANT_IMAGE:-qdrant/qdrant:latest}
+    container_name: infra-qdrant
+    volumes:
+      - qdrant-data:/qdrant/storage
+    ports:
+      - "127.0.0.1:${QDRANT_PUBLISH_PORT:-16334}:6333"
+    networks:
+      backend:
+        aliases:
+          - qdrant
+      access:
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - grep -q "00000000:18BD " /proc/net/tcp
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  rustfs:
+    image: ${RUSTFS_IMAGE:-ghcr.io/rustfs/rustfs:1.0.4}
+    container_name: infra-rustfs
+    command: ["/data"]
+    environment:
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?Set RUSTFS_ACCESS_KEY in /opt/infra/.env}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Set RUSTFS_SECRET_KEY in /opt/infra/.env}
+    volumes:
+      - ${RUSTFS_DATA_PATH:-./RustFS/data}:/data
+    ports:
+      - "127.0.0.1:${RUSTFS_S3_PORT:-19000}:9000"
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-19001}:9001"
+    networks:
+      backend:
+        aliases:
+          - rustfs
+      access:
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://127.0.0.1:9000/health && curl -fsS http://127.0.0.1:9001/rustfs/console/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  monitoring:
+    image: ${GLANCES_IMAGE:-nicolargo/glances:4.5.9}
+    container_name: infra-monitoring
+    environment:
+      GLANCES_OPT: ${GLANCES_OPT:--w}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/os-release:/etc/os-release:ro
+    pid: host
+    networks:
+      - access
+    ports:
+      - "127.0.0.1:${GLANCES_PORT:-16128}:61208"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:61208", timeout=3)
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+
+volumes:
+  postgres-data:
+    name: ${POSTGRES_VOLUME:-infra_postgres_data}
+  redis-data:
+    external: true
+    name: ${REDIS_VOLUME:-synapse_synapse-redis-data}
+  qdrant-data:
+    external: true
+    name: ${QDRANT_VOLUME:-synapse_synapse-qdrant-data}
+
+networks:
+  backend:
+    name: ${INFRA_NETWORK:-infra_backend}
+    internal: true
+  access:
+    name: ${INFRA_ACCESS_NETWORK:-infra_access}

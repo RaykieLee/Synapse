@@ -35,4 +35,5 @@ storage/
 /uploads/
 apps/api/var/
 deploy/rustfs/data/
+deploy/infra/RustFS/data/
 .artifacts/

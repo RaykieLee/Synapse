@@ -9,13 +9,20 @@ services:
       SYNAPSE_JWT_SECRET: ${SYNAPSE_JWT_SECRET:?Set SYNAPSE_JWT_SECRET in .env.docker}
       SYNAPSE_AUTH_COOKIE_SECURE: ${SYNAPSE_AUTH_COOKIE_SECURE:-false}
       SYNAPSE_ATTACHMENTS_STORAGE_PATH: /data/attachments
-      SYNAPSE_AGENTSCOPE_REDIS_HOST: redis
+      SYNAPSE_ATTACHMENTS_STORAGE_BACKEND: ${SYNAPSE_ATTACHMENTS_STORAGE_BACKEND:-local}
+      SYNAPSE_ATTACHMENTS_S3_ENDPOINT_URL: ${SYNAPSE_ATTACHMENTS_S3_ENDPOINT_URL:-http://rustfs:9000}
+      SYNAPSE_ATTACHMENTS_S3_BUCKET: ${SYNAPSE_ATTACHMENTS_S3_BUCKET:-synapse-attachments}
+      SYNAPSE_ATTACHMENTS_S3_REGION: ${SYNAPSE_ATTACHMENTS_S3_REGION:-us-east-1}
+      SYNAPSE_ATTACHMENTS_S3_ACCESS_KEY_ID: ${SYNAPSE_ATTACHMENTS_S3_ACCESS_KEY_ID:-}
+      SYNAPSE_ATTACHMENTS_S3_SECRET_ACCESS_KEY: ${SYNAPSE_ATTACHMENTS_S3_SECRET_ACCESS_KEY:-}
+      SYNAPSE_ATTACHMENTS_S3_FORCE_PATH_STYLE: ${SYNAPSE_ATTACHMENTS_S3_FORCE_PATH_STYLE:-true}
+      SYNAPSE_AGENTSCOPE_REDIS_HOST: ${SYNAPSE_AGENTSCOPE_REDIS_HOST:-redis}
       SYNAPSE_AGENTSCOPE_REDIS_PORT: "6379"
       SYNAPSE_AGENTSCOPE_STORAGE_REDIS_DB: "1"
       SYNAPSE_AGENTSCOPE_BUS_REDIS_DB: "2"
       SYNAPSE_AGENTSCOPE_WORKSPACE_PATH: /data/agentscope/workspaces
       SYNAPSE_AGENTSCOPE_BLOB_PATH: /data/agentscope/blobs
-      SYNAPSE_AGENTSCOPE_QDRANT_URL: http://qdrant:6333
+      SYNAPSE_AGENTSCOPE_QDRANT_URL: ${SYNAPSE_AGENTSCOPE_QDRANT_URL:-http://qdrant:6333}
       SYNAPSE_AGENTSCOPE_KNOWLEDGE_ENABLED: ${SYNAPSE_AGENTSCOPE_KNOWLEDGE_ENABLED:-true}
       SYNAPSE_AGENTSCOPE_HUBS_ENABLED: ${SYNAPSE_AGENTSCOPE_HUBS_ENABLED:-false}
       SYNAPSE_AGENTSCOPE_SCHEDULER_ENABLED: ${SYNAPSE_AGENTSCOPE_SCHEDULER_ENABLED:-true}
@@ -26,11 +33,9 @@ services:
       - synapse-api-data:/data
     ports:
       - "127.0.0.1:${SYNAPSE_API_PORT:-8010}:8010"
-    depends_on:
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
+    networks:
+      - default
+      - infra_backend
     restart: unless-stopped
     healthcheck:
       test:
@@ -65,36 +70,10 @@ services:
       retries: 6
       start_period: 5s
 
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - synapse-redis-data:/data
-    ports:
-      - "127.0.0.1:${SYNAPSE_REDIS_PUBLISH_PORT:-16382}:6379"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-
-  qdrant:
-    image: qdrant/qdrant:latest
-    volumes:
-      - synapse-qdrant-data:/qdrant/storage
-    ports:
-      - "127.0.0.1:${SYNAPSE_QDRANT_PUBLISH_PORT:-16334}:6333"
-    restart: unless-stopped
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - grep -q "00000000:18BD " /proc/net/tcp
-      interval: 5s
-      timeout: 3s
-      retries: 12
-
 volumes:
   synapse-api-data:
-  synapse-redis-data:
-  synapse-qdrant-data:
+
+networks:
+  infra_backend:
+    external: true
+    name: ${SYNAPSE_INFRA_NETWORK:-infra_backend}
