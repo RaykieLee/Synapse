@@ -1,0 +1,60 @@
+services:
+  wiki:
+    image: ${WIKI_IMAGE:-ghcr.io/requarks/wiki:3}
+    container_name: docs-wiki
+    environment:
+      ADMIN_EMAIL: ${WIKI_ADMIN_EMAIL:?Set WIKI_ADMIN_EMAIL in .env}
+      ADMIN_PASS: ${WIKI_ADMIN_PASSWORD:?Set WIKI_ADMIN_PASSWORD in .env}
+      DB_HOST: ${WIKI_DB_HOST:-postgres}
+      DB_PORT: ${WIKI_DB_PORT:-5432}
+      DB_NAME: ${WIKI_DB_NAME:-wikijs}
+      DB_USER: ${WIKI_DB_USER:-wikijs}
+      DB_PASS_FILE: /run/secrets/wiki-db-password
+      DB_SCHEMA: ${WIKI_DB_SCHEMA:-wiki}
+      DB_SSL: ${WIKI_DB_SSL:-false}
+    secrets:
+      - wiki-db-password
+    volumes:
+      - wiki-content:/wiki/data/content
+      - wiki-repo:/wiki/data/repo
+    networks:
+      - default
+      - postgres
+    ports:
+      - "${WIKI_PUBLISH_BIND:-127.0.0.1}:${WIKI_PUBLISH_PORT:-18080}:3000"
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          require('http').get('http://127.0.0.1:3000',
+          response => process.exit(response.statusCode < 500 ? 0 : 1))
+          .on('error', () => process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+secrets:
+  wiki-db-password:
+    file: ./.db-secret
+
+volumes:
+  wiki-content:
+    name: ${WIKI_CONTENT_VOLUME:-docs_wiki_content}
+  wiki-repo:
+    name: ${WIKI_REPO_VOLUME:-docs_wiki_repo}
+
+networks:
+  default:
+    name: ${WIKI_NETWORK:-docs-wiki_default}
+  postgres:
+    name: ${INFRA_WIKI_DB_NETWORK:-infra_wiki_db}
+    external: true
+

@@ -1,15 +1,18 @@
 services:
   postgres:
-    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:0.8.7-pg18-bookworm}
     container_name: infra-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-synapse}
       POSTGRES_USER: ${POSTGRES_USER:-synapse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in /opt/infra/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in /opt/docker/dockercompose/infra/.env}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data:${POSTGRES_DATA_MOUNT:-/var/lib/postgresql}
     networks:
       backend:
+        aliases:
+          - postgres
+      wiki-db:
         aliases:
           - postgres
     restart: unless-stopped
@@ -127,7 +130,7 @@ services:
 
 volumes:
   postgres-data:
-    name: ${POSTGRES_VOLUME:-infra_postgres_data}
+    name: ${POSTGRES_VOLUME:-infra_postgres18_data}
   redis-data:
     external: true
     name: ${REDIS_VOLUME:-synapse_synapse-redis-data}
@@ -141,3 +144,6 @@ networks:
     internal: true
   access:
     name: ${INFRA_ACCESS_NETWORK:-infra_access}
+  wiki-db:
+    name: ${INFRA_WIKI_DB_NETWORK:-infra_wiki_db}
+    internal: true

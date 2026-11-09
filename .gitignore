@@ -36,4 +36,6 @@ storage/
 apps/api/var/
 deploy/rustfs/data/
 deploy/infra/RustFS/data/
+deploy/docs-wiki/.db-secret
+deploy/docs-wiki/.env
 .artifacts/
