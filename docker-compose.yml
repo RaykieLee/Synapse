@@ -11,6 +11,13 @@ services:
       SYNAPSE_JWT_SECRET: ${SYNAPSE_JWT_SECRET:?Set SYNAPSE_JWT_SECRET in .env.docker}
       SYNAPSE_AUTH_COOKIE_SECURE: ${SYNAPSE_AUTH_COOKIE_SECURE:-false}
       SYNAPSE_ATTACHMENTS_STORAGE_PATH: /data/attachments
+      SYNAPSE_ATTACHMENTS_STORAGE_BACKEND: ${SYNAPSE_ATTACHMENTS_STORAGE_BACKEND:-local}
+      SYNAPSE_ATTACHMENTS_S3_ENDPOINT_URL: ${SYNAPSE_ATTACHMENTS_S3_ENDPOINT_URL:-}
+      SYNAPSE_ATTACHMENTS_S3_BUCKET: ${SYNAPSE_ATTACHMENTS_S3_BUCKET:-synapse-attachments}
+      SYNAPSE_ATTACHMENTS_S3_REGION: ${SYNAPSE_ATTACHMENTS_S3_REGION:-us-east-1}
+      SYNAPSE_ATTACHMENTS_S3_ACCESS_KEY_ID: ${SYNAPSE_ATTACHMENTS_S3_ACCESS_KEY_ID:-}
+      SYNAPSE_ATTACHMENTS_S3_SECRET_ACCESS_KEY: ${SYNAPSE_ATTACHMENTS_S3_SECRET_ACCESS_KEY:-}
+      SYNAPSE_ATTACHMENTS_S3_FORCE_PATH_STYLE: ${SYNAPSE_ATTACHMENTS_S3_FORCE_PATH_STYLE:-true}
       SYNAPSE_AGENTSCOPE_REDIS_HOST: redis
       SYNAPSE_AGENTSCOPE_REDIS_PORT: "6379"
       SYNAPSE_AGENTSCOPE_STORAGE_REDIS_DB: "1"
@@ -33,6 +40,9 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
+    networks:
+      - default
+      - attachments
     restart: unless-stopped
     healthcheck:
       test:
@@ -105,3 +115,8 @@ volumes:
   synapse-api-data:
   synapse-redis-data:
   synapse-qdrant-data:
+
+networks:
+  attachments:
+    name: ${SYNAPSE_ATTACHMENTS_NETWORK:-synapse_attachments}
+    internal: true

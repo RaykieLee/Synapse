@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import io
-import os
-import re
-import time
+import logging
 import unicodedata
 import uuid
 import zipfile
@@ -18,8 +16,17 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.database.session import register_rollback_cleanup
+from app.integrations.attachment_storage import LocalAttachmentStore
 from app.models.attachment import Attachment
 from app.schemas.attachments import AttachmentScopeKind
+from app.services.attachment_storage import (
+    AttachmentBody,
+    AttachmentObjectMissing,
+    AttachmentStorageRouter,
+    AttachmentStorageScope,
+    AttachmentStoreCleanupFailed,
+    AttachmentStoreUnavailable,
+)
 from app.services.errors import ServiceError
 from app.services.results import PageResult
 from app.tenancy.context import WorkspaceContext
@@ -27,8 +34,9 @@ from app.tenancy.scopes import personal_scope, personal_values, workspace_scope,
 from app.core.config import get_settings
 
 
+logger = logging.getLogger(__name__)
+
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
-_STORAGE_KEY = re.compile(r"^[a-f0-9]{32}$")
 _CONTENT_TYPES = {
     ".png": ("image/png",),
     ".jpg": ("image/jpeg",),
@@ -110,18 +118,25 @@ class AttachmentFileCleanupFailed(AttachmentServiceError):
     code = "FILE_CLEANUP_FAILED"
 
 
+class AttachmentStorageUnavailable(AttachmentServiceError):
+    status_code = 503
+    code = "ATTACHMENT_STORAGE_UNAVAILABLE"
+
+
 @dataclass(frozen=True)
 class AttachmentDownload:
-    path: Path
+    body: AttachmentBody
     media_type: str
     filename: str
+    size_bytes: int
 
 
 class AttachmentService:
     """Attachment use cases bound to one request-scoped database session."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, storage: AttachmentStorageRouter):
         self.db = db
+        self.storage = storage
 
     def upload(
         self,
@@ -147,19 +162,30 @@ class AttachmentService:
 
         attachment_id = str(uuid.uuid4())
         storage_key = uuid.uuid4().hex
-        path = self._storage_path(storage_key)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+        storage_backend = self.storage.default_backend
+        try:
+            store = self.storage.store_for(storage_backend)
+        except AttachmentStoreUnavailable as exc:
+            raise AttachmentStorageUnavailable() from exc
+        scope = self._scope_for_values(
+            tenant_id=context.tenant_id,
+            workspace_id=context.workspace_id,
+            scope_kind=scope_kind,
+            owner_user_id=context.actor_user_id if scope_kind == "personal" else None,
+        )
+        object_written = False
 
         try:
-            temporary_path.write_bytes(payload)
-            os.replace(temporary_path, path)
-            # The request transaction owns the metadata commit. If that
-            # commit fails after this method returns, get_db() invokes this
-            # compensation callback after rolling the metadata back.
+            try:
+                store.put(storage_key, scope, payload, media_type)
+            except AttachmentStoreUnavailable as exc:
+                raise AttachmentStorageUnavailable() from exc
+            object_written = True
+            # The request transaction owns the metadata commit. If it fails,
+            # get_db() invokes this compensation callback after rollback.
             register_rollback_cleanup(
                 self.db,
-                lambda: self._cleanup_upload_paths(temporary_path, path),
+                lambda: self._cleanup_storage_object(store, storage_key, scope),
             )
             values = {
                 "attachment_id": attachment_id,
@@ -167,6 +193,7 @@ class AttachmentService:
                 "original_filename": original_filename,
                 "media_type": media_type,
                 "size_bytes": len(payload),
+                "storage_backend": storage_backend,
                 "storage_key": storage_key,
             }
             if scope_kind == "personal":
@@ -174,14 +201,11 @@ class AttachmentService:
             else:
                 row = Attachment(**workspace_values(context, **values))
             self.db.add(row)
-            try:
-                self.db.flush()
-            except Exception:
-                self._cleanup_upload_paths(temporary_path, path)
-                raise
+            self.db.flush()
             return row
         except Exception:
-            self._cleanup_upload_paths(temporary_path, path)
+            if object_written:
+                self._cleanup_storage_object(store, storage_key, scope)
             raise
 
     def list_attachments(
@@ -219,13 +243,20 @@ class AttachmentService:
     ) -> AttachmentDownload:
         self._permission(context, "resource:read")
         row = self._get_attachment(context, scope_kind, attachment_id)
-        path = self._storage_path(row.storage_key)
-        if not path.is_file():
-            raise AttachmentFileNotFound()
+        try:
+            body = self.storage.store_for(row.storage_backend).open(
+                row.storage_key,
+                self._scope_for_row(row),
+            )
+        except AttachmentObjectMissing as exc:
+            raise AttachmentFileNotFound() from exc
+        except AttachmentStoreUnavailable as exc:
+            raise AttachmentStorageUnavailable() from exc
         return AttachmentDownload(
-            path=path,
+            body=body,
             media_type=row.media_type,
             filename=row.original_filename,
+            size_bytes=row.size_bytes,
         )
 
     def delete(
@@ -241,8 +272,16 @@ class AttachmentService:
         elif row.owner_user_id != context.actor_user_id:
             raise AttachmentNotFound()
 
-        path = self._storage_path(row.storage_key)
-        self._unlink_storage_file(path)
+        scope = self._scope_for_row(row)
+        try:
+            self.storage.store_for(row.storage_backend).delete(row.storage_key, scope)
+            alternate_store = self.storage.alternate_store_for(row.storage_backend)
+            if alternate_store is not None:
+                alternate_store.delete(row.storage_key, scope)
+        except AttachmentStoreCleanupFailed as exc:
+            raise AttachmentFileCleanupFailed() from exc
+        except AttachmentStoreUnavailable as exc:
+            raise AttachmentStorageUnavailable() from exc
         statement = delete(Attachment).where(
             Attachment.attachment_id == row.attachment_id,
             Attachment.tenant_id == context.tenant_id,
@@ -253,10 +292,6 @@ class AttachmentService:
             statement = statement.where(Attachment.owner_user_id == context.actor_user_id)
         self.db.execute(statement)
         self.db.flush()
-        try:
-            path.parent.rmdir()
-        except OSError:
-            pass
 
     def _permission(self, context: WorkspaceContext, permission: str) -> None:
         if permission not in context.permission_set:
@@ -295,6 +330,30 @@ class AttachmentService:
         if row is None:
             raise AttachmentNotFound()
         return row
+
+    @staticmethod
+    def _scope_for_values(
+        *,
+        tenant_id: int,
+        workspace_id: int,
+        scope_kind: AttachmentScopeKind,
+        owner_user_id: int | None,
+    ) -> AttachmentStorageScope:
+        return AttachmentStorageScope(
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
+            scope_kind=scope_kind,
+            owner_user_id=owner_user_id,
+        )
+
+    @classmethod
+    def _scope_for_row(cls, row: Attachment) -> AttachmentStorageScope:
+        return cls._scope_for_values(
+            tenant_id=row.tenant_id,
+            workspace_id=row.workspace_id,
+            scope_kind=row.scope_kind,
+            owner_user_id=row.owner_user_id,
+        )
 
     @staticmethod
     def _safe_filename(filename: str | None) -> tuple[str, str]:
@@ -367,62 +426,22 @@ class AttachmentService:
 
     @staticmethod
     def _storage_path(storage_key: str) -> Path:
-        if not _STORAGE_KEY.fullmatch(storage_key):
-            raise RuntimeError("Invalid persisted attachment storage key")
-        root = get_settings().attachments_storage_path.expanduser().resolve()
-        path = (root / storage_key[:2] / storage_key[2:]).resolve()
-        if root not in path.parents:
-            raise RuntimeError("Attachment path escaped configured storage root")
-        return path
+        return LocalAttachmentStore(
+            get_settings().attachments_storage_path
+        ).path_for_key(storage_key)
 
     @staticmethod
-    def _cleanup_upload_paths(*paths: Path) -> None:
-        for path in paths:
-            try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                # Cleanup is compensating work; the original request error
-                # remains the authoritative failure.
-                pass
-
-    @staticmethod
-    def _unlink_storage_file(path: Path) -> None:
-        """Remove a stored object while tolerating a short Windows race."""
+    def _cleanup_storage_object(
+        store,
+        storage_key: str,
+        scope: AttachmentStorageScope,
+    ) -> None:
         try:
-            path.unlink(missing_ok=True)
-            return
-        except PermissionError as initial_error:
-            last_error = initial_error
-        except OSError as exc:
-            raise AttachmentFileCleanupFailed() from exc
-
-        for delay in (0.01, 0.05, 0.1):
-            try:
-                path.stat()
-            except FileNotFoundError:
-                return
-            except OSError as exc:
-                raise AttachmentFileCleanupFailed() from exc
-
-            time.sleep(delay)
-            try:
-                path.unlink(missing_ok=True)
-            except FileNotFoundError:
-                return
-            except PermissionError as exc:
-                last_error = exc
-            except OSError as exc:
-                raise AttachmentFileCleanupFailed() from exc
-            else:
-                return
-
-        try:
-            path.stat()
-        except FileNotFoundError:
-            return
-        except OSError as exc:
-            raise AttachmentFileCleanupFailed() from exc
-        raise AttachmentFileCleanupFailed() from last_error
+            store.delete(storage_key, scope)
+        except Exception:
+            logger.warning(
+                "Attachment storage cleanup failed; reconciliation may detect an untracked object"
+            )
 
 
 def aware_datetime(value: datetime) -> datetime:

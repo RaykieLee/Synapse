@@ -367,3 +367,140 @@ def test_f17a_attachment_storage_api_and_migration(tmp_path, monkeypatch):
             assert db.scalar(select(Attachment).where(Attachment.original_filename == "rollback.txt")) is None
         # Successful uploads above have been deleted, so no payload path should remain. The directory may be empty.
         assert not any(path.is_file() and not path.name.endswith(".tmp") for path in storage.rglob("*")), list(storage.rglob("*"))
+
+        from botocore.exceptions import ClientError, EndpointConnectionError
+        import app.integrations.attachment_storage as attachment_storage_module
+
+        class MemoryS3:
+            def __init__(self):
+                self.objects = {}
+                self.failure = None
+
+            def _raise_if_failing(self, operation):
+                if self.failure == operation:
+                    raise EndpointConnectionError(endpoint_url="http://rustfs:9000")
+
+            def put_object(self, *, Bucket, Key, Body, ContentType):
+                self._raise_if_failing("put")
+                self.objects[(Bucket, Key)] = (bytes(Body), ContentType)
+
+            def get_object(self, *, Bucket, Key):
+                self._raise_if_failing("get")
+                if (Bucket, Key) not in self.objects:
+                    raise ClientError(
+                        {
+                            "Error": {"Code": "NoSuchKey"},
+                            "ResponseMetadata": {"HTTPStatusCode": 404},
+                        },
+                        "GetObject",
+                    )
+                from io import BytesIO
+                return {"Body": BytesIO(self.objects[(Bucket, Key)][0])}
+
+            def head_object(self, *, Bucket, Key):
+                self._raise_if_failing("head")
+                if (Bucket, Key) not in self.objects:
+                    raise ClientError(
+                        {
+                            "Error": {"Code": "NoSuchKey"},
+                            "ResponseMetadata": {"HTTPStatusCode": 404},
+                        },
+                        "HeadObject",
+                    )
+                return {"ContentLength": len(self.objects[(Bucket, Key)][0])}
+
+            def delete_object(self, *, Bucket, Key):
+                self._raise_if_failing("delete")
+                self.objects.pop((Bucket, Key), None)
+
+        memory_s3 = MemoryS3()
+        monkeypatch.setattr(
+            attachment_storage_module.boto3,
+            "client",
+            lambda *_args, **_kwargs: memory_s3,
+        )
+        monkeypatch.setenv("SYNAPSE_ATTACHMENTS_STORAGE_BACKEND", "s3")
+        monkeypatch.setenv("SYNAPSE_ATTACHMENTS_S3_ENDPOINT_URL", "http://rustfs:9000")
+        monkeypatch.setenv("SYNAPSE_ATTACHMENTS_S3_BUCKET", "synapse-attachments")
+        monkeypatch.setenv("SYNAPSE_ATTACHMENTS_S3_ACCESS_KEY_ID", "f17a-test-access")
+        monkeypatch.setenv("SYNAPSE_ATTACHMENTS_S3_SECRET_ACCESS_KEY", "f17a-test-secret")
+        get_settings.cache_clear()
+
+        s3_created = upload("f17a-uploader", "s3-report.txt", b"s3 payload")
+        assert s3_created.status_code == 201, s3_created.text
+        s3_item = s3_created.json()
+        with factory() as db:
+            s3_row = db.get(Attachment, s3_item["attachment_id"])
+            assert s3_row.storage_backend == "s3"
+            s3_key = next(key for bucket, key in memory_s3.objects if bucket == "synapse-attachments")
+            assert f"/tenants/{tenant_a_id}/workspaces/{workspace_ids['alpha']}/workspace-shared/" in s3_key
+            local_backup = storage / s3_row.storage_key[:2] / s3_row.storage_key[2:]
+            local_backup.parent.mkdir(parents=True, exist_ok=True)
+            local_backup.write_bytes(b"rollback copy")
+        s3_download = req(
+            "get",
+            f"{api}/{s3_item['attachment_id']}/download",
+            "f17a-reader",
+            workspace_ids["alpha"],
+        )
+        assert s3_download.status_code == 200 and s3_download.content == b"s3 payload"
+        assert s3_download.headers.get("cache-control") == "private, no-store"
+        assert s3_download.headers.get("x-content-type-options") == "nosniff"
+        assert s3_key not in s3_download.text
+        assert req(
+            "delete",
+            f"{api}/{s3_item['attachment_id']}",
+            "f17a-owner-a",
+            workspace_ids["alpha"],
+        ).status_code == 204
+        assert not memory_s3.objects and not local_backup.exists()
+
+        memory_s3.failure = "put"
+        unavailable_upload = upload("f17a-uploader", "unavailable.txt", b"retry")
+        memory_s3.failure = None
+        assert unavailable_upload.status_code == 503
+        assert unavailable_upload.json()["code"] == "ATTACHMENT_STORAGE_UNAVAILABLE"
+        assert "rustfs:9000" not in unavailable_upload.text
+        assert "synapse-attachments" not in unavailable_upload.text
+        with factory() as db:
+            assert db.scalar(
+                select(Attachment).where(Attachment.original_filename == "unavailable.txt")
+            ) is None
+
+        private_s3 = upload(
+            "f17a-uploader",
+            "s3-private.txt",
+            b"private object",
+            scope="personal",
+        )
+        assert private_s3.status_code == 201, private_s3.text
+        private_s3_id = private_s3.json()["attachment_id"]
+        with factory() as db:
+            private_s3_row = db.get(Attachment, private_s3_id)
+            private_s3_key = next(key for _, key in memory_s3.objects)
+            assert f"/personal/{ids['f17a-uploader']}/" in private_s3_key
+            assert private_s3_row.storage_backend == "s3"
+        assert req(
+            "get",
+            f"{api}/{private_s3_id}/download?scope_kind=personal",
+            "f17a-owner-a",
+            workspace_ids["alpha"],
+        ).status_code == 404
+        memory_s3.failure = "get"
+        unavailable_download = req(
+            "get",
+            f"{api}/{private_s3_id}/download?scope_kind=personal",
+            "f17a-uploader",
+            workspace_ids["alpha"],
+        )
+        memory_s3.failure = None
+        assert unavailable_download.status_code == 503
+        assert unavailable_download.json()["code"] == "ATTACHMENT_STORAGE_UNAVAILABLE"
+        assert "rustfs:9000" not in unavailable_download.text
+        assert "synapse-attachments" not in unavailable_download.text
+        assert req(
+            "delete",
+            f"{api}/{private_s3_id}?scope_kind=personal",
+            "f17a-uploader",
+            workspace_ids["alpha"],
+        ).status_code == 204

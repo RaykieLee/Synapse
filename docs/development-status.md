@@ -128,6 +128,7 @@
 | F16b | 参数配置前端迁移 | 通过（service 化后真实 Redis 复验通过） | agent_embedding_design | verification/F16b-tenant-config-frontend.md：build、真实 API/Vite/Chromium CRUD、敏感值延迟响应、租户切换隔离和当前 Redis `16381` 环境通过 |
 | F17a | 附件管理本地存储后端 | 通过（service 化独立验收通过） | verify_tenant_backend | verification/F17-attachment-service-refactor.md 与 verification/F17a-attachments-api.md：AttachmentService、请求级事务补偿、文件校验、并发删除、权限隔离、定向 API、默认 API 和 compileall 通过 |
 | F17b | 附件管理前端 | 通过（service 化后真实 Redis/Chromium 复验通过） | verify_tenant_backend | verification/F17b-attachments-frontend.md：类型化附件 API、URL scope/page、错误重试、AlertDialog、权限/撤权/租户切换、真实 Redis/Vite/Playwright 通过；ESLint 0 errors、24 warnings |
+| F17c | S3-compatible 附件存储与本地迁移 | 后端实现、定向测试与独立验收通过；UX/运维体验及 RustFS 远端复核待闭环；生产切换未完成 | verify_tenant_backend | verification/F17c-attachment-s3-storage.md：测试通过；事后 UX 评审记录删除/会话选择器重试缺口；SSH Agent 阻塞 RustFS 实时复核；Bucket、API 切换及生产附件迁移待执行 |
 | F18a | 系统任务定义后端迁移 | 通过 | verify_tenant_backend | verification/F18a-scheduled-task-definition.md：修复后1 passed，计划校验422且无写入、隔离、目标allowlist与迁移通过 |
 | F18b1 | 过期租户邀请任务目标 | 通过 | verify_tenant_backend | verification/F18b1-expire-invitations.md：1 passed，租户过滤、到期边界及重复/并发幂等通过 |
 | F18b2a | 系统任务内部目标分发 | 通过 | verify_tenant_backend | verification/F18b2a-task-dispatcher.md：1 passed，三个真实目标与跨租户/参数拒绝通过 |

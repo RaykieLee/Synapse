@@ -1,0 +1,40 @@
+services:
+  rustfs:
+    image: ghcr.io/rustfs/rustfs:1.0.4
+    container_name: synapse-rustfs
+    command: ["/data"]
+    environment:
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?Set RUSTFS_ACCESS_KEY in the RustFS env file}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Set RUSTFS_SECRET_KEY in the RustFS env file}
+    volumes:
+      - ${RUSTFS_DATA_PATH:-./data}:/data
+    ports:
+      - "127.0.0.1:${RUSTFS_S3_PORT:-19000}:9000"
+      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-19001}:9001"
+    networks:
+      attachments:
+        aliases:
+          - rustfs
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://127.0.0.1:9000/health && curl -fsS http://127.0.0.1:9001/rustfs/console/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  attachments:
+    external: true
+    name: ${SYNAPSE_ATTACHMENTS_NETWORK:-synapse_attachments}

@@ -169,12 +169,17 @@ def test_f18b3_attachment_reconcile_is_read_only_and_tenant_scoped(tmp_path, mon
         "exception_count": 6,
         "exception_ids": {
             "invalid_storage_key": ["f18b3-a-key"],
+            "invalid_storage_backend": [],
+            "invalid_storage_scope": [],
             "storage_path_outside_root": ["f18b3-a-outside"],
             "missing_file": ["f18b3-a-missing"],
             "not_regular_file": ["f18b3-a-directory", "f18b3-a-symlink"],
             "unreadable_file": [],
             "size_mismatch": ["f18b3-a-size"],
+            "storage_unavailable": [],
         },
+        "s3_orphan_object_count": None,
+        "s3_orphan_scan_status": "not_configured",
         "read_only": True,
     }
     assert not scan_calls, f"handler traversed storage directories: {scan_calls}"

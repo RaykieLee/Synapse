@@ -1,4 +1,4 @@
-"""Metadata for locally stored, tenant/workspace-scoped attachments."""
+"""Metadata for tenant/workspace-scoped attachments."""
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, ForeignKeyConstraint, Integer, String, UniqueConstraint
@@ -29,6 +29,9 @@ class Attachment(Base):
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     media_type: Mapped[str] = mapped_column(String(127), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    storage_backend: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="local", server_default="local"
+    )
     storage_key: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)

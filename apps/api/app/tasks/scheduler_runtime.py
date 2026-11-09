@@ -133,7 +133,15 @@ def _safe_result_summary(target: str, result) -> dict:
         return {"expired_count": result.get("expired_count", 0)}
     if target == "tenant.reconcile_attachment_metadata":
         keys = ("metadata_count", "present_file_count", "consistent_file_count", "exception_count")
-        return {key: result.get(key, 0) for key in keys}
+        summary = {key: result.get(key, 0) for key in keys}
+        orphan_count = result.get("s3_orphan_object_count")
+        summary["s3_orphan_object_count"] = (
+            orphan_count if isinstance(orphan_count, int) else None
+        )
+        scan_status = result.get("s3_orphan_scan_status")
+        if scan_status in {"not_configured", "complete", "unavailable", "unsupported"}:
+            summary["s3_orphan_scan_status"] = scan_status
+        return summary
     if target == "tenant.refresh_resource_summary":
         counts = result.get("counts")
         if isinstance(counts, dict):

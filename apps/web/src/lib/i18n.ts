@@ -187,6 +187,8 @@ const attachmentZhToEn: Record<string, string> = {
     'The attachment file no longer exists. Refresh the list and try again.',
   '附件清理失败，请稍后重试。':
     'Attachment cleanup failed. Please try again later.',
+  '附件存储暂时不可用，请稍后重试。':
+    'Attachment storage is temporarily unavailable. Please try again later.',
   '附件操作失败，请稍后重试。':
     'Attachment operation failed. Please try again later.',
   '文件类型不受支持。': 'This file type is not supported.',

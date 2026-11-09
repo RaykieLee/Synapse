@@ -121,6 +121,7 @@ const attachmentMessageKeys: Record<string, string> = {
   EMPTY_FILE: '不能上传空文件。',
   FILE_NOT_FOUND: '附件文件已不存在，请刷新列表后重试。',
   FILE_CLEANUP_FAILED: '附件清理失败，请稍后重试。',
+  ATTACHMENT_STORAGE_UNAVAILABLE: '附件存储暂时不可用，请稍后重试。',
   FORBIDDEN: '当前账号没有执行此操作的权限。',
   RESOURCE_NOT_FOUND: '附件不存在或当前账号无权访问。',
   NETWORK_ERROR: '无法连接服务器，请检查网络后重试。',

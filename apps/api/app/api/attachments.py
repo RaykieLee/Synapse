@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from datetime import timezone
 from typing import NoReturn
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.database.session import get_db
+from app.integrations.attachment_storage import create_attachment_storage
 from app.models.attachment import Attachment
 from app.schemas.attachments import (
     AttachmentPageResponse,
@@ -20,11 +23,21 @@ from app.services.attachments import (
     MAX_UPLOAD_BYTES,
     AttachmentService,
     AttachmentServiceError,
+    AttachmentStorageUnavailable,
 )
+from app.services.attachment_storage import AttachmentStoreUnavailable
 from app.tenancy.context import WorkspaceContext, get_workspace_context
 
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/attachments", tags=["attachments"])
+
+
+def _service(db: Session) -> AttachmentService:
+    try:
+        storage = create_attachment_storage(get_settings())
+    except AttachmentStoreUnavailable as exc:
+        raise AttachmentStorageUnavailable() from exc
+    return AttachmentService(db, storage)
 
 
 def _raise_attachment_error(error: AttachmentServiceError) -> NoReturn:
@@ -54,6 +67,21 @@ def _response(row: Attachment) -> AttachmentResponse:
     )
 
 
+def _stream_body(body):
+    try:
+        while chunk := body.read(64 * 1024):
+            yield chunk
+    finally:
+        body.close()
+
+
+def _content_disposition(filename: str) -> str:
+    fallback = filename.encode("ascii", "ignore").decode("ascii")
+    fallback = fallback.replace("\\", "").replace('"', "") or "attachment"
+    encoded = quote(filename, safe="")
+    return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{encoded}'
+
+
 @router.post("", response_model=AttachmentResponse, status_code=201)
 def upload_attachment(
     file: UploadFile = File(...),
@@ -63,7 +91,7 @@ def upload_attachment(
 ):
     try:
         payload = file.file.read(MAX_UPLOAD_BYTES + 1)
-        row = AttachmentService(db).upload(
+        row = _service(db).upload(
             context,
             payload=payload,
             filename=file.filename,
@@ -86,7 +114,7 @@ def list_attachments(
     db: Session = Depends(get_db),
 ):
     try:
-        result = AttachmentService(db).list_attachments(
+        result = _service(db).list_attachments(
             context,
             scope_kind=scope_kind,
             page=page,
@@ -110,16 +138,17 @@ def download_attachment(
     db: Session = Depends(get_db),
 ):
     try:
-        download = AttachmentService(db).download(
+        download = _service(db).download(
             context,
             scope_kind=scope_kind,
             attachment_id=attachment_id,
         )
-        return FileResponse(
-            download.path,
+        return StreamingResponse(
+            _stream_body(download.body),
             media_type=download.media_type,
-            filename=download.filename,
             headers={
+                "Content-Disposition": _content_disposition(download.filename),
+                "Content-Length": str(download.size_bytes),
                 "Cache-Control": "private, no-store",
                 "X-Content-Type-Options": "nosniff",
             },
@@ -136,7 +165,7 @@ def delete_attachment(
     db: Session = Depends(get_db),
 ):
     try:
-        AttachmentService(db).delete(
+        _service(db).delete(
             context,
             scope_kind=scope_kind,
             attachment_id=attachment_id,

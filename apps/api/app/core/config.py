@@ -1,5 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -23,6 +25,13 @@ class Settings(BaseSettings):
     jwt_secret: str | None = None
     jwt_ttl_minutes: int = 60
     attachments_storage_path: Path = Path("./var/attachments")
+    attachments_storage_backend: Literal["local", "s3"] = "local"
+    attachments_s3_endpoint_url: str | None = None
+    attachments_s3_bucket: str | None = None
+    attachments_s3_region: str = "us-east-1"
+    attachments_s3_access_key_id: SecretStr | None = None
+    attachments_s3_secret_access_key: SecretStr | None = None
+    attachments_s3_force_path_style: bool = True
     agentscope_redis_host: str = "localhost"
     agentscope_redis_port: int = 6379
     agentscope_redis_password: SecretStr | None = None
@@ -51,6 +60,8 @@ class Settings(BaseSettings):
     @field_validator(
         "jwt_secret",
         "agentscope_credential_encryption_key",
+        "attachments_s3_access_key_id",
+        "attachments_s3_secret_access_key",
         mode="before",
     )
     @classmethod
@@ -61,6 +72,32 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_deployment_secrets(self) -> "Settings":
+        if self.attachments_storage_backend == "s3":
+            if not all(
+                (
+                    self.attachments_s3_endpoint_url,
+                    self.attachments_s3_bucket,
+                    self.attachments_s3_access_key_id,
+                    self.attachments_s3_secret_access_key,
+                )
+            ):
+                raise ValueError(
+                    "S3 attachment storage requires endpoint, bucket, access key, and secret key"
+                )
+            endpoint = urlsplit(self.attachments_s3_endpoint_url or "")
+            if (
+                endpoint.scheme not in {"http", "https"}
+                or not endpoint.hostname
+                or endpoint.username
+                or endpoint.password
+                or endpoint.path not in {"", "/"}
+                or endpoint.query
+                or endpoint.fragment
+            ):
+                raise ValueError(
+                    "SYNAPSE_ATTACHMENTS_S3_ENDPOINT_URL must be an HTTP(S) origin without credentials or path"
+                )
+
         if self.env.lower() not in {"production", "prod"}:
             return self
 
