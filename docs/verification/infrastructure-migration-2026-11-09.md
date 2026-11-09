@@ -130,12 +130,14 @@ loop from the API lifespan; adding another copy would risk duplicate claims.
 
 ## Resource sample
 
-After Wiki.js started, a point-in-time sample reported approximately 3.3 GiB
-host memory, 1.9 GiB available memory, and 41 GiB free disk. Container memory
-was approximately 200 MiB for Wiki.js, 69 MiB for PostgreSQL, and 87 MiB for
-Glances. After deleting temporary image-transfer archives, free disk space was
-43 GiB. These are one-time observations, not historical monitoring or load
-test results.
+At `2026-11-09 17:49:50 +08:00`, a read-only Tabby MCP recheck reported 3.3 GiB
+host memory (1.0 GiB used, 1.9 GiB available), 43 GiB free disk, and load
+averages of `0.13, 0.25, 0.29`. Docker reported Wiki.js at 161.8 MiB,
+PostgreSQL at 78.9 MiB, Qdrant at 17.7 MiB, RustFS at 62.5 MiB, Redis at
+3.9 MiB, Glances at 87.5 MiB, the API at 166.5 MiB, and Web at 4.1 MiB. All
+eight containers were running and healthy; Wiki.js returned HTTP 200, and
+PostgreSQL reported 18.6 with pgvector 0.8.7. These are one-time observations,
+not historical monitoring or load-test results.
 
 ## Monitoring choice
 
