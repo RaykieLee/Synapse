@@ -1,30 +1,24 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useRouterState } from '@tanstack/react-router'
+import { useRouterState } from '@tanstack/react-router'
 import {
-  Bell,
   Bot,
   Boxes,
   Building2,
-  BookOpen,
-  Database,
   CalendarClock,
   ClipboardCheck,
+  Database,
   FileText,
   Folder,
-  FolderTree,
   Home,
+  KeyRound,
   LayoutDashboard,
   Layers3,
-  KeyRound,
   MessageSquare,
-  Monitor,
-  Palette,
   Radio,
-  Settings,
   Sparkles,
-  UserCog,
   Users,
+  UserCog,
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
@@ -44,113 +38,45 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import {
   TeamSwitcher,
   useWorkspaceDirectory,
 } from '@/features/workspaces/directory'
-import { sidebarData } from './data/sidebar-data'
+import {
+  buildTenantNavigationGroup,
+  buildWorkspaceNavigationGroup,
+  selectPlatformNavigationGroup,
+  isNavigationScopeRecoveryFailure,
+  selectFreshAuthorizedNavigationCandidates,
+  sidebarData,
+  type AuthorizedNavigationCandidate,
+  type NavigationMenuResponse,
+  type VerifiedNavigationScope,
+} from './data/sidebar-data'
 import { NavGroup } from './nav-group'
 import { NavUser } from './nav-user'
 import type { NavGroup as NavGroupType, NavItem, NavLink } from './types'
 
-type NavigationMenu = {
-  menu_id: string
-  parent_id: string | null
-  menu_name: string
-  order_num: number
-  path: string
-  component: string | null
-  query: string | null
-  is_frame: number
-  is_cache: number
-  menu_type: 'M' | 'C'
-  visible: '0'
-  perms: string | null
-  icon: string
-  children: NavigationMenu[]
-}
-type NavigationResponse = {
-  tenant_id: string
-  membership_version: number
-  items: NavigationMenu[]
-}
-
 const iconMap: Record<string, LucideIcon> = {
+  Bot,
+  Boxes,
   Building2,
+  CalendarClock,
+  ClipboardCheck,
+  Database,
   FileText,
   Folder,
-  FolderTree,
   Home,
+  KeyRound,
   LayoutDashboard,
-  Monitor,
-  Palette,
-  Settings,
-  UserCog,
+  MessageSquare,
+  Radio,
+  Sparkles,
   Users,
+  UserCog,
   Wrench,
-  Bell,
-}
-function workspaceSystemGroups(
-  workspaceId: string,
-  isPlatformAdmin: boolean
-): NavGroupType[] {
-  return [
-    {
-      title: '系统',
-      items: [
-        { title: '附件', url: `/w/${workspaceId}/attachments`, icon: FileText },
-        { title: '模型与凭据', url: `/w/${workspaceId}/models`, icon: Wrench },
-        { title: '租户管理', url: '/tenants', icon: Building2 },
-        ...(isPlatformAdmin
-          ? [{ title: '全局用户', url: '/users', icon: Users }]
-          : []),
-      ],
-    },
-    {
-      title: 'AI 工作台',
-      items: [
-        { title: 'AI 对话', url: `/w/${workspaceId}/chat`, icon: Bot },
-        { title: '智能体', url: `/w/${workspaceId}/agents`, icon: Bot },
-        { title: '会话', url: `/w/${workspaceId}/sessions`, icon: MessageSquare },
-        {
-          title: 'AgentScope 凭据',
-          url: `/w/${workspaceId}/credential`,
-          icon: KeyRound,
-        },
-        {
-          title: '知识库',
-          url: `/w/${workspaceId}/knowledge`,
-          icon: Database,
-        },
-        { title: 'MCP', url: `/w/${workspaceId}/mcp`, icon: Boxes },
-        { title: 'Skills', url: `/w/${workspaceId}/skills`, icon: Sparkles },
-        { title: 'SOP 流程', url: `/w/${workspaceId}/sop`, icon: ClipboardCheck },
-        {
-          title: '调度任务',
-          url: `/w/${workspaceId}/schedule`,
-          icon: CalendarClock,
-        },
-        { title: '渠道', url: `/w/${workspaceId}/channel`, icon: Radio },
-      ],
-    },
-    {
-      title: '个人设置',
-      items: [
-        {
-          title: '设置',
-          icon: Settings,
-          items: [
-            { title: '个人资料', url: '/settings', icon: UserCog },
-            { title: '账号', url: '/settings/account', icon: Wrench },
-            { title: '外观', url: '/settings/appearance', icon: Palette },
-            { title: '通知', url: '/settings/notifications', icon: Bell },
-            { title: '显示', url: '/settings/display', icon: Monitor },
-          ],
-        },
-      ],
-    },
-  ]
 }
 
 function workspaceIdFromPath(pathname: string) {
@@ -161,71 +87,98 @@ function tenantIdFromPath(pathname: string) {
   return pathname.match(/^\/tenants\/([^/]+)/)?.[1]
 }
 
-function tenantManagementGroup(
-  tenantId: string,
-  tenantRole: 'owner' | 'admin' | 'member' | null
-): NavGroupType | null {
-  if (!tenantRole) return null
-
-  const overview = {
-    title: '成员与邀请',
-    url: `/tenants/${tenantId}`,
-    icon: Users,
+function navigationLinks(
+  candidates: AuthorizedNavigationCandidate[],
+  existingItems: NavItem[]
+): NavLink[] {
+  const existingUrls = new Set<string>()
+  for (const item of existingItems) {
+    if ('url' in item && item.url) existingUrls.add(item.url)
+    if ('items' in item && item.items) {
+      for (const child of item.items) {
+        if (child.url) existingUrls.add(child.url)
+      }
+    }
   }
-  if (tenantRole === 'member') {
-    return { title: '当前租户配置', items: [overview] }
-  }
 
-  return {
-    title: '当前租户配置',
-    items: [
-      overview,
-      { title: '角色管理', url: `/tenants/${tenantId}/roles`, icon: UserCog },
-      { title: '菜单管理', url: `/tenants/${tenantId}/menus`, icon: FileText },
-      {
-        title: '部门管理',
-        url: `/tenants/${tenantId}/departments`,
-        icon: FolderTree,
-      },
-      {
-        title: '字典管理',
-        url: `/tenants/${tenantId}/dictionaries`,
-        icon: BookOpen,
-      },
-      {
-        title: '参数配置',
-        url: `/tenants/${tenantId}/configs`,
-        icon: Settings,
-      },
-      {
-        title: '系统任务',
-        url: `/tenants/${tenantId}/scheduled-tasks`,
-        icon: CalendarClock,
-      },
-    ],
-  }
-}
-
-function menuIcon(name: string): LucideIcon {
-  return iconMap[name] ?? Folder
-}
-
-function toNavLinks(menus: NavigationMenu[], prefix = ''): NavLink[] {
-  return menus.flatMap((menu) => {
-    const title = prefix ? `${prefix} / ${menu.menu_name}` : menu.menu_name
-    const current: NavLink[] = menu.path
-      ? [
-          {
-            title,
-            url: menu.path,
-            external: menu.is_frame === 0,
-            icon:
-              menu.icon && menu.icon !== '#' ? menuIcon(menu.icon) : undefined,
-          },
-        ]
-      : []
-    return [...current, ...toNavLinks(menu.children, title)]
+  const seenUrls = new Set(existingUrls)
+  return candidates.flatMap((candidate) => {
+    if (seenUrls.has(candidate.url)) return []
+    seenUrls.add(candidate.url)
+    return [{
+      title: candidate.title,
+      url: candidate.url,
+      external: candidate.external,
+      icon: candidate.icon ? iconMap[candidate.icon] ?? Folder : undefined,
+    }]
   })
+}
+
+function localizeStaticGroup(
+  group: NavGroupType,
+  locale: ReturnType<typeof useLocale>
+): NavGroupType {
+  return {
+    ...group,
+    title: translate(group.title, locale),
+    items: group.items.map((item) => localizeStaticItem(item, locale)),
+  }
+}
+
+function localizeStaticItem(
+  item: NavItem,
+  locale: ReturnType<typeof useLocale>
+): NavItem {
+  return 'items' in item && item.items
+    ? {
+        ...item,
+        title: translate(item.title, locale),
+        items: item.items.map((child) => ({
+          ...child,
+          title: translate(child.title, locale),
+        })),
+      }
+    : { ...item, title: translate(item.title, locale) }
+}
+
+function NavigationStatus({
+  title,
+  message,
+  state,
+  onRetry,
+}: {
+  title: string
+  message: string
+  state: 'loading' | 'empty' | 'error'
+  onRetry?: () => void
+}) {
+  const locale = useLocale()
+  const { state: sidebarState, isMobile } = useSidebar()
+  if (sidebarState === 'collapsed' && !isMobile) return null
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>{translate(title, locale)}</SidebarGroupLabel>
+      <div
+        className='px-2 pb-1 text-xs leading-relaxed text-muted-foreground'
+        role={state === 'error' ? 'alert' : 'status'}
+        aria-live={state === 'error' ? 'assertive' : 'polite'}
+      >
+        {translate(message, locale)}
+      </div>
+      {state === 'error' && onRetry ? (
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <button type='button' onClick={onRetry}>
+                <span>{translate('重试', locale)}</span>
+              </button>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      ) : null}
+    </SidebarGroup>
+  )
 }
 
 export function AppSidebar() {
@@ -244,9 +197,6 @@ export function AppSidebar() {
         (item) => item.workspace_id === activeWorkspaceId
       )
     : undefined
-
-  // Share the verified detail query used by the workspace route. Menus remain
-  // hidden until a fresh workspace-context response confirms this URL's scope.
   const detail = useQuery({
     queryKey: [
       'synapse',
@@ -257,40 +207,90 @@ export function AppSidebar() {
       workspace?.membership_version ?? 0,
     ],
     queryFn: () => getWorkspace(activeWorkspaceId!),
-    enabled: Boolean(authUser && workspace && activeWorkspaceId),
+    enabled: Boolean(authUser?.user_id && workspace && activeWorkspaceId),
     initialData: workspace,
     staleTime: 0,
     refetchOnMount: 'always',
   })
+
+  const detailVersion = detail.data?.membership_version
   const contextReady = Boolean(
-    workspace &&
-    detail.data &&
-    detail.isFetched &&
-    !detail.isFetching &&
-    !detail.isError &&
-    detail.data.workspace_id === activeWorkspaceId &&
-    detail.data.tenant_id === workspace.tenant_id
+    authUser?.user_id &&
+      workspace &&
+      directory.tenantQuery.isSuccess &&
+      detail.data &&
+      detail.isFetched &&
+      !detail.isFetching &&
+      !detail.isError &&
+      detail.data.workspace_id === activeWorkspaceId &&
+      detail.data.tenant_id === workspace.tenant_id &&
+      Number.isInteger(detailVersion) &&
+      detailVersion! >= 0 &&
+      directory.tenantById.has(detail.data.tenant_id)
   )
   const current = contextReady ? detail.data : undefined
-  const activeTenantId = routeTenantId ?? current?.tenant_id
-  const activeTenant = activeTenantId
-    ? directory.tenantById.get(activeTenantId)
-    : undefined
-  const tenantGroup = activeTenant
-    ? tenantManagementGroup(activeTenant.tenant_id, activeTenant.tenant_role)
-    : null
-  const navigationKey = current
+  const currentMembershipVersion = current?.membership_version
+  const scope = useMemo<VerifiedNavigationScope | null>(() => {
+    if (
+      !contextReady ||
+      !authUser?.user_id ||
+      !current ||
+      !activeWorkspaceId ||
+      !Number.isInteger(currentMembershipVersion) ||
+      currentMembershipVersion! < 0
+    ) {
+      return null
+    }
+    return {
+      verified: true,
+      actorId: authUser.user_id,
+      tenantId: current.tenant_id,
+      workspaceId: current.workspace_id,
+      membershipVersion: currentMembershipVersion!,
+    }
+  }, [
+    activeWorkspaceId,
+    authUser?.user_id,
+    contextReady,
+    current,
+    currentMembershipVersion,
+  ])
+
+  useEffect(() => {
+    if (
+      workspace &&
+      detail.data?.membership_version !== undefined &&
+      detail.data.membership_version !== workspace.membership_version
+    ) {
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'synapse',
+          directory.actorId,
+          'global',
+          'personal',
+          'workspace-directory',
+        ],
+      })
+    }
+  }, [
+    detail.data?.membership_version,
+    directory.actorId,
+    queryClient,
+    workspace,
+  ])
+
+  const navigationKey = scope
     ? ([
         'synapse',
-        directory.actorId,
-        current.tenant_id,
+        scope.actorId,
+        scope.tenantId,
         'tenant-navigation',
-        current.workspace_id,
-        current.membership_version ?? 0,
+        scope.workspaceId,
+        scope.membershipVersion,
       ] as const)
     : ([
         'synapse',
-        directory.actorId,
+        authUser?.user_id ?? 'anonymous',
         'unresolved',
         'tenant-navigation',
         activeWorkspaceId ?? 'none',
@@ -299,23 +299,28 @@ export function AppSidebar() {
   const navigation = useQuery({
     queryKey: navigationKey,
     queryFn: () =>
-      api<NavigationResponse>(
-        `/tenants/${current!.tenant_id}/menus/visible-tree`
+      api<NavigationMenuResponse>(
+        `/tenants/${scope!.tenantId}/menus/visible-tree`
       ),
-    enabled: Boolean(current),
+    enabled: Boolean(scope),
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   })
 
   const scopeRef = useRef<string | null>(null)
-  const scope = current
-    ? `${directory.actorId}:${current.tenant_id}:${current.workspace_id}:${current.membership_version ?? 0}`
+  const scopeKey = scope
+    ? JSON.stringify([
+        scope.actorId,
+        scope.tenantId,
+        scope.workspaceId,
+        scope.membershipVersion,
+      ])
     : null
   useEffect(() => {
     const previous = scopeRef.current
-    if (previous && previous !== scope) {
-      const [actorId, tenantId, workspaceId] = previous.split(':')
+    if (previous && previous !== scopeKey) {
+      const [actorId, tenantId, workspaceId] = JSON.parse(previous) as string[]
       queryClient.removeQueries({
         predicate: (query) =>
           query.queryKey[0] === 'synapse' &&
@@ -325,43 +330,158 @@ export function AppSidebar() {
           query.queryKey[4] === workspaceId,
       })
     }
-    scopeRef.current = scope
-  }, [queryClient, scope])
+    scopeRef.current = scopeKey
+  }, [queryClient, scopeKey])
 
-  const dynamicItems =
-    contextReady &&
-    navigation.isSuccess &&
-    !navigation.isFetching &&
-    navigation.data.tenant_id === current?.tenant_id &&
-    navigation.data.membership_version === (current?.membership_version ?? 0)
-      ? toNavLinks(navigation.data.items)
-      : []
+  const candidates = selectFreshAuthorizedNavigationCandidates(
+    navigation.data,
+    scope,
+    navigation.isError
+  )
   const inWorkspaceRoute = Boolean(activeWorkspaceId)
-  const navGroups = inWorkspaceRoute
-    ? [
-        ...(tenantGroup
-          ? [localizeStaticGroup(tenantGroup, locale)]
-          : []),
-        ...(dynamicItems.length
-          ? [{ title: '工作空间', items: dynamicItems }]
-          : []),
-        ...workspaceSystemGroups(
-          activeWorkspaceId!,
-          authUser?.platform_role === 'platform_admin'
-        ).map((group) => localizeStaticGroup(group, locale)),
-      ]
-    : [
-        ...(tenantGroup ? [localizeStaticGroup(tenantGroup, locale)] : []),
-        ...sidebarData.navGroups.map((group) => ({
-          ...group,
-          title: translate(group.title, locale),
-          items: group.items.filter(
-            (item) =>
-              item.title !== '全局用户' ||
-              authUser?.platform_role === 'platform_admin'
-          ).map((item) => localizeStaticItem(item, locale)),
-        })),
-      ]
+  const isPlatformAdmin = authUser?.platform_role === 'platform_admin'
+  const activeTenantId = routeTenantId ?? current?.tenant_id
+  const activeTenant =
+    activeTenantId && directory.tenantQuery.isSuccess
+      ? directory.tenantById.get(activeTenantId)
+      : undefined
+
+  const navGroups: NavGroupType[] = []
+  const platformGroup = selectPlatformNavigationGroup(isPlatformAdmin)
+  if (platformGroup) {
+    navGroups.push(localizeStaticGroup(platformGroup, locale))
+  } else {
+    navGroups.push({
+      title: translate('租户', locale),
+      items: [
+        {
+          title: translate('我的租户', locale),
+          url: '/tenants',
+          icon: Layers3,
+        },
+      ],
+    })
+  }
+
+  if (activeTenant?.tenant_role) {
+    const tenantGroup = buildTenantNavigationGroup(
+      activeTenant.tenant_id,
+      activeTenant.tenant_role
+    )
+    if (tenantGroup) navGroups.push(localizeStaticGroup(tenantGroup, locale))
+  }
+
+  if (inWorkspaceRoute && contextReady && activeWorkspaceId && current) {
+    const group = buildWorkspaceNavigationGroup(
+      activeWorkspaceId,
+      current.workspace_role
+    )
+    if (candidates?.length) {
+      group.items.push(...navigationLinks(candidates, group.items))
+    }
+    navGroups.push(localizeStaticGroup(group, locale))
+  }
+
+  const personalGroup = sidebarData.navGroups.find(
+    (group) => group.title === '个人'
+  )
+  if (personalGroup) navGroups.push(localizeStaticGroup(personalGroup, locale))
+
+  const retryDirectory = () => {
+    void Promise.all([
+      directory.tenantQuery.refetch(),
+      directory.workspaceQuery.refetch(),
+    ])
+  }
+
+  let contextStatus: {
+    state: 'loading' | 'empty' | 'error'
+    message: string
+    onRetry?: () => void
+  } | null = null
+
+  if (inWorkspaceRoute) {
+    if (directory.tenantQuery.isError || directory.workspaceQuery.isError) {
+      contextStatus = {
+        state: 'error',
+        message: '无法加载租户或 Workspace 目录。',
+        onRetry: retryDirectory,
+      }
+    } else if (
+      directory.tenantQuery.isLoading ||
+      directory.workspaceQuery.isLoading
+    ) {
+      contextStatus = {
+        state: 'loading',
+        message: '正在确认 Workspace 访问权限…',
+      }
+    } else if (!workspace) {
+      contextStatus = {
+        state: 'empty',
+        message: '无法在当前已授权目录中确认此 Workspace；请使用上方切换器选择可访问的 Workspace。',
+      }
+    } else if (detail.isError) {
+      contextStatus = {
+        state: 'error',
+        message: '无法确认当前 Workspace 的授权上下文。',
+        onRetry: () => void detail.refetch(),
+      }
+    } else if (!contextReady) {
+      contextStatus = {
+        state: 'loading',
+        message: '正在确认 Workspace 与租户成员资格…',
+      }
+    } else if (
+      navigation.isError &&
+      isNavigationScopeRecoveryFailure(navigation.error)
+    ) {
+      contextStatus = {
+        state: 'error',
+        message: 'Workspace 访问上下文无法确认；请使用切换器重新选择可访问的 Workspace。',
+      }
+    } else if (navigation.isError) {
+      contextStatus = {
+        state: 'error',
+        message: 'Workspace 菜单加载失败；固定工作台入口仍可用。',
+        onRetry: () => void navigation.refetch(),
+      }
+    } else if (navigation.isFetching || !navigation.isSuccess) {
+      contextStatus = {
+        state: 'loading',
+        message: '正在加载 Workspace 菜单…',
+      }
+    } else if (!candidates) {
+      contextStatus = {
+        state: 'error',
+        message: 'Workspace 菜单与当前授权范围不匹配，已隐藏菜单链接。',
+        onRetry: () => void navigation.refetch(),
+      }
+    } else if (candidates.length === 0) {
+      contextStatus = {
+        state: 'empty',
+        message: '此 Workspace 没有额外的动态菜单；上方固定工作台入口仍可用。',
+      }
+    }
+  } else if (directory.tenantQuery.isError || directory.workspaceQuery.isError) {
+    contextStatus = {
+      state: 'error',
+      message: '无法加载租户或 Workspace 目录。',
+      onRetry: retryDirectory,
+    }
+  } else if (
+    directory.tenantQuery.isLoading ||
+    directory.workspaceQuery.isLoading
+  ) {
+    contextStatus = {
+      state: 'loading',
+      message: '正在加载可访问的 Workspace…',
+    }
+  } else if (directory.workspaces.length === 0) {
+    contextStatus = {
+      state: 'empty',
+      message: '当前账号没有可访问的 Workspace；可以使用上方切换器查看或创建有权限的空间。',
+    }
+  }
 
   return (
     <Sidebar collapsible={collapsible} variant={variant}>
@@ -369,34 +489,17 @@ export function AppSidebar() {
         <TeamSwitcher />
       </SidebarHeader>
       <SidebarContent>
-        {navGroups.map((props) => (
-          <NavGroup key={props.title} {...props} />
+        {navGroups.map((group) => (
+          <NavGroup key={group.title} {...group} />
         ))}
-        {!inWorkspaceRoute &&
-          (directory.tenantQuery.isError ||
-            directory.workspaceQuery.isError ||
-            (directory.tenantQuery.isSuccess &&
-              directory.workspaceQuery.isSuccess &&
-              directory.workspaces.length === 0)) && (
-            <SidebarGroup>
-              <SidebarGroupLabel>{translate('工作空间', locale)}</SidebarGroupLabel>
-              <div className='px-2 pb-2 text-xs leading-relaxed text-muted-foreground'>
-                {directory.tenantQuery.isError || directory.workspaceQuery.isError
-                  ? translate('无法加载租户或工作空间目录。', locale)
-                  : translate('当前账号还没有可访问的工作空间。可以先查看租户成员资格，或通过上方选择器创建有权限的空间。', locale)}
-              </div>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link to='/tenants'>
-                      <Layers3 />
-                      <span>{translate('前往租户管理', locale)}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroup>
-          )}
+        {contextStatus ? (
+          <NavigationStatus
+            title={inWorkspaceRoute ? 'Workspace 菜单状态' : 'Workspace（工作空间）'}
+            message={contextStatus.message}
+            state={contextStatus.state}
+            onRetry={contextStatus.onRetry}
+          />
+        ) : null}
       </SidebarContent>
       <SidebarFooter>
         <NavUser
@@ -410,19 +513,4 @@ export function AppSidebar() {
       <SidebarRail />
     </Sidebar>
   )
-}
-
-function localizeStaticGroup(group: NavGroupType, locale: ReturnType<typeof useLocale>): NavGroupType {
-  if (group.title === '工作空间') return { ...group, title: translate(group.title, locale) }
-  return {
-    ...group,
-    title: translate(group.title, locale),
-    items: group.items.map((item) => localizeStaticItem(item, locale)),
-  }
-}
-
-function localizeStaticItem(item: NavItem, locale: ReturnType<typeof useLocale>): NavItem {
-  return 'items' in item && item.items
-    ? { ...item, title: translate(item.title, locale), items: item.items.map((child) => ({ ...child, title: translate(child.title, locale) })) }
-    : { ...item, title: translate(item.title, locale) }
 }

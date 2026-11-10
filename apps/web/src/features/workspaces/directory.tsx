@@ -2,10 +2,10 @@ import * as React from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { Check, ChevronsUpDown, Plus, Layers3 } from 'lucide-react'
+import { Check, ChevronsUpDown, Plus, Layers3, X } from 'lucide-react'
 import { createWorkspace, listAllWorkspaces } from '@/api/workspaces'
 import { useAuthStore } from '@/stores/auth-store'
-import { api } from '@/lib/api'
+import { ApiProblem, api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -23,6 +23,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -44,7 +45,11 @@ import {
   type Workspace,
 } from './types'
 import { LocalizedText } from '@/components/localized-text'
-import { useLocaleText } from '@/lib/i18n'
+import { useLocale, useLocaleText } from '@/lib/i18n'
+import {
+  workspaceRecoveryCopy,
+  workspaceRecoveryReason,
+} from './workspace-recovery-messages'
 
 const workspacePath = (id: string) => `/w/${id}`
 const recentKey = (userId: string) => `synapse:recent-workspace:${userId}`
@@ -97,8 +102,7 @@ export function useWorkspaceDirectory(includeArchived = true) {
     accessibleTenants.map((tenant) => [tenant.tenant_id, tenant])
   )
   const workspaces = (workspaceQuery.data?.items ?? []).filter((workspace) => {
-    const tenant = tenantById.get(workspace.tenant_id)
-    if (!tenant) return false
+    if (tenantQuery.isSuccess && !tenantById.has(workspace.tenant_id)) return false
     if (
       workspace.status === 'archived' &&
       !['owner', 'admin'].includes(workspace.workspace_role)
@@ -137,22 +141,80 @@ export async function loadAllPages<T>(
   return { ...first, items }
 }
 
+export function useWorkspaceSwitch(
+  directory: ReturnType<typeof useWorkspaceDirectory>
+) {
+  const actor = useAuthStore((state) => state.auth.user)
+  const navigate = useNavigate()
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const queryClient = useQueryClient()
+  const routeId = activeWorkspaceId(pathname)
+
+  return React.useCallback(
+    async (workspaceId: string) => {
+      if (
+        !actor ||
+        directory.actorId !== actor.user_id ||
+        !directory.tenantQuery.isSuccess ||
+        !directory.workspaceQuery.isSuccess
+      )
+        return false
+
+      const workspace = directory.workspaces.find(
+        (item) => item.workspace_id === workspaceId
+      )
+      if (!workspace || !directory.tenantById.has(workspace.tenant_id))
+        return false
+
+      saveRecentWorkspace(actor.user_id, workspace)
+      const previous = directory.workspaces.find(
+        (item) => item.workspace_id === routeId
+      )
+      if (previous && previous.workspace_id !== workspace.workspace_id) {
+        queryClient.removeQueries({
+          predicate: (query) =>
+            query.queryKey[0] === 'synapse' &&
+            query.queryKey[1] === directory.actorId &&
+            query.queryKey[3] === previous.workspace_id,
+        })
+      }
+      await navigate({ to: workspacePath(workspace.workspace_id) as never })
+      return true
+    },
+    [
+      actor,
+      directory.actorId,
+      directory.tenantById,
+      directory.tenantQuery.isSuccess,
+      directory.workspaceQuery.isSuccess,
+      directory.workspaces,
+      navigate,
+      queryClient,
+      routeId,
+    ]
+  )
+}
+
 function activeWorkspaceId(pathname: string) {
   return pathname.match(/^\/w\/([^/]+)/)?.[1]
 }
 
 export function TeamSwitcher() {
   const t = useLocaleText()
-  const { isMobile } = useSidebar()
+  const locale = useLocale()
+  const { isMobile, setOpenMobile } = useSidebar()
   const actor = useAuthStore((state) => state.auth.user)
-  const { actorId, tenants, tenantById, workspaces, workspaceQuery } =
-    useWorkspaceDirectory(true)
-  const navigate = useNavigate()
+  const directory = useWorkspaceDirectory(true)
+  const { actorId, tenants, tenantById, workspaces, tenantQuery, workspaceQuery } = directory
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const switchWorkspace = useWorkspaceSwitch(directory)
   const [open, setOpen] = React.useState(false)
   const [createOpen, setCreateOpen] = React.useState(false)
+  const routeFocusPending = React.useRef(false)
   const routeId = activeWorkspaceId(pathname)
   const recent = actor ? readRecentWorkspace(actor.user_id) : null
   const selected =
@@ -169,119 +231,190 @@ export function TeamSwitcher() {
   const selectedTenant = selected
     ? tenantById.get(selected.tenant_id)
     : undefined
-  const groups = tenants
-    .map((tenant) => ({
-      tenant,
-      items: workspaces.filter((w) => w.tenant_id === tenant.tenant_id),
-    }))
-    .filter((group) => group.items.length)
+  const directoryError = tenantQuery.isError || workspaceQuery.isError
+  const directoryFailure = tenantQuery.isError
+    ? tenantQuery.error
+    : workspaceQuery.isError
+      ? workspaceQuery.error
+      : undefined
+  const recoveryFailure =
+    directoryFailure instanceof ApiProblem &&
+    (directoryFailure.status === 403 ||
+      directoryFailure.code === 'WORKSPACE_CONTEXT_REQUIRED' ||
+      directoryFailure.code === 'CONTEXT_MISMATCH')
+      ? directoryFailure
+      : undefined
+  const recoveryReason = recoveryFailure
+    ? workspaceRecoveryReason(recoveryFailure.status, recoveryFailure.code)
+    : undefined
+  const directoryErrorMessage = recoveryReason
+    ? workspaceRecoveryCopy(
+        locale,
+        recoveryReason === 'requestFailed' && recoveryFailure?.status === 403
+          ? 'actionDenied'
+          : recoveryReason
+      )
+    : t('无法加载可访问的 Workspace 目录。')
+  const groups = directoryError
+    ? []
+    : tenants
+        .map((tenant) => ({
+          tenant,
+          items: workspaces.filter((w) => w.tenant_id === tenant.tenant_id),
+        }))
+        .filter((group) => group.items.length)
 
   const switchTo = async (workspace: Workspace) => {
     if (!actor) return
-    const previous =
-      workspaces.find((item) => item.workspace_id === routeId) ??
-      (recent?.workspace_id === routeId ? recent : undefined) ??
-      (recent?.workspace_id === routeId ? recent : undefined)
-    saveRecentWorkspace(actor.user_id, workspace)
+    const switched = await switchWorkspace(workspace.workspace_id)
+    if (!switched) return
+    routeFocusPending.current = isMobile
     setOpen(false)
-    if (previous && previous.workspace_id !== workspace.workspace_id) {
-      // Query keys keep old responses inside their former scope. Remove old UI subscriptions;
-      // api() deliberately does not bind request lifetime to the route or abort in-flight jobs.
-      client.removeQueries({
-        predicate: (query) =>
-          query.queryKey[0] === 'synapse' &&
-          query.queryKey[1] === actorId &&
-          query.queryKey[3] === previous.workspace_id,
-      })
-    }
-    await navigate({ to: workspacePath(workspace.workspace_id) as never })
+    if (isMobile) setOpenMobile(false)
   }
-
-  // Captured through the stable QueryClient provider so route changes only drop old observers.
-  const client = useQueryClient()
 
   return (
     <>
       <SidebarMenu>
         <SidebarMenuItem>
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <SidebarMenuButton
-                size='lg'
-                aria-label={t('选择工作区')}
-                className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
+          {isMobile ? (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <SidebarMenuButton
+                  size='lg'
+                  aria-label={t('选择 Workspace')}
+                  className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
+                >
+                  <div className='flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground'>
+                    <Layers3 className='size-4' />
+                  </div>
+                  <div className='grid min-w-0 flex-1 text-start text-sm leading-tight'>
+                    <span className='truncate font-semibold'>
+                      {selected?.name ?? t('选择 Workspace')}
+                    </span>
+                    <span className='truncate text-xs text-muted-foreground'>
+                      {selectedTenant?.name ??
+                        (actor
+                          ? t('仅显示已确认可访问的 Workspace')
+                          : t('登录后查看可访问的 Workspace'))}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className='ms-auto size-4' />
+                </SidebarMenuButton>
+              </DialogTrigger>
+              <DialogContent
+                className='inset-0 left-0 top-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 p-0 !animate-none sm:hidden'
+                showCloseButton={false}
+                onOpenAutoFocus={(event) => {
+                  event.preventDefault()
+                  event.currentTarget
+                    .querySelector<HTMLInputElement>('[cmdk-input]')
+                    ?.focus()
+                }}
+                onCloseAutoFocus={(event) => {
+                  if (!routeFocusPending.current) return
+                  event.preventDefault()
+                  routeFocusPending.current = false
+                  document.getElementById('route-destination')?.focus()
+                }}
               >
-                <div className='flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground'>
-                  <Layers3 className='size-4' />
-                </div>
-                <div className='grid flex-1 text-start text-sm leading-tight'>
-                  <span className='truncate font-semibold'>
-                    {selected?.name ?? '选择工作区'}
-                  </span>
-                  <span className='truncate text-xs text-muted-foreground'>
-                    {selectedTenant?.name ??
-                      (actor ? '仅显示已加入的空间' : '登录后查看空间')}
-                  </span>
-                </div>
-                <ChevronsUpDown className='ms-auto size-4' />
-              </SidebarMenuButton>
-            </PopoverTrigger>
-            <PopoverContent
-              className='w-[min(22rem,calc(100vw-2rem))] p-0'
-              align='start'
-              side={isMobile ? "bottom" : "right"}
-            >
-              <Command>
-                <CommandInput placeholder='搜索空间或租户…' />
-                <CommandList>
-                  <CommandEmpty>
-                    {workspaceQuery.isLoading ? <LocalizedText text={"正在加载空间…"} /> : <LocalizedText text={"没有匹配的可访问空间"} />}
-                  </CommandEmpty>
-                  {groups.map(({ tenant, items }) => (
-                    <CommandGroup key={tenant.tenant_id} heading={tenant.name}>
-                      {items.map((workspace) => (
-                        <CommandItem
-                          key={workspace.workspace_id}
-                          value={`${tenant.name} ${workspace.name} ${workspace.slug}`}
-                          onSelect={() => void switchTo(workspace)}
-                        >
-                          <Layers3 className='size-4' />
-                          <span className='min-w-0 flex-1 truncate'>
-                            {workspace.name}
-                          </span>
-                          <span className='text-xs text-muted-foreground'>
-                            {workspace.status === 'archived' ? <LocalizedText text={"已归档"} /> : roleLabel[workspace.workspace_role]}
-                          </span>
-                          {workspace.workspace_id ===
-                            selected?.workspace_id && (
-                            <Check className='size-4' />
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  ))}
-                  {tenants.some(
+                <DialogHeader className='border-b px-4 py-4 pe-14 text-start'>
+                  <DialogTitle>{t('切换 Workspace')}</DialogTitle>
+                  <DialogDescription>
+                    {t('仅显示已确认可访问的 Workspace')}
+                  </DialogDescription>
+                </DialogHeader>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='icon'
+                  className='absolute end-3 top-3'
+                  aria-label={t('关闭 Workspace 切换器')}
+                  onClick={() => setOpen(false)}
+                >
+                  <X className='size-4' aria-hidden='true' />
+                </Button>
+                <WorkspaceSwitcherCommand
+                  groups={groups}
+                  selectedId={selected?.workspace_id}
+                  loading={workspaceQuery.isLoading || tenantQuery.isLoading}
+                  error={directoryError}
+                  errorMessage={directoryErrorMessage}
+                  onRetry={() => {
+                    void Promise.all([
+                      tenantQuery.refetch(),
+                      workspaceQuery.refetch(),
+                    ])
+                  }}
+                  onSelect={switchTo}
+                  onCreate={() => {
+                    setOpen(false)
+                    setCreateOpen(true)
+                  }}
+                  canCreate={tenants.some(
                     (tenant) =>
                       tenant.tenant_role === 'owner' ||
                       tenant.tenant_role === 'admin'
-                  ) && (
-                    <>
-                      <CommandSeparator />
-                      <CommandGroup>
-                        <CommandItem
-                          onSelect={() => {
-                            setOpen(false)
-                            setCreateOpen(true)
-                          }}
-                        >
-                          <Plus className='size-4' /> <LocalizedText text={" 创建空间\n                        "} /></CommandItem>
-                      </CommandGroup>
-                    </>
                   )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+                />
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <SidebarMenuButton
+                  size='lg'
+                  aria-label={t('选择 Workspace')}
+                  className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
+                >
+                  <div className='flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground'>
+                    <Layers3 className='size-4' />
+                  </div>
+                  <div className='grid min-w-0 flex-1 text-start text-sm leading-tight'>
+                    <span className='truncate font-semibold'>
+                      {selected?.name ?? t('选择 Workspace')}
+                    </span>
+                    <span className='truncate text-xs text-muted-foreground'>
+                      {selectedTenant?.name ??
+                        (actor
+                          ? t('仅显示已确认可访问的 Workspace')
+                          : t('登录后查看可访问的 Workspace'))}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className='ms-auto size-4' />
+                </SidebarMenuButton>
+              </PopoverTrigger>
+              <PopoverContent
+                className='w-[min(22rem,calc(100vw-2rem))] p-0'
+                align='start'
+                side='right'
+              >
+                <WorkspaceSwitcherCommand
+                  groups={groups}
+                  selectedId={selected?.workspace_id}
+                  loading={workspaceQuery.isLoading || tenantQuery.isLoading}
+                  error={directoryError}
+                  errorMessage={directoryErrorMessage}
+                  onRetry={() => {
+                    void Promise.all([
+                      tenantQuery.refetch(),
+                      workspaceQuery.refetch(),
+                    ])
+                  }}
+                  onSelect={switchTo}
+                  onCreate={() => {
+                    setOpen(false)
+                    setCreateOpen(true)
+                  }}
+                  canCreate={tenants.some(
+                    (tenant) =>
+                      tenant.tenant_role === 'owner' ||
+                      tenant.tenant_role === 'admin'
+                  )}
+                />
+              </PopoverContent>
+            </Popover>
+          )}
         </SidebarMenuItem>
       </SidebarMenu>
       <CreateWorkspaceDialog
@@ -292,6 +425,90 @@ export function TeamSwitcher() {
         onCreated={switchTo}
       />
     </>
+  )
+}
+
+function WorkspaceSwitcherCommand({
+  groups,
+  selectedId,
+  loading,
+  error,
+  errorMessage,
+  onRetry,
+  onSelect,
+  onCreate,
+  canCreate,
+}: {
+  groups: { tenant: TenantSummary; items: Workspace[] }[]
+  selectedId?: string
+  loading: boolean
+  error: boolean
+  errorMessage: string
+  onRetry: () => void
+  onSelect: (workspace: Workspace) => void
+  onCreate: () => void
+  canCreate: boolean
+}) {
+  const t = useLocaleText()
+
+  return (
+    <Command className='h-auto min-h-0 flex-1'>
+      <CommandInput
+        aria-label={t('搜索 Workspace 或租户…')}
+        placeholder={t('搜索 Workspace 或租户…')}
+      />
+      <CommandList className='min-h-0 max-h-none flex-1'>
+        <CommandEmpty>
+          {error ? (
+            <div className='space-y-3 px-4' role='alert'>
+              <p>{errorMessage}</p>
+              <Button type='button' variant='outline' onClick={onRetry}>
+                {t('重新加载目录')}
+              </Button>
+            </div>
+          ) : loading ? (
+            <span role='status'>{t('正在加载可访问的 Workspace…')}</span>
+          ) : (
+            t('没有匹配的可访问 Workspace。')
+          )}
+        </CommandEmpty>
+        {groups.map(({ tenant, items }) => (
+          <CommandGroup key={tenant.tenant_id} heading={tenant.name}>
+            {items.map((workspace) => (
+              <CommandItem
+                key={workspace.workspace_id}
+                value={`${tenant.name} ${workspace.name} ${workspace.slug}`}
+                onSelect={() => onSelect(workspace)}
+              >
+                <Layers3 className='size-4' aria-hidden='true' />
+                <span className='min-w-0 flex-1 truncate' title={workspace.name}>
+                  {workspace.name}
+                </span>
+                <span className='shrink-0 text-xs text-muted-foreground'>
+                  {workspace.status === 'archived'
+                    ? t('已归档')
+                    : t(roleLabel[workspace.workspace_role])}
+                </span>
+                {workspace.workspace_id === selectedId ? (
+                  <Check className='size-4' aria-label={t('当前 Workspace')} />
+                ) : null}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
+        {canCreate ? (
+          <>
+            <CommandSeparator />
+            <CommandGroup>
+              <CommandItem onSelect={onCreate}>
+                <Plus className='size-4' aria-hidden='true' />
+                {t('创建 Workspace')}
+              </CommandItem>
+            </CommandGroup>
+          </>
+        ) : null}
+      </CommandList>
+    </Command>
   )
 }
 

@@ -1,12 +1,12 @@
 import { Languages } from 'lucide-react'
-import { useEffect } from 'react'
-import { useLocale, setLocale } from '@/lib/i18n'
+import { useLayoutEffect } from 'react'
+import { useLocale, setLocale, syncLocaleFromStorage } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 
 
 export function LanguageSwitch({ className }: { className?: string }) {
   const locale = useLocale()
-  useEffect(() => { document.documentElement.lang = locale }, [locale])
+  useLayoutEffect(() => { syncLocaleFromStorage() }, [syncLocaleFromStorage])
   return (
     <Button
       type='button'

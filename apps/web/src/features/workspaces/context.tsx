@@ -1,67 +1,261 @@
 import * as React from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import {
-  Link,
   Outlet,
-  redirect,
   useNavigate,
   useParams,
+  useRouter,
 } from '@tanstack/react-router'
-import { toast } from 'sonner'
-import { getWorkspace, listAllWorkspaces } from '@/api/workspaces'
+import { getWorkspace } from '@/api/workspaces'
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiProblem } from '@/lib/api'
+import { useLocale } from '@/lib/i18n'
+import { Button } from '@/components/ui/button'
 import {
   readRecentWorkspace,
   saveRecentWorkspace,
   useWorkspaceDirectory,
 } from './directory'
 import type { Workspace } from './types'
-import { LocalizedText } from '@/components/localized-text'
+import {
+  isWorkspaceAccessUnavailable,
+  workspaceRecoveryCopy,
+  workspaceRecoveryReason,
+} from './workspace-recovery-messages'
 
 type WorkspaceContextValue = { workspace: Workspace; actorId: string }
 const WorkspaceContext = React.createContext<WorkspaceContextValue | null>(null)
 
+type WorkspaceVerification =
+  | {
+      actorId: string
+      attempt: number
+      state: 'checking'
+      workspaceId: string
+    }
+  | {
+      actorId: string
+      attempt: number
+      state: 'verified'
+      workspace: Workspace
+      workspaceId: string
+    }
+  | {
+      actorId: string
+      attempt: number
+      code?: string
+      state: 'failed'
+      status: number
+      workspaceId: string
+    }
+
+function isWorkspaceScopedQuery(
+  queryKey: readonly unknown[],
+  actorId: string,
+  tenantId: string,
+  workspaceId: string
+) {
+  return (
+    queryKey[0] === 'synapse' &&
+    queryKey[1] === actorId &&
+    queryKey[2] === tenantId &&
+    queryKey[3] === workspaceId &&
+    queryKey.length >= 5
+  )
+}
+
+function cachedWorkspaceTenantId(
+  queryClient: ReturnType<typeof useQueryClient>,
+  actorId: string,
+  workspaceId: string
+) {
+  const matchingDetails = queryClient.getQueryCache().findAll({
+    predicate: (query) => {
+      const [namespace, queryActorId, tenantId, queryWorkspaceId, resource] =
+        query.queryKey
+      const cachedWorkspace = query.state.data
+      return (
+        namespace === 'synapse' &&
+        queryActorId === actorId &&
+        typeof tenantId === 'string' &&
+        queryWorkspaceId === workspaceId &&
+        resource === 'workspace-detail' &&
+        cachedWorkspace !== null &&
+        typeof cachedWorkspace === 'object' &&
+        'workspace_id' in cachedWorkspace &&
+        cachedWorkspace.workspace_id === workspaceId &&
+        'tenant_id' in cachedWorkspace &&
+        cachedWorkspace.tenant_id === tenantId
+      )
+    },
+  })
+  const tenantIds = [
+    ...new Set(matchingDetails.map((query) => query.queryKey[2])),
+  ]
+  return tenantIds.length === 1 && typeof tenantIds[0] === 'string'
+    ? tenantIds[0]
+    : undefined
+}
+
+function safeReturnTo(path: string) {
+  return path.startsWith('/') && !path.startsWith('//') && !path.includes('\\')
+    ? path
+    : '/'
+}
+
 export function WorkspaceRouteLayout() {
   const { workspaceId } = useParams({ from: '/_authenticated/w/$workspaceId' })
   const actor = useAuthStore((state) => state.auth.user)
+  const actorId = actor?.user_id
   const navigate = useNavigate()
+  const router = useRouter()
   const queryClient = useQueryClient()
+  const locale = useLocale()
   const directory = useWorkspaceDirectory(true)
-  const recent = actor ? readRecentWorkspace(actor.user_id) : null
-  const workspace =
+  const [attempt, setAttempt] = React.useState(0)
+  const [verification, setVerification] =
+    React.useState<WorkspaceVerification | null>(null)
+  const recent = actorId ? readRecentWorkspace(actorId) : null
+  const knownWorkspace =
     directory.workspaces.find((item) => item.workspace_id === workspaceId) ??
     (recent?.workspace_id === workspaceId ? recent : undefined)
-  const detail = useQuery({
-    queryKey: [
-      'synapse',
-      directory.actorId,
-      workspace?.tenant_id ?? 'unresolved',
-      workspaceId,
-      'workspace-detail',
-      workspace?.membership_version ?? 0,
-    ],
-    queryFn: () => getWorkspace(workspaceId),
-    enabled: Boolean(workspace && actor),
-    initialData: workspace,
-    staleTime: 0,
-    refetchOnMount: 'always',
+  const currentRoute = React.useRef({
+    actorId,
+    attempt,
+    knownWorkspace,
+    workspaceId,
   })
+  currentRoute.current = { actorId, attempt, knownWorkspace, workspaceId }
+
+  const verificationForRoute =
+    verification &&
+    verification.actorId === actorId &&
+    verification.attempt === attempt &&
+    verification.workspaceId === workspaceId
+      ? verification
+      : null
 
   React.useEffect(() => {
-    if (!actor || !workspace || detail.isError) return
-    if (detail.data) saveRecentWorkspace(actor.user_id, detail.data)
-  }, [actor, detail.data, detail.isError, workspace])
+    if (!actorId) return
+    let current = true
+    setVerification({ actorId, attempt, state: 'checking', workspaceId })
+    void getWorkspace(workspaceId)
+      .then((workspace) => {
+        const latest = currentRoute.current
+        if (
+          !current ||
+          latest.actorId !== actorId ||
+          latest.attempt !== attempt ||
+          latest.workspaceId !== workspaceId
+        )
+          return
+        saveRecentWorkspace(actorId, workspace)
+        setVerification({
+          actorId,
+          attempt,
+          state: 'verified',
+          workspace,
+          workspaceId,
+        })
+      })
+      .catch((cause: unknown) => {
+        const latest = currentRoute.current
+        if (cause instanceof ApiProblem && cause.status === 401) {
+          const pathname = router.state.location.pathname
+          if (
+            (latest.actorId && latest.actorId !== actorId) ||
+            (pathname !== `/w/${workspaceId}` &&
+              !pathname.startsWith(`/w/${workspaceId}/`))
+          )
+            return
+          void navigate({
+            to: '/sign-in',
+            search: { redirect: safeReturnTo(router.state.location.href) },
+            replace: true,
+          })
+          return
+        }
+        if (
+          !current ||
+          latest.actorId !== actorId ||
+          latest.attempt !== attempt ||
+          latest.workspaceId !== workspaceId
+        )
+          return
+        if (latest.actorId !== actorId) return
+
+        const status = cause instanceof ApiProblem ? cause.status : 0
+        const code = cause instanceof ApiProblem ? cause.code : undefined
+        const reason = workspaceRecoveryReason(status, code)
+        if (isWorkspaceAccessUnavailable(reason)) {
+          const recentWorkspace = readRecentWorkspace(actorId)
+          if (recentWorkspace?.workspace_id === workspaceId)
+            window.localStorage.removeItem(
+              `synapse:recent-workspace:${actorId}`
+            )
+
+          const targetTenantId =
+            latest.knownWorkspace?.tenant_id ??
+            (recentWorkspace?.workspace_id === workspaceId
+              ? recentWorkspace.tenant_id
+              : undefined) ??
+            cachedWorkspaceTenantId(queryClient, actorId, workspaceId)
+          if (targetTenantId) {
+            void queryClient.removeQueries({
+              predicate: (query) =>
+                isWorkspaceScopedQuery(
+                  query.queryKey,
+                  actorId,
+                  targetTenantId,
+                  workspaceId
+                ),
+            })
+          }
+          void queryClient.invalidateQueries({
+            queryKey: [
+              'synapse',
+              actorId,
+              'global',
+              'personal',
+              'tenant-directory',
+            ],
+          })
+          void queryClient.invalidateQueries({
+            queryKey: [
+              'synapse',
+              actorId,
+              'global',
+              'personal',
+              'workspace-directory',
+            ],
+          })
+        }
+
+        setVerification({
+          actorId,
+          attempt,
+          ...(code ? { code } : {}),
+          state: 'failed',
+          status,
+          workspaceId,
+        })
+      })
+    return () => {
+      current = false
+    }
+  }, [actorId, attempt, navigate, queryClient, router, workspaceId])
 
   React.useEffect(() => {
+    if (verificationForRoute?.state !== 'verified') return
     if (
-      detail.data?.membership_version !== undefined &&
-      detail.data.membership_version !== workspace?.membership_version
+      knownWorkspace?.membership_version !== undefined &&
+      verificationForRoute.workspace.membership_version !==
+        knownWorkspace.membership_version
     ) {
       void queryClient.invalidateQueries({
         queryKey: [
           'synapse',
-          directory.actorId,
+          actorId,
           'global',
           'personal',
           'workspace-directory',
@@ -69,81 +263,93 @@ export function WorkspaceRouteLayout() {
       })
     }
   }, [
-    detail.data?.membership_version,
-    directory.actorId,
+    actorId,
+    knownWorkspace?.membership_version,
     queryClient,
-    workspace?.membership_version,
+    verificationForRoute,
   ])
 
+  const viewAccessibleWorkspaces = React.useCallback(() => {
+    if (actorId) {
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'synapse',
+          actorId,
+          'global',
+          'personal',
+          'tenant-directory',
+        ],
+      })
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'synapse',
+          actorId,
+          'global',
+          'personal',
+          'workspace-directory',
+        ],
+      })
+    }
+    void navigate({ to: '/' })
+  }, [actorId, navigate, queryClient])
+
+  const headingRef = React.useRef<HTMLHeadingElement>(null)
   React.useEffect(() => {
     if (
-      !actor ||
-      !workspaceId ||
-      directory.workspaceQuery.isLoading ||
-      !detail.isError
+      verificationForRoute?.state === 'failed' &&
+      document.activeElement === document.body
     )
-      return
-    if (
-      !(detail.error instanceof ApiProblem) ||
-      ![403, 404, 409].includes(detail.error.status)
-    )
-      return
-    const fallback = directory.workspaces.find(
-      (item) => item.workspace_id !== workspaceId
-    )
-    if (recent?.workspace_id === workspaceId)
-      window.localStorage.removeItem(
-        `synapse:recent-workspace:${actor.user_id}`
-      )
-    toast.error('此空间已不可访问，已切换到可访问空间。')
-    void navigate(
-      fallback ? { to: `/w/${fallback.workspace_id}` as never } : { to: '/' }
-    )
-  }, [
-    actor,
-    detail.isError,
-    directory.workspaceQuery.isLoading,
-    directory.workspaces,
-    navigate,
-    recent,
-    workspace,
-    workspaceId,
-  ])
+      headingRef.current?.focus()
+  }, [verificationForRoute])
 
-  if (!actor)
+  if (
+    !actorId ||
+    !verificationForRoute ||
+    verificationForRoute.state === 'checking'
+  )
     return (
-      <main className='p-6 text-sm text-muted-foreground'>
-        <LocalizedText text={"\n        正在检查登录状态…\n      "} /></main>
-    )
-  if (directory.workspaceQuery.isLoading)
-    return (
-      <main className='p-6 text-sm text-muted-foreground'>
-        <LocalizedText text={"\n        正在加载空间上下文…\n      "} /></main>
-    )
-  if (!workspace)
-    return (
-      <main className='space-y-3 p-6'>
-        <h1 className='text-xl font-semibold'><LocalizedText text={"空间不可用"} /></h1>
-        <p className='text-sm text-muted-foreground'>
-          <LocalizedText text={"\n          切换器只会显示当前可访问的空间。\n        "} /></p>
-        <Link to='/' className='text-sm underline underline-offset-4'>
-          <LocalizedText text={"\n          返回工作台\n        "} /></Link>
+      <main
+        aria-live='polite'
+        className='p-6 text-sm text-muted-foreground'
+        role='status'
+      >
+        {workspaceRecoveryCopy(locale, attempt ? 'retrying' : 'checking')}
       </main>
     )
-  if (detail.isError)
+
+  if (verificationForRoute.state === 'failed') {
+    const failureReason = workspaceRecoveryReason(
+      verificationForRoute.status,
+      verificationForRoute.code
+    )
     return (
-      <main className='space-y-3 p-6'>
-        <h1 className='text-xl font-semibold'><LocalizedText text={"无法验证空间"} /></h1>
-        <p role='alert' className='text-sm text-destructive'>
-          {detail.error.message}
+      <main className='mx-auto flex w-full max-w-2xl flex-col gap-4 p-6 sm:p-8'>
+        <h1 ref={headingRef} className='text-xl font-semibold' tabIndex={-1}>
+          {workspaceRecoveryCopy(locale, 'title')}
+        </h1>
+        <p role='alert' className='text-sm text-muted-foreground'>
+          {workspaceRecoveryCopy(locale, failureReason)}
         </p>
+        <div className='flex flex-col gap-2 sm:flex-row'>
+          <Button onClick={viewAccessibleWorkspaces}>
+            {workspaceRecoveryCopy(locale, 'viewAccessible')}
+          </Button>
+          <Button
+            variant='outline'
+            onClick={() => setAttempt((previous) => previous + 1)}
+          >
+            {workspaceRecoveryCopy(locale, 'retry')}
+          </Button>
+        </div>
       </main>
     )
+  }
+
   return (
     <WorkspaceContext.Provider
       value={{
-        workspace: detail.data ?? workspace,
-        actorId: directory.actorId,
+        workspace: verificationForRoute.workspace,
+        actorId,
       }}
     >
       <Outlet />
@@ -151,33 +357,7 @@ export function WorkspaceRouteLayout() {
   )
 }
 
-export async function validateWorkspaceRoute(workspaceId: string) {
-  try {
-    await getWorkspace(workspaceId)
-  } catch (cause) {
-    if (cause instanceof ApiProblem && [403, 404, 409].includes(cause.status)) {
-      const actorId = useAuthStore.getState().auth.user?.user_id
-      if (actorId)
-        window.localStorage.removeItem(`synapse:recent-workspace:${actorId}`)
-      let fallback: Workspace | undefined
-      try {
-        const page = await listAllWorkspaces()
-        fallback = page.items.find((item) => item.status === 'active')
-      } catch {
-        /* the authenticated workspace list may itself be unavailable */
-      }
-      toast.error(
-        fallback
-          ? '当前空间不可访问，已切换到可访问空间。'
-          : '当前空间不可访问，已返回工作台。'
-      )
-      if (fallback)
-        throw redirect({ to: `/w/${fallback.workspace_id}` as never })
-      throw redirect({ to: '/' })
-    }
-    throw cause
-  }
-}
+export function validateWorkspaceRoute(_workspaceId: string) {}
 
 export function useWorkspace() {
   const value = React.useContext(WorkspaceContext)

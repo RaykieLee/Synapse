@@ -8,6 +8,6 @@ const searchSchema = z.object({
 export const Route = createFileRoute('/(auth)/sign-in-2')({
   validateSearch: searchSchema,
   beforeLoad: ({ search }) => {
-    throw redirect({ to: '/sign-in', search })
+    throw redirect({ to: '/sign-in', search, replace: true })
   },
 })

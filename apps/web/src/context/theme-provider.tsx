@@ -8,6 +8,59 @@ const DEFAULT_THEME = 'system'
 const THEME_COOKIE_NAME = 'vite-ui-theme'
 const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 // 1 year
 
+type ThemeCookieStage = { rollback: () => boolean }
+type ThemeCookieFailure = Error & {
+  cause?: unknown
+  rollbackConfirmed: boolean
+  writeAttempted: boolean
+}
+
+function readThemeCookie(storageKey: string): Theme | undefined {
+  try {
+    const savedTheme = getCookie(storageKey)
+    return savedTheme === 'system' || savedTheme === 'light' || savedTheme === 'dark'
+      ? savedTheme
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function restoreThemeCookie(storageKey: string, theme: string | undefined) {
+  try {
+    if (theme === undefined) removeCookie(storageKey)
+    else setCookie(storageKey, theme, THEME_COOKIE_MAX_AGE)
+    return getCookie(storageKey) === theme
+  } catch {
+    return false
+  }
+}
+
+function stageThemeCookie(storageKey: string, theme: Theme): ThemeCookieStage {
+  let previousTheme: string | undefined
+  let writeAttempted = false
+
+  try {
+    previousTheme = getCookie(storageKey)
+    writeAttempted = true
+    setCookie(storageKey, theme, THEME_COOKIE_MAX_AGE)
+    if (getCookie(storageKey) !== theme) {
+      throw new Error('Theme cookie write was not confirmed.')
+    }
+  } catch (cause) {
+    const rollbackConfirmed = writeAttempted
+      ? restoreThemeCookie(storageKey, previousTheme)
+      : false
+    const failure = new Error(
+      'Theme cookie write could not be confirmed.'
+    ) as ThemeCookieFailure
+    Object.assign(failure, { cause, rollbackConfirmed, writeAttempted })
+    throw failure
+  }
+
+  return { rollback: () => restoreThemeCookie(storageKey, previousTheme) }
+}
+
 type ThemeProviderProps = {
   children: React.ReactNode
   defaultTheme?: Theme
@@ -19,6 +72,8 @@ type ThemeProviderState = {
   resolvedTheme: ResolvedTheme
   theme: Theme
   setTheme: (theme: Theme) => void
+  stageTheme: (theme: Theme) => ThemeCookieStage
+  applyTheme: (theme: Theme) => void
   resetTheme: () => void
 }
 
@@ -27,6 +82,8 @@ const initialState: ThemeProviderState = {
   resolvedTheme: 'light',
   theme: DEFAULT_THEME,
   setTheme: () => null,
+  stageTheme: () => ({ rollback: () => true }),
+  applyTheme: () => null,
   resetTheme: () => null,
 }
 
@@ -39,7 +96,7 @@ export function ThemeProvider({
   ...props
 }: ThemeProviderProps) {
   const [theme, _setTheme] = useState<Theme>(
-    () => (getCookie(storageKey) as Theme) || defaultTheme
+    () => readThemeCookie(storageKey) || defaultTheme
   )
 
   // Optimized: Memoize the resolved theme calculation to prevent unnecessary re-computations
@@ -75,9 +132,13 @@ export function ThemeProvider({
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [theme, resolvedTheme])
 
-  const setTheme = (theme: Theme) => {
-    setCookie(storageKey, theme, THEME_COOKIE_MAX_AGE)
+  const stageTheme = (theme: Theme) => stageThemeCookie(storageKey, theme)
+  const applyTheme = (theme: Theme) => {
     _setTheme(theme)
+  }
+  const setTheme = (theme: Theme) => {
+    stageTheme(theme)
+    applyTheme(theme)
   }
 
   const resetTheme = () => {
@@ -89,6 +150,8 @@ export function ThemeProvider({
     defaultTheme,
     resolvedTheme,
     resetTheme,
+    stageTheme,
+    applyTheme,
     theme,
     setTheme,
   }
