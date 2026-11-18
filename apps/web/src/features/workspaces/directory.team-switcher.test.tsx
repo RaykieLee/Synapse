@@ -172,7 +172,7 @@ describe('mobile Workspace switcher', () => {
       name: 'Search Workspaces or tenants…',
     })
 
-    await expect.element(input).toHaveFocus()
+    expect(document.activeElement).toBe(input.element())
     await userEvent.keyboard('{ArrowDown}{Enter}')
     await new Promise((resolve) => window.requestAnimationFrame(resolve))
 

@@ -307,9 +307,8 @@ export function TeamSwitcher() {
                 showCloseButton={false}
                 onOpenAutoFocus={(event) => {
                   event.preventDefault()
-                  event.currentTarget
-                    .querySelector<HTMLInputElement>('[cmdk-input]')
-                    ?.focus()
+                  const content = event.currentTarget as HTMLElement
+                  content.querySelector<HTMLInputElement>('[cmdk-input]')?.focus()
                 }}
                 onCloseAutoFocus={(event) => {
                   if (!routeFocusPending.current) return

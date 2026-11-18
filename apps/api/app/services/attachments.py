@@ -274,10 +274,10 @@ class AttachmentService:
 
         scope = self._scope_for_row(row)
         try:
-            self.storage.store_for(row.storage_backend).delete(row.storage_key, scope)
             alternate_store = self.storage.alternate_store_for(row.storage_backend)
             if alternate_store is not None:
                 alternate_store.delete(row.storage_key, scope)
+            self.storage.store_for(row.storage_backend).delete(row.storage_key, scope)
         except AttachmentStoreCleanupFailed as exc:
             raise AttachmentFileCleanupFailed() from exc
         except AttachmentStoreUnavailable as exc:

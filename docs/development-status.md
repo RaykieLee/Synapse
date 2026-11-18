@@ -2,7 +2,7 @@
 
 目标：完成 integration-plan.md 全部明确范围。租户与 Workspace 为所有业务迁移的前置条件。
 
-用户要求：子智能体全部使用 gpt-6-luna / high；每个任务只做一个功能或一个验证；每项验证由独立子智能体执行。主智能体负责协调、契约和进度记录。开发完成不等于验收通过。
+用户要求：子智能体全部使用 gpt-6-luna / medium；每个任务只做一个功能或一个验证；每项验证由独立子智能体执行。主智能体负责协调、契约和进度记录。开发完成不等于验收通过。
 
 状态：待开始 → 开发中 → 待独立验收 → 通过；验证失败转回修复。外部运行条件不足的功能记为待实际验收，不记为通过。
 
@@ -29,8 +29,9 @@
 | ARCH-VERIFY-001 | 独立验收授权上下文 seam 与依赖方向规则 | tenancy seam 定向验收通过；架构守护新独立复验通过 | tenancy 报告 `9 passed`；guard 新独立任务 `task_0105325e3749` 报告 `5 passed`；旧 follow-up `ctx_b9d3a1fc4749` 仍未结算；详见两份 `docs/verification/architecture-*-acceptance-2026-11-06.md` 报告 |
 | UX-SETTINGS-REALISM-001 | 审查个人设置域真实可用性并输出实施契约 | UX 设计与两轮实现完成；复验失败待修复 | 独立 UX worker `ctx_0f304b985a56`；方案见 [个人设置域真实可用性 UX 契约](ux/settings-realism.md)。首轮修复 Cookie 异常与 Profile 401 草稿；复验发现外观仍先提交主题再写字体，且两个 provider 的 `Error(message, { cause })` 与 ES2020 目标冲突，见 [设置复验报告](verification/settings-realism-reacceptance.md) |
 | UX-WORKSPACE-RECOVERY-001 | 审查不可访问 Workspace 的原地恢复体验并输出实施契约 | 前端模拟复验通过；真实/生产验收待补 | 独立 UX worker `ctx_d8ced0dbdedb`；方案见 [Workspace 不可访问恢复 UX 契约](ux/inaccessible-workspace-recovery.md)。首轮独立验收发现的 unresolved-descriptor 缓存清理缺口已修复；复验 `task_574db72d379f` 通过隔离回归 `1/1` 与聚焦套件 `32/32`，仅限 simulated frontend reacceptance，见 [恢复复验报告](verification/workspace-inaccessible-recovery-reacceptance.md) |
-| UX-QUICK-NAVIGATION-001 | 审查快速导航搜索的作用域、状态与可访问性 | UX 设计与实现完成；独立验收失败 | 独立 UX worker `ctx_46df3b4a1a5a`；方案见 [命令搜索与全局导航 UX 契约](ux/command-search-context.md)。实现精确复用 `selectAuthorizedNavigationCandidates`，但独立验收发现 Tenant 上下文解析期间错误显示 Global scope，见 [快速导航验收报告](verification/quick-navigation-acceptance.md) |
-| UX-GLOBAL-NAVIGATION-001 | 审查全局导航四层信息架构与实施分期 | UX 设计与实现完成；独立验收失败 | 独立 UX worker `ctx_8c773f85b462`；方案见 [全局导航信息架构 UX 契约](ux/global-navigation-information-architecture.md)。设计冻结“个人 / 平台管理 / 租户管理 / Workspace 工作台”四层；实现完成后，独立 verifier `task_ad67822bb6f8` 判定失败：移动端仍用 Popover、失败重取可残留旧菜单、面包屑层级/中英文案与焦点公告存在缺口，见 [全局导航验收报告](verification/global-navigation-acceptance.md) |
+| UX-QUICK-NAVIGATION-001 | 审查快速导航搜索的作用域、状态与可访问性 | UX 设计和实现完成；首轮验收失败，修复后聚焦复验通过 | 独立 UX worker `ctx_46df3b4a1a5a`；方案见 [命令搜索与全局导航 UX 契约](ux/command-search-context.md)。Tenant 上下文未确认时错误显示 Global 的缺陷已修复；mock UI 独立复验 `33/33` 通过，真实 API 授权、读屏、触屏与生产验收仍未覆盖，见 [快速导航复验报告](verification/quick-navigation-reacceptance.md) |
+| UX-GLOBAL-NAVIGATION-001 | 审查全局导航四层信息架构与实施分期 | UX 设计和实施完成；定向复验通过，整体验收仍待真实证据 | 独立 UX worker `ctx_8c773f85b462`；方案见 [全局导航信息架构 UX 契约](ux/global-navigation-information-architecture.md)。首轮验收发现移动端、菜单残留、面包屑/焦点缺口；后续定向复验通过，但真实 API 授权、应用壳 Drawer、真机移动端和读屏仍未验证，见 [全局导航最终复验报告](verification/global-navigation-final-reacceptance.md) |
+| UX-F17C-DELETE-001 | 审查 F17c 附件删除部分失败与重试体验 | 实现前 UX/契约审查完成；commit 不确定状态与删除后 404 提示策略待决 | UX worker `ctx_ab75cba94b7c` / Task `task_b182a78de766`；方案及未决事项见 [附件删除一致性 UX 契约](ux/attachment-deletion-consistency.md)。本轮不增加 `delete_outcome`，也不改变隐私 404 语义 |
 | UX-F43-ROUTE-CLEANUP-001 | 审查演示与模板路由的清理策略 | UX 设计与二次修复完成；聚焦复验通过 | 独立 UX worker `ctx_8df70ca301bc`；方案见 [F43 路由清理 UX 契约](ux/F43-route-cleanup.md)。二次修复删除确认无引用文案并同步 document lang；第三次复验 `task_bac6c4f97beb` 通过聚焦范围，报告记录生产深链、真实授权、完整读屏、route regeneration/build 与来源部署证据仍未覆盖 |
 | UX-WORKSPACE-HOME-001 | 审查稳定工作台与 Workspace 概览 UX/API 契约 | UX 设计完成；第一阶段实现完成；自动化 UI 补测完成，真实验收待补 | 独立 UX worker `ctx_ee20f7f090c7`；方案见 [Workspace 工作台与空间概览 UX 契约](ux/workspace-home-overview.md)。核心决策为登录后 `/` 保持稳定工作台，不自动进入最近/首个/唯一 Workspace；概览聚合 API 与指标清单均未存在，实施不得使用模板值或前端拼凑指标 |
 | IMPL-F43-ROUTE-CLEANUP-001 | 实施演示与模板路由清理 | 二次修复完成；第三次复验中 | 实现 worker `ctx_5e1b8acea403` 完成路由清理；首轮修复 `task_a1f9fa471d9d` 增加 Clerk 父路由 404 与测试、移除 Clerk/Faker 依赖及 37 条死文案。二次修复 `task_4371bdcd75be` 仅删除确认无引用的 Apps/Chats/Connected/Connect/Coming Soon 词条，并同步存储 locale 与 `document.documentElement.lang`；Help Center 与 Tasks 因现存引用保留 |
@@ -52,16 +53,19 @@
 | REVERIFY-WORKSPACE-RECOVERY-001 | 独立复验 Workspace 恢复修复 | 通过（仅限模拟前端证据） | Orca Task `task_574db72d379f` / verifier `ctx_14cd0cb1e4ca` 完成 [恢复复验报告](verification/workspace-inaccessible-recovery-reacceptance.md)：目标缓存清理、其他 actor/tenant/Workspace 隔离、不匹配最近项保留与原路由保持均通过；真实后端授权/撤权、移动端、键盘、读屏与生产验收仍待独立执行 |
 | IMPL-GLOBAL-NAVIGATION-001 | 实施全局导航四层信息架构 | 首轮实现完成；验收失败待修复 | 独立实现 worker `ctx_1f7bffe87eda`；导出 `selectAuthorizedNavigationCandidates(response, scope)` 与强类型已验证作用域；模拟角色定向测试通过。验收确认作用域静态模型与普通/平台角色基本正确，但移动端切换、失败残留、面包屑、双语文案、焦点与真实权限证据未通过，待针对性修复 |
 | VERIFY-GLOBAL-NAVIGATION-001 | 独立验收全局导航实现 | 首轮验收失败；待修复复验 | Orca Task `task_ad67822bb6f8` / verifier `ctx_4354e1a289ae`，`gpt-6-luna/high`，已新增 [全局导航验收报告](verification/global-navigation-acceptance.md)。聚焦模拟测试 6/6 通过；完整 build 被并行 `font-provider.tsx`/`theme-provider.tsx` TS2554 阻塞。验收结论失败，不能以静态 selector 或模拟测试替代真实权限证据 |
-| FIX-GLOBAL-NAVIGATION-001 | 修复全局导航验收阻断项 | 修复完成；独立复验待执行 | Orca Task `task_cd81cb9cfdfe` / worker `ctx_6cd29da9d0c3` 完成：移动端 viewport-wide Dialog、切换后关闭 drawer 并交接焦点、失败/撤权清除旧菜单、scope breadcrumbs、窄屏祖先键盘访问和双语 switcher 文案；定向 Chromium 测试 `26/26`、`vite build`、diff check 通过。无真实授权 fixture/读屏；完整 build 未运行，复验报告需核查新 `app-header` 类型诊断 |
-| REVERIFY-GLOBAL-NAVIGATION-001 | 独立复验全局导航修复 | 验收进行中 | Orca Task `task_b3579dc1f1ab` / verifier `ctx_27c47e8359eb`；只写 `docs/verification/global-navigation-reacceptance.md`，复验移动端、失败残留、面包屑、本地化、键盘焦点、完整 build 与真实权限证据边界 |
+| FIX-GLOBAL-NAVIGATION-001 | 修复全局导航验收阻断项 | 功能和类型修复完成；定向复验通过，整体验收仍待补证 | 原修复 worker `ctx_6cd29da9d0c3` 完成移动端 Dialog、焦点交接、失败清理、面包屑及本地化；后续 Task `task_dde67eb660e8` / worker `ctx_60da1ad7b827` 修复 ES2020 与 Dialog 事件类型，定向测试 `11/11`、`tsc -b` 通过。无真实授权、应用壳 Drawer、真机或读屏验收 |
+| REVERIFY-GLOBAL-NAVIGATION-001 | 独立复验全局导航修复 | 定向复验通过；整体验收未建立 | 新复验 Task `task_7c9daaaf7997` / verifier `ctx_301d0b459992`：3 个浏览器测试文件 `19/19`、`tsc -b` 无诊断；见 [最终复验报告](verification/global-navigation-final-reacceptance.md)。真实 API 授权、真实 Drawer 集成、真机移动端、读屏与生产打包未覆盖 |
 | IMPL-QUICK-NAVIGATION-001 | 按当前 scope 提供已授权的快速导航 | 首轮实现完成；验收失败待修复 | Orca Task `task_3b521168352c` 完成。实现复用 `selectAuthorizedNavigationCandidates`，仅搜索已授权导航与当前 actor 服务端确认的 Workspace 目录，最近项先经目录校验再排序，切换走 `useWorkspaceSwitch(directory)`。独立验收确认核心 selector 与目录隔离通过，但 Tenant pending/error 被 fallback 成 Global |
-| VERIFY-QUICK-NAVIGATION-001 | 独立验收已授权的快速导航 | 验收失败；待修复复验 | Orca Task `task_b3a8cd625cf2` / verifier `ctx_af08a431dc18`，仅写 [快速导航验收报告](verification/quick-navigation-acceptance.md)。聚焦测试 `28/28` 通过，但 scope-label 缺陷判定整体失败；真实 API 授权、迟到响应、读屏/触屏与生产验收仍未覆盖 |
-| FIX-QUICK-NAVIGATION-001 | 修复快速导航 Tenant scope 标签 | 已就绪待启动 | Orca Task `task_2507456f3463`；只允许改 `command-menu.tsx` 与最小聚焦测试，Tenant route 未确认时不得 fallback 为 Global。待全局导航复验完成后串行启动 |
+| VERIFY-QUICK-NAVIGATION-001 | 独立验收已授权的快速导航 | 首轮验收失败；修复后聚焦复验通过（mock） | 首轮 verifier `ctx_af08a431dc18` 发现 Tenant pending 被标为 Global；修复后 Task `task_00fcf32105f4` / verifier `ctx_a2b3243718f9` 独立复验 `33/33` 通过，见 [快速导航复验报告](verification/quick-navigation-reacceptance.md)。真实 API 授权、读屏、触屏与生产验收未覆盖 |
+| FIX-QUICK-NAVIGATION-001 | 修复快速导航 Tenant scope 标签 | 修复完成；聚焦 UI 回归通过 | Task `task_8e3347b8057d` / worker `ctx_8adeb8d50ba9`：Tenant pending/error 不再显示 Global 或旧上下文，修复测试 mock 并增加三类回归；独立复验 `33/33` 通过。真实授权仍由服务端保证且未在本次 mock 验证 |
+| FIX-F17C-DELETE-CONSISTENCY-001 | 修复 alternate 存储失败时误删权威附件对象 | 修复完成；定向独立复验通过（模拟存储） | UX Task `task_b182a78de766` / worker `ctx_ab75cba94b7c` 先完成契约；实现 Task `task_6caddb96e006` / worker `ctx_b0f31e9e0f82` 调整 alternate-first 删除顺序并加模拟 S3 故障重试回归；独立复验 `7 passed, 5 warnings`，另本地 F17a 并发 API 测试连续 `3/3` 通过。真实 RustFS、HTTP 503 故障注入及 DB commit 故障未验证 |
+| REVERIFY-F17C-DELETE-CONSISTENCY-001 | 独立复验 F17c 删除一致性修复 | 定向复验通过；生产/提交故障验收仍待完成 | Task `task_0677408e1cda` / verifier `ctx_5461c534b074`，报告见 [F17c 删除一致性复验](verification/F17c-attachment-delete-consistency-reacceptance.md)。内存 S3 模拟覆盖 alternate 故障保留权威对象、元数据和重试；真实 RustFS CRUD、生产数据、HTTP 503 wire 路径、真实 DB commit 失败、UI/读屏/窄屏未验证 |
 
-### 最新复验补充（2026-11-10）
+### 最新复验补充（2026-11-18）
 
-- 全局导航修复已完成，但独立复验 `task_b3579dc1f1ab` 判定失败，见 [全局导航复验报告](verification/global-navigation-reacceptance.md)：聚焦检查有通过项，但 Quick Navigation 测试未能收集，web build 报 3 个 TypeScript 错误，窄屏真实 shell 的 drawer 关闭/焦点交接仍需核验。真实 API 权限证据与读屏验收仍未完成。
-- 快速导航首轮验收失败，Tenant scope 未确认时错误显示 Global；修复任务 `task_2507456f3463` 已就绪，需修正并安排独立复验。
+- 全局导航类型修复的独立定向复验通过：浏览器测试 `19/19`、`tsc -b` 无诊断，见 [最终复验报告](verification/global-navigation-final-reacceptance.md)。整体验收仍未建立；真实 API 权限、应用壳 Drawer、真机移动端和读屏待验。
+- 快速导航 Tenant scope 修复的独立 mock UI 复验通过 `33/33`，见 [快速导航复验报告](verification/quick-navigation-reacceptance.md)。真实 API 授权、迟到响应、读屏、触屏/真机和生产验收仍未覆盖。
+- F17c 删除一致性修复按 alternate-first 顺序清理并保留元数据重试；独立定向复验 `7 passed, 5 warnings`。实现首轮运行曾出现一次 F17a 并发删除 500，随后实现复跑、独立复验和本地三次重复均通过；这不证明 commit 阶段故障已覆盖。真实 RustFS/HTTP 503 故障路径、DB commit 不确定性、删除对话框 UX/辅助功能与生产迁移仍待验证，见 [UX 契约](ux/attachment-deletion-consistency.md) 和 [复验报告](verification/F17c-attachment-delete-consistency-reacceptance.md)。
 - 设置原子提交二次复验为部分通过，缺 paired-cookie readback 最终异常的独立回归；补测任务 `task_81fe88eb84f5` 的全局导航依赖已完成，可继续执行，之后由 `task_f0fff4e05701` 独立复验。
 - Workspace 恢复缓存隔离复验通过（模拟前端证据）；真实后端撤权、生产、移动端与读屏仍待验收。
 
@@ -77,7 +81,7 @@
 | TENANCY-SEAM-001-MATRIX | 补足 adapter 状态码/错误码矩阵的独立验收证据 | 首次复验失败，无结论；待重派 | `ctx_21ea990e900f` 报告 focused pytest 120 秒无输出后中止，未改文件、未产生验收结果；后续仍需覆盖端到端 `RESOURCE_NOT_FOUND` 404，且不得改产品实现 |
 | TENANCY-UX-IMPLEMENT-001 | 按已完成 UX 契约实现 Workspace 授权上下文前端状态与切换隔离 | 实现 worker 中断，无完成回执 | `ctx_f3cd826a904b` 因 Codex provider exited 中断；当前仅发现未接入的本地 WIP 文件，未作为完成实现提交；独立前端验收尚未派发 |
 
-本批新派发均请求 Orca 使用 `gpt-6-luna` / `high`。Codex transcript 曾报告该模型的本地 metadata 未找到并使用 fallback metadata；因此记录为“请求/Orca effective 配置为 Luna/high”，不把它夸大为可独立证明的实际推理后端身份。ARCH-MAP-001 已完成；首个 context-first 存量迁移任务仍待产品负责人确认上下文责任、数据归属与试点，再依次扩展边界测试、完成试点 UX/API 契约并单切片迁移，避免无依据地搬动目录或扩大范围。
+以下为历史派发记录：当时的新任务均请求 Orca 使用 `gpt-6-luna` / `high`；当前新任务遵循 `AGENTS.md` 的 `gpt-6-luna` / `medium` 要求。Codex transcript 曾报告该模型的本地 metadata 未找到并使用 fallback metadata；因此记录为“请求/Orca effective 配置为 Luna/high”，不把它夸大为可独立证明的实际推理后端身份。ARCH-MAP-001 已完成；首个 context-first 存量迁移任务仍待产品负责人确认上下文责任、数据归属与试点，再依次扩展边界测试、完成试点 UX/API 契约并单切片迁移，避免无依据地搬动目录或扩大范围。
 
 ## 功能任务
 
@@ -165,7 +169,7 @@
 | F16b | 参数配置前端迁移 | 通过（service 化后真实 Redis 复验通过） | agent_embedding_design | verification/F16b-tenant-config-frontend.md：build、真实 API/Vite/Chromium CRUD、敏感值延迟响应、租户切换隔离和当前 Redis `16381` 环境通过 |
 | F17a | 附件管理本地存储后端 | 通过（service 化独立验收通过） | verify_tenant_backend | verification/F17-attachment-service-refactor.md 与 verification/F17a-attachments-api.md：AttachmentService、请求级事务补偿、文件校验、并发删除、权限隔离、定向 API、默认 API 和 compileall 通过 |
 | F17b | 附件管理前端 | 通过（service 化后真实 Redis/Chromium 复验通过） | verify_tenant_backend | verification/F17b-attachments-frontend.md：类型化附件 API、URL scope/page、错误重试、AlertDialog、权限/撤权/租户切换、真实 Redis/Vite/Playwright 通过；ESLint 0 errors、24 warnings |
-| F17c | S3-compatible 附件存储与本地迁移 | 后端实现、定向测试、独立验收及共享 RustFS 远端健康/网络复查通过；UX/运维体验、真实 S3 CRUD、生产 Bucket、API 切换与附件迁移仍待完成 | verify_tenant_backend | verification/F17c-attachment-s3-storage.md：自动化 S3 使用内存替身；Tabby MCP 复核到 infra-rustfs healthy、infra_backend internal、Console health 200；认证对象读写与生产迁移未验证 |
+| F17c | S3-compatible 附件存储与本地迁移 | 删除顺序修复与模拟 S3 定向独立复验通过；真实 RustFS CRUD、Bucket/API 切换、生产迁移/回滚、commit 故障与 UI 辅助功能验收仍待完成 | verify_tenant_backend | 原报告记录 RustFS 健康/网络检查但未认证 CRUD；本次 [附件删除 UX 契约](ux/attachment-deletion-consistency.md) 与 [删除一致性复验](verification/F17c-attachment-delete-consistency-reacceptance.md) 覆盖 alternate 故障模拟，不代表生产存储验收 |
 | F18a | 系统任务定义后端迁移 | 通过 | verify_tenant_backend | verification/F18a-scheduled-task-definition.md：修复后1 passed，计划校验422且无写入、隔离、目标allowlist与迁移通过 |
 | F18b1 | 过期租户邀请任务目标 | 通过 | verify_tenant_backend | verification/F18b1-expire-invitations.md：1 passed，租户过滤、到期边界及重复/并发幂等通过 |
 | F18b2a | 系统任务内部目标分发 | 通过 | verify_tenant_backend | verification/F18b2a-task-dispatcher.md：1 passed，三个真实目标与跨租户/参数拒绝通过 |

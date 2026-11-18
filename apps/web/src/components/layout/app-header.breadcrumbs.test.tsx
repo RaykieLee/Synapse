@@ -87,8 +87,10 @@ describe('global navigation breadcrumbs', () => {
     await expect.element(middleAncestor).toHaveFocus()
     expect(middleAncestor.element().className).toContain('focus-visible:outline')
     expect(nav.element().scrollWidth).toBeGreaterThan(nav.element().clientWidth)
-    await expect
-      .element(screen.getByRole('status'))
-      .toHaveTextContent('Tenant Alpha role permission rules')
+    const announcement = screen.getByRole('status')
+    await expect.element(announcement).toHaveTextContent(
+      'Tenant Alpha role permission rules'
+    )
+    expect(announcement.element().getAttribute('aria-live')).toBe('polite')
   })
 })

@@ -290,7 +290,7 @@ export function AppHeader() {
   )
   const destinationAnnouncement = activeWorkspaceId
     ? `${translate('当前 Workspace：', locale)} ${activeWorkspace?.name ?? translate('Workspace', locale)}`
-    : translate(breadcrumbs.at(-1)?.title ?? '', locale)
+    : translate(breadcrumbs[breadcrumbs.length - 1]?.title ?? '', locale)
 
   return (
     <Header fixed className='border-b bg-background/95 backdrop-blur'>

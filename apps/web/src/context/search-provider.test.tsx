@@ -71,7 +71,10 @@ vi.mock('@/api/workspaces', () => ({
   getWorkspace: vi.fn(),
 }))
 
-vi.mock('@/lib/api', () => ({ api: mocks.api }))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return { ...actual, api: mocks.api }
+})
 
 vi.mock('@/context/theme-provider', () => ({
   useTheme: () => ({ setTheme: mocks.setTheme }),
@@ -323,6 +326,45 @@ describe('Quick Navigation', () => {
     await openQuickNavigation()
     await expect.element(resolving.getByText('正在确认当前空间…')).toBeInTheDocument()
     await expect.element(resolving.getByText('自定义入口')).not.toBeInTheDocument()
+  })
+
+  it('keeps a Tenant route unscoped while its directory context is pending', async () => {
+    mocks.pathname = '/tenants/tenant-1'
+    mocks.directory.tenantQuery.isSuccess = false
+    mocks.directory.tenantQuery.isLoading = true
+    const screen = await renderQuickNavigation()
+    await openQuickNavigation()
+
+    await expect.element(screen.getByText('正在确认当前租户…')).toBeInTheDocument()
+    await expect.element(screen.getByText('全局导航')).not.toBeInTheDocument()
+    await expect.element(screen.getByText('Northwind')).not.toBeInTheDocument()
+    await expect.element(screen.getByText('Research Room')).not.toBeInTheDocument()
+    await expect.element(screen.getByText('成员与邀请')).not.toBeInTheDocument()
+  })
+
+  it('keeps a Tenant route unscoped and hides stale context after directory error', async () => {
+    mocks.pathname = '/tenants/tenant-1'
+    mocks.directory.tenantQuery.isSuccess = false
+    mocks.directory.tenantQuery.isError = true
+    mocks.directory.tenantQuery.isLoading = false
+    const screen = await renderQuickNavigation()
+    await openQuickNavigation()
+
+    await expect
+      .element(screen.getByText('当前导航范围暂时无法确认。'))
+      .toBeInTheDocument()
+    await expect.element(screen.getByText('全局导航')).not.toBeInTheDocument()
+    await expect.element(screen.getByText('Northwind')).not.toBeInTheDocument()
+    await expect.element(screen.getByText('Research Room')).not.toBeInTheDocument()
+    await expect.element(screen.getByText('成员与邀请')).not.toBeInTheDocument()
+  })
+
+  it('labels a verified global route as Global navigation', async () => {
+    mocks.pathname = '/settings'
+    const screen = await renderQuickNavigation()
+    await openQuickNavigation()
+
+    await expect.element(screen.getByText('全局导航')).toBeInTheDocument()
   })
 
   it('preserves fixed navigation during partial errors and provides retry', async () => {

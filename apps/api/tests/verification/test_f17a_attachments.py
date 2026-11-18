@@ -316,8 +316,8 @@ def test_f17a_attachment_storage_api_and_migration(tmp_path, monkeypatch):
             raise RuntimeError("injected attachment delete flush failure")
         with monkeypatch.context() as patch:
             patch.setattr(Session, "flush", fail_delete_flush)
-            commit_failed = req("delete", f"{api}/{retry_id}", "f17a-owner-a", workspace_ids["alpha"])
-        assert commit_failed.status_code == 500
+            flush_failed = req("delete", f"{api}/{retry_id}", "f17a-owner-a", workspace_ids["alpha"])
+        assert flush_failed.status_code == 500
         with factory() as db:
             assert db.get(Attachment, retry_id) is not None
         assert not retry_path.exists()

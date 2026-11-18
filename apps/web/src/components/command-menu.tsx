@@ -642,8 +642,10 @@ export function CommandMenu() {
 
   const scopeLabel = contextScope
     ? localizedScope(contextScope, tenant?.name, workspace?.name, locale)
-    : routeTenantId && tenantContextReady && tenant
-      ? localizedScope(null, tenant.name, undefined, locale)
+    : routeTenantId
+      ? tenantContextReady && tenant
+        ? localizedScope(null, tenant.name, undefined, locale)
+        : null
       : workspaceId && !workspaceContextReady
         ? null
         : text('global-scope')

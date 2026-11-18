@@ -81,7 +81,7 @@ python -m app.cli.migrate_attachment_storage --target s3 --tenant-id 123 --apply
 
 `DELETE /api/v1/workspaces/{workspace_id}/attachments/{attachment_id}?scope_kind=workspace`
 
-返回 `204`；系统先幂等删除当前后端对象及可用的保留副本，再删除元数据。本地对象清理失败时返回 `500 FILE_CLEANUP_FAILED`；对象存储不可用时返回 `503 ATTACHMENT_STORAGE_UNAVAILABLE`，元数据行保留以便重试。如果对象已不存在，则幂等地继续删除。如果对象移除后数据库提交失败，元数据会保留，重试时可将其删除。带作用域的条件元数据删除使并发删除具备幂等性：资源删除后，两个调用方都会收到 `204`。删除 Workspace 附件需要 `resource:delete`；个人附件仅所有者可删除。未知、跨租户、跨 Workspace 或非本人所有的个人附件 ID 均返回 `404`。
+返回 `204`；系统先幂等删除配置中的 alternate 保留副本（如有），再删除当前后端对象，最后删除元数据。任何存储清理失败均不会删除元数据；例如 alternate 清理失败时，当前后端对象仍保留，可在修复故障后安全重试。如果对象已不存在，则幂等地继续删除。本地对象清理失败时返回 `500 FILE_CLEANUP_FAILED`；对象存储不可用时返回 `503 ATTACHMENT_STORAGE_UNAVAILABLE`。如果存储对象移除后数据库提交失败，元数据会保留，已删除的对象不会恢复，重试时可继续清理。如果 alternate 已删除但当前后端对象清理失败，这属于部分清理，元数据保留以便重试。带作用域的条件元数据删除使并发删除具备幂等性：资源删除后，两个调用方都会收到 `204`。删除 Workspace 附件需要 `resource:delete`；个人附件仅所有者可删除。未知、跨租户、跨 Workspace 或非本人所有的个人附件 ID 均返回 `404`。
 
 ## 当前边界
 

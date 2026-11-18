@@ -25,7 +25,11 @@ from app.services.attachment_storage import (
     AttachmentStorageScope,
     AttachmentStoreUnavailable,
 )
-from app.services.attachments import AttachmentService
+from app.services.attachments import (
+    AttachmentService,
+    AttachmentStorageUnavailable as AttachmentServiceStorageUnavailable,
+)
+from app.tenancy.context import WorkspaceContext
 from app.tasks.attachments import reconcile_attachment_metadata
 from app.cli.migrate_attachment_storage import _migrate_one, _pending_rows
 
@@ -34,6 +38,7 @@ class MemoryS3Store:
     def __init__(self) -> None:
         self.objects: dict[tuple[str, AttachmentStorageScope], bytes] = {}
         self.unavailable = False
+        self.delete_unavailable = False
 
     def put(self, storage_key, scope, payload, media_type) -> None:
         del media_type
@@ -48,6 +53,8 @@ class MemoryS3Store:
             raise AttachmentObjectMissing() from exc
 
     def delete(self, storage_key, scope) -> None:
+        if self.delete_unavailable:
+            raise AttachmentStoreUnavailable()
         self.objects.pop((storage_key, scope), None)
 
     def size(self, storage_key, scope) -> int:
@@ -201,6 +208,59 @@ def test_attachment_storage_migration_is_verified_reversible_and_read_only(
         assert unavailable["exception_ids"]["storage_unavailable"] == [attachment_id]
         assert unavailable["s3_orphan_object_count"] is None
         assert unavailable["s3_orphan_scan_status"] == "unavailable"
+
+
+def test_simulated_alternate_store_delete_failure_preserves_authoritative_object_for_retry(
+    attachment_database,
+):
+    factory, root, tenant_id, workspace_id, actor_id, attachment_id, storage_key = (
+        attachment_database
+    )
+    scope = AttachmentStorageScope(tenant_id, workspace_id, "workspace", None)
+    local_object = root / storage_key[:2] / storage_key[2:]
+    s3_store = MemoryS3Store()
+    s3_store.objects[(storage_key, scope)] = b"simulated retained copy"
+    s3_store.delete_unavailable = True
+    storage = AttachmentStorageRouter(
+        local=LocalAttachmentStore(root),
+        s3=s3_store,
+        default_backend="local",
+    )
+    context = WorkspaceContext(
+        actor_user_id=actor_id,
+        tenant_id=tenant_id,
+        workspace_id=workspace_id,
+        tenant_role="owner",
+        workspace_role="owner",
+        permission_set=frozenset({"resource:delete"}),
+        membership_version=1,
+    )
+
+    with factory() as db:
+        service = AttachmentService(db, storage)
+        with pytest.raises(AttachmentServiceStorageUnavailable):
+            service.delete(
+                context,
+                scope_kind="workspace",
+                attachment_id=attachment_id,
+            )
+
+        assert local_object.read_bytes() == b"verified attachment body"
+        assert s3_store.objects[(storage_key, scope)] == b"simulated retained copy"
+        assert db.get(Attachment, attachment_id) is not None
+
+        s3_store.delete_unavailable = False
+        service.delete(
+            context,
+            scope_kind="workspace",
+            attachment_id=attachment_id,
+        )
+        db.commit()
+
+    assert not local_object.exists()
+    assert (storage_key, scope) not in s3_store.objects
+    with factory() as db:
+        assert db.get(Attachment, attachment_id) is None
 
 
 def test_s3_adapter_uses_path_style_and_scoped_object_keys(monkeypatch):
