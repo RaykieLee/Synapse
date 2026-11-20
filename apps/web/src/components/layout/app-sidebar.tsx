@@ -24,6 +24,8 @@ import {
 } from 'lucide-react'
 import { getWorkspace } from '@/api/workspaces'
 import { translate, useLocale } from '@/lib/i18n'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import { useAuthStore } from '@/stores/auth-store'
 import { api } from '@/lib/api'
 import { useLayout } from '@/context/layout-provider'
@@ -44,6 +46,11 @@ import {
   TeamSwitcher,
   useWorkspaceDirectory,
 } from '@/features/workspaces/directory'
+import {
+  WORKSPACE_QUERY_STALE_TIME,
+  unresolvedWorkspaceDetailQueryKey,
+  workspaceDetailQueryKey,
+} from '@/features/workspaces/workspace-query-keys'
 import {
   buildTenantNavigationGroup,
   buildWorkspaceNavigationGroup,
@@ -198,19 +205,16 @@ export function AppSidebar() {
       )
     : undefined
   const detail = useQuery({
-    queryKey: [
-      'synapse',
-      directory.actorId,
-      workspace?.tenant_id ?? 'unresolved',
-      activeWorkspaceId ?? 'none',
-      'workspace-detail',
-      workspace?.membership_version ?? 0,
-    ],
+    queryKey: workspace
+      ? workspaceDetailQueryKey(directory.actorId, workspace)
+      : unresolvedWorkspaceDetailQueryKey(
+          directory.actorId,
+          activeWorkspaceId ?? 'none'
+        ),
     queryFn: () => getWorkspace(activeWorkspaceId!),
     enabled: Boolean(authUser?.user_id && workspace && activeWorkspaceId),
-    initialData: workspace,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: WORKSPACE_QUERY_STALE_TIME,
+    refetchOnMount: false,
   })
 
   const detailVersion = detail.data?.membership_version
@@ -263,13 +267,10 @@ export function AppSidebar() {
       detail.data.membership_version !== workspace.membership_version
     ) {
       void queryClient.invalidateQueries({
-        queryKey: [
-          'synapse',
-          directory.actorId,
-          'global',
-          'personal',
-          'workspace-directory',
-        ],
+        queryKey: queryKeys.workspace.resource(
+          queryKeys.actorScope(directory.actorId),
+          'directory'
+        ),
       })
     }
   }, [
@@ -279,23 +280,23 @@ export function AppSidebar() {
     workspace,
   ])
 
-  const navigationKey = scope
-    ? ([
-        'synapse',
-        scope.actorId,
-        scope.tenantId,
-        'tenant-navigation',
-        scope.workspaceId,
-        scope.membershipVersion,
-      ] as const)
-    : ([
-        'synapse',
-        authUser?.user_id ?? 'anonymous',
-        'unresolved',
-        'tenant-navigation',
-        activeWorkspaceId ?? 'none',
-        0,
-      ] as const)
+  const navigationScope = scope
+    ? queryKeys.workspaceScope(scope.actorId, {
+        tenant_id: scope.tenantId,
+        workspace_id: scope.workspaceId,
+        membership_version: scope.membershipVersion,
+      })
+    : {
+        actorId: authUser?.user_id ?? 'anonymous',
+        tenantId: 'unresolved',
+        workspaceId: activeWorkspaceId ?? 'none',
+        membershipVersion: 0,
+      }
+  const navigationKey = queryKeys.workspace.query(
+    navigationScope,
+    'tenant-navigation',
+    { tenantId: scope?.tenantId }
+  )
   const navigation = useQuery({
     queryKey: navigationKey,
     queryFn: () =>
@@ -303,8 +304,8 @@ export function AppSidebar() {
         `/tenants/${scope!.tenantId}/menus/visible-tree`
       ),
     enabled: Boolean(scope),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: WORKSPACE_QUERY_STALE_TIME,
+    refetchOnMount: false,
     refetchOnWindowFocus: true,
   })
 
@@ -320,14 +321,19 @@ export function AppSidebar() {
   useEffect(() => {
     const previous = scopeRef.current
     if (previous && previous !== scopeKey) {
-      const [actorId, tenantId, workspaceId] = JSON.parse(previous) as string[]
+      const [actorId, tenantId, workspaceId, membershipVersion] = JSON.parse(
+        previous
+      ) as [string, string, string, number]
       queryClient.removeQueries({
-        predicate: (query) =>
-          query.queryKey[0] === 'synapse' &&
-          query.queryKey[1] === actorId &&
-          query.queryKey[2] === tenantId &&
-          query.queryKey[3] === 'tenant-navigation' &&
-          query.queryKey[4] === workspaceId,
+        queryKey: queryKeys.workspace.resource(
+          {
+            actorId,
+            tenantId,
+            workspaceId,
+            membershipVersion,
+          },
+          'tenant-navigation'
+        ),
       })
     }
     scopeRef.current = scopeKey
@@ -339,7 +345,9 @@ export function AppSidebar() {
     navigation.isError
   )
   const inWorkspaceRoute = Boolean(activeWorkspaceId)
-  const isPlatformAdmin = authUser?.platform_role === 'platform_admin'
+  const isPlatformAdmin = getPermissionCapabilities({
+    platformRole: authUser?.platform_role,
+  }).platform.managePlatformUsers
   const activeTenantId = routeTenantId ?? current?.tenant_id
   const activeTenant =
     activeTenantId && directory.tenantQuery.isSuccess

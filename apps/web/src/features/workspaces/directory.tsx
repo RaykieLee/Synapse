@@ -6,6 +6,8 @@ import { Check, ChevronsUpDown, Plus, Layers3, X } from 'lucide-react'
 import { createWorkspace, listAllWorkspaces } from '@/api/workspaces'
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiProblem, api } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -70,30 +72,21 @@ export function saveRecentWorkspace(userId: string, workspace: Workspace) {
 export function useWorkspaceDirectory(includeArchived = true) {
   const actor = useAuthStore((state) => state.auth.user)
   const actorId = actor?.user_id ?? 'anonymous'
+  const queryScope = queryKeys.actorScope(actorId)
   const tenantQuery = useQuery({
-    queryKey: [
-      'synapse',
-      actorId,
-      'global',
-      'personal',
-      'tenant-directory',
-      1,
-      100,
-    ],
+    queryKey: queryKeys.tenant.query(queryScope, 'directory', {
+      page: 1,
+      pageSize: 100,
+    }),
     queryFn: () => loadAllPages<TenantSummary>('/tenants'),
     enabled: Boolean(actor),
   })
   const workspaceQuery = useQuery({
-    queryKey: [
-      'synapse',
-      actorId,
-      'global',
-      'personal',
-      'workspace-directory',
+    queryKey: queryKeys.workspace.query(queryScope, 'directory', {
       includeArchived,
-      1,
-      100,
-    ],
+      page: 1,
+      pageSize: 100,
+    }),
     queryFn: () => listAllWorkspaces(includeArchived),
     enabled: Boolean(actor),
   })
@@ -105,7 +98,9 @@ export function useWorkspaceDirectory(includeArchived = true) {
     if (tenantQuery.isSuccess && !tenantById.has(workspace.tenant_id)) return false
     if (
       workspace.status === 'archived' &&
-      !['owner', 'admin'].includes(workspace.workspace_role)
+      !getPermissionCapabilities({
+        workspaceRole: workspace.workspace_role,
+      }).workspace.manageWorkspaceSettings
     )
       return false
     return true
@@ -174,10 +169,9 @@ export function useWorkspaceSwitch(
       )
       if (previous && previous.workspace_id !== workspace.workspace_id) {
         queryClient.removeQueries({
-          predicate: (query) =>
-            query.queryKey[0] === 'synapse' &&
-            query.queryKey[1] === directory.actorId &&
-            query.queryKey[3] === previous.workspace_id,
+          queryKey: queryKeys.scope(
+            queryKeys.workspaceScope(actor.user_id, previous)
+          ),
         })
       }
       await navigate({ to: workspacePath(workspace.workspace_id) as never })
@@ -225,7 +219,9 @@ export function TeamSwitcher() {
     (recent &&
     routeId === recent.workspace_id &&
     recent.status === 'archived' &&
-    ['owner', 'admin'].includes(recent.workspace_role)
+    getPermissionCapabilities({
+      workspaceRole: recent.workspace_role,
+    }).workspace.manageWorkspaceSettings
       ? recent
       : undefined)
   const selectedTenant = selected
@@ -352,8 +348,9 @@ export function TeamSwitcher() {
                   }}
                   canCreate={tenants.some(
                     (tenant) =>
-                      tenant.tenant_role === 'owner' ||
-                      tenant.tenant_role === 'admin'
+                      getPermissionCapabilities({
+                        tenantRole: tenant.tenant_role,
+                      }).tenant.createWorkspaces
                   )}
                 />
               </DialogContent>
@@ -407,8 +404,9 @@ export function TeamSwitcher() {
                   }}
                   canCreate={tenants.some(
                     (tenant) =>
-                      tenant.tenant_role === 'owner' ||
-                      tenant.tenant_role === 'admin'
+                      getPermissionCapabilities({
+                        tenantRole: tenant.tenant_role,
+                      }).tenant.createWorkspaces
                   )}
                 />
               </PopoverContent>
@@ -526,7 +524,9 @@ function CreateWorkspaceDialog({
 }) {
   const client = useQueryClient()
   const eligible = tenants.filter(
-    (tenant) => tenant.tenant_role === 'owner' || tenant.tenant_role === 'admin'
+    (tenant) =>
+      getPermissionCapabilities({ tenantRole: tenant.tenant_role }).tenant
+        .createWorkspaces
   )
   const [tenantId, setTenantId] = React.useState(eligible[0]?.tenant_id ?? '')
   const selectedTenantId = tenantId || eligible[0]?.tenant_id || ''
@@ -539,13 +539,10 @@ function CreateWorkspaceDialog({
       const actor = useAuthStore.getState().auth.user
       if (actor) saveRecentWorkspace(actor.user_id, workspace)
       await client.invalidateQueries({
-        queryKey: [
-          'synapse',
-          actorId,
-          'global',
-          'personal',
-          'workspace-directory',
-        ],
+        queryKey: queryKeys.workspace.resource(
+          queryKeys.actorScope(actorId),
+          'directory'
+        ),
       })
       setName('')
       setSlug('')

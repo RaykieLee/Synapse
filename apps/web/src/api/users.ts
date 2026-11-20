@@ -1,27 +1,17 @@
 import { api } from '@/lib/api'
+import type { components } from '@/api/generated/openapi'
 
 export type GlobalUserStatus = 'active' | 'disabled'
 
-export type GlobalUser = {
-  user_id: string
-  user_name: string
-  nick_name: string | null
-  email: string | null
-  phonenumber: string | null
-  sex: string | null
-  avatar: string | null
-  status: GlobalUserStatus
-  platform_role: string
-  created_at: string | null
-  updated_at: string | null
-}
+export type GlobalUser = Omit<
+  components['schemas']['UserResponse'],
+  'status'
+> & { status: GlobalUserStatus }
 
-export type UserPage = {
-  items: GlobalUser[]
-  total: number
-  page: number
-  page_size: number
-}
+export type UserPage = Omit<
+  components['schemas']['UserPageResponse'],
+  'items'
+> & { items: GlobalUser[] }
 
 export type UserListParams = {
   page?: number
@@ -29,31 +19,19 @@ export type UserListParams = {
   search?: string
 }
 
-export type UserCreatePayload = {
-  user_name: string
-  password: string
-  nick_name?: string
-  email?: string | null
-  phonenumber?: string | null
-  sex?: string | null
-  avatar?: string | null
-}
+export type UserCreatePayload = components['schemas']['UserCreate']
 
-export type UserPatchPayload = Partial<
-  Pick<
-    GlobalUser,
-    'nick_name' | 'email' | 'phonenumber' | 'sex' | 'avatar' | 'status'
-  >
->
+export type UserPatchPayload = Omit<
+  components['schemas']['UserPatch'],
+  'status'
+> & { status?: GlobalUserStatus }
 
 export type UserProfilePayload = Pick<
   UserPatchPayload,
   'nick_name' | 'email' | 'phonenumber' | 'sex' | 'avatar'
 >
 
-export type UserPasswordResetPayload = {
-  new_password: string
-}
+export type UserPasswordResetPayload = components['schemas']['PasswordReset']
 
 function withQuery(path: string, params: Record<string, string | number | undefined>) {
   const search = new URLSearchParams()

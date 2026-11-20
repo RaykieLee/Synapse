@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "openapi:generate": "node ../../scripts/frontend/run_openapi_codegen.mjs",
+    "openapi:verify": "node ../../scripts/frontend/run_openapi_codegen.mjs --check && tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
     "format:check": "prettier --check .",
@@ -53,7 +55,6 @@
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.72.1",
     "react-top-loading-bar": "^3.0.2",
-    "recharts": "^3.8.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",

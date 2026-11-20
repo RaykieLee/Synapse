@@ -40,8 +40,16 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
     ...actual,
     useQuery: (options: any) => {
       mocks.queryConfigs.push(options)
-      if (options.queryKey[4] === 'workspace-detail') return mocks.detail
-      if (options.queryKey[3] === 'tenant-navigation') return mocks.navigation
+      if (
+        options.queryKey[6] === 'workspace' &&
+        options.queryKey[7] === 'workspace-detail'
+      )
+        return mocks.detail
+      if (
+        options.queryKey[6] === 'workspace' &&
+        options.queryKey[7] === 'tenant-navigation'
+      )
+        return mocks.navigation
       return { data: undefined, isSuccess: false, isLoading: true, isFetching: true, isError: false }
     },
   }
@@ -203,15 +211,18 @@ describe('Quick Navigation', () => {
     expect(mocks.navigate).toHaveBeenCalledWith({ to: '/w/workspace-1/custom' })
 
     const navigationQuery = mocks.queryConfigs.find(
-      (options) => options.queryKey[3] === 'tenant-navigation'
+      (options) => options.queryKey[7] === 'tenant-navigation'
     )
     expect(navigationQuery.queryKey).toEqual([
       'synapse',
       'actor-1',
       'tenant-1',
-      'tenant-navigation',
       'workspace-1',
+      'membership',
       17,
+      'workspace',
+      'tenant-navigation',
+      { tenantId: 'tenant-1' },
     ])
     await navigationQuery.queryFn()
     expect(mocks.api).toHaveBeenCalledWith(
@@ -570,10 +581,14 @@ describe('Quick Navigation', () => {
       .element(screen.getByText('仅搜索你有权访问的导航，不搜索内容。').last())
       .toBeInTheDocument()
     const queriedKeys = mocks.queryConfigs.map((options) => options.queryKey)
-    expect(queriedKeys.some((key) => key[3] === 'tenant-navigation')).toBe(true)
+    expect(queriedKeys.some((key) => key[7] === 'tenant-navigation')).toBe(true)
     expect(
       queriedKeys.some((key) =>
-        ['chats', 'files', 'users', 'tasks', 'agent-runs'].includes(String(key[4]))
+        key.some((segment: unknown) =>
+          ['chats', 'files', 'users', 'tasks', 'agent-runs'].includes(
+            String(segment)
+          )
+        )
       )
     ).toBe(false)
     expect(mocks.api).not.toHaveBeenCalled()

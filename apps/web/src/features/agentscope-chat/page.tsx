@@ -1,4 +1,4 @@
-import * as React from 'react'
+﻿import * as React from 'react'
 import {
   useInfiniteQuery,
   useMutation,
@@ -23,6 +23,7 @@ import {
 import { downloadAttachment, listAttachments } from '@/api/attachments'
 import { useAuthStore } from '@/stores/auth-store'
 import { useLocaleText } from '@/lib/i18n'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -61,14 +62,27 @@ import { MessageBubble, type ChatMessage } from './components/message-bubble'
 import { SessionConfigPanel } from './components/session-config-panel'
 import { useRealtimeVoice } from './use-realtime-voice'
 import type { SessionConfigPatch, SessionConfigView } from './types'
+import {
+  MAX_CHAT_ATTACHMENT_BYTES,
+  MAX_EXTERNAL_RESULT_CHARS,
+  createSessionMachineState,
+  redactToolText,
+  scopeSessionMachineAction,
+  sessionMachineReducer,
+  sessionStreamEventKey,
+  summarizeToolArguments,
+  summarizeToolResult,
+  type ChatSessionStatus as SessionStatus,
+  type PendingConfirmation,
+  type PendingExternalResult,
+  type ScopedSessionMachineAction,
+  type SessionMachineScope,
+  type SessionStreamEvent as StreamEvent,
+  type ToolExecution,
+} from './session-state'
 
 type AgentView = { id: string; data: { name: string }; editable: boolean }
 type AgentList = { agents: AgentView[]; total: number }
-type SessionStatus =
-  | 'running'
-  | 'idle'
-  | 'awaiting_permission'
-  | 'awaiting_external_result'
 type SessionView = {
   session: {
     id: string
@@ -111,15 +125,6 @@ type AgentTask = {
 type SessionList = { sessions: SessionView[]; total: number }
 type SessionMutation = { name: string; permissionMode: string }
 
-const scopedKey = (actorId: string, workspace: Workspace, resource: string) =>
-  [
-    'synapse',
-    actorId,
-    workspace.tenant_id,
-    workspace.workspace_id,
-    resource,
-    workspace.membership_version ?? 0,
-  ] as const
 const headers = workspaceHeaders
 const aiPath = agentScopePath
 const permissionModes = [
@@ -180,10 +185,18 @@ function WorkspaceSessionsContent({
   const [draftPermission, setDraftPermission] = React.useState('default')
   const [formError, setFormError] = React.useState('')
   const canWrite = workspace.status === 'active'
-  const agentsKey = scopedKey(actorId, workspace, 'ai-agents')
+  const queryScope = React.useMemo(
+    () => workspaceQueryScope(actorId, workspace),
+    [actorId, workspace.tenant_id, workspace.workspace_id, workspace.membership_version]
+  )
+  const agentsKey = queryKeys.agentscope.query(queryScope, ['chat', 'agents'])
   const sessionListKey = React.useMemo(
-    () => [...scopedKey(actorId, workspace, 'ai-sessions'), agentId] as const,
-    [actorId, agentId, workspace]
+    () =>
+      queryKeys.agentscope.query(queryScope, ['chat', 'sessions'], {
+        agentId,
+        workspaceId: workspace.workspace_id,
+      }),
+    [queryScope, agentId, workspace.workspace_id]
   )
 
   const agents = useQuery({
@@ -730,7 +743,7 @@ function WorkspaceSessionsContent({
 
       {selected && selectedAgent && workspace.status === 'active' && (
         <SessionMessagesPanel
-          key={`${actorId}:${workspace.tenant_id}:${workspace.workspace_id}:${agentId}:${selected.session.id}`}
+          key={`${actorId}:${workspace.tenant_id}:${workspace.workspace_id}:${workspace.membership_version ?? 0}:${agentId}:${selected.session.id}`}
           actorId={actorId}
           workspace={workspace}
           agentId={agentId}
@@ -1028,186 +1041,6 @@ type DataBlock = {
   name: string
   source: { type: 'base64'; data: string; media_type: string }
 }
-type StreamEvent = {
-  id?: string
-  sequence?: number
-  seq?: number
-  payload?: string | StreamEvent
-  type?: string
-  reply_id?: string
-  block_id?: string
-  tool_call_id?: string
-  tool_call_name?: string
-  delta?: string
-  text?: string | null
-  state?: string
-  media_type?: string
-  name?: string
-  data?: string | null
-  created_at?: string
-  tool_calls?: PendingToolCall[]
-  execution_results?: Array<{ id: string }>
-  confirm_results?: Array<{ confirmed: boolean; tool_call: { id: string } }>
-  value?: {
-    event_type?: string
-    reply_id?: string
-    event?: StreamEvent
-    worker_session_id?: string
-  }
-}
-type LiveReply = {
-  id: string
-  name: string
-  blocks: Array<{ id: string; text: string }>
-}
-type PendingToolCall = {
-  type?: 'tool_call'
-  id: string
-  name: string
-  input: string
-  state?: string
-  suggested_rules?: unknown[]
-  created_at?: string
-  finished_at?: string | null
-}
-type PendingConfirmation = {
-  key: string
-  replyId: string
-  toolCall: PendingToolCall
-  status: 'pending' | 'submitting' | 'stale'
-  error?: string
-}
-type PendingExternalResult = {
-  key: string
-  replyId: string
-  toolCall: PendingToolCall
-  status: 'pending' | 'submitting' | 'stale'
-  output: string
-  error?: string
-}
-type ToolExecution = {
-  id: string
-  replyId: string
-  name: string
-  state:
-    | 'requesting'
-    | 'awaiting_confirmation'
-    | 'awaiting_external_result'
-    | 'running'
-    | 'success'
-    | 'error'
-    | 'interrupted'
-    | 'denied'
-    | 'finished'
-  startedAt?: string
-  finishedAt?: string
-  argumentsSummary?: string
-  resultText?: string
-  resultTruncated?: boolean
-}
-
-const MAX_CHAT_ATTACHMENT_BYTES = 5 * 1024 * 1024
-const MAX_TOOL_ARGUMENTS_CHARS = 1200
-const MAX_TOOL_RESULT_CHARS = 6000
-const MAX_EXTERNAL_RESULT_CHARS = 4000
-
-function redactToolText(value: string): string {
-  return value
-    .replace(
-      /-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/gi,
-      '[已隐藏的私钥]'
-    )
-    .replace(/(\bBearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[已隐藏]')
-    .replace(
-      /((?:password|passwd|passphrase|token|secret|credential|api[_-]?key|authorization|cookie|private[_-]?key)\s*["']?\s*[:=]\s*["']?)[^"'\s,}\]]+/gi,
-      '$1[已隐藏]'
-    )
-}
-
-function safeToolValue(value: unknown, key = ''): unknown {
-  if (
-    /(password|passwd|passphrase|token|secret|credential|api[_-]?key|authorization|cookie|private[_-]?key)/i.test(
-      key
-    )
-  )
-    return '[已隐藏]'
-  if (typeof value === 'string') return redactToolText(value).slice(0, 240)
-  if (Array.isArray(value))
-    return value.slice(0, 8).map((item) => safeToolValue(item))
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .slice(0, 12)
-        .map(([childKey, child]) => [childKey, safeToolValue(child, childKey)])
-    )
-  }
-  return value
-}
-
-function summarizeToolArguments(raw: string): string {
-  try {
-    return JSON.stringify(safeToolValue(JSON.parse(raw))).slice(
-      0,
-      MAX_TOOL_ARGUMENTS_CHARS
-    )
-  } catch {
-    return '参数摘要不可用'
-  }
-}
-
-function summarizeToolResult(output: unknown): {
-  text: string
-  truncated: boolean
-} {
-  let text: string
-  if (typeof output === 'string') text = output
-  else if (Array.isArray(output)) {
-    text = output
-      .map((block) => {
-        if (
-          block &&
-          typeof block === 'object' &&
-          'text' in block &&
-          typeof block.text === 'string'
-        )
-          return block.text
-        if (
-          block &&
-          typeof block === 'object' &&
-          ('media_type' in block || 'type' in block)
-        ) {
-          const mediaType =
-            'media_type' in block && typeof block.media_type === 'string'
-              ? block.media_type
-              : '附件'
-          const name =
-            'name' in block && typeof block.name === 'string'
-              ? ` ${block.name}`
-              : ''
-          return `[已隐藏附件内容：${mediaType}${name}]`
-        }
-        return '[已隐藏非文本结果]'
-      })
-      .join('\n')
-  } else text = ''
-  const sanitized = redactToolText(text)
-  return {
-    text: sanitized.slice(0, MAX_TOOL_RESULT_CHARS),
-    truncated: sanitized.length > MAX_TOOL_RESULT_CHARS,
-  }
-}
-
-function ensureToolExecution(
-  items: ToolExecution[],
-  id: string,
-  replyId: string,
-  name: string
-): ToolExecution[] {
-  return items.some((item) => item.id === id)
-    ? items
-    : [...items, { id, replyId, name: name || '工具', state: 'requesting' }]
-}
-
 function collectHistoricalTools(messages: ChatMessage[]): ToolExecution[] {
   const items = new Map<string, ToolExecution>()
   for (const message of messages) {
@@ -1364,12 +1197,6 @@ function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-function ensureLiveReply(replies: LiveReply[], id: string): LiveReply[] {
-  return replies.some((reply) => reply.id === id)
-    ? replies
-    : [...replies, { id, name: '智能体', blocks: [] }]
-}
-
 function SessionMessagesPanel({
   actorId,
   workspace,
@@ -1400,91 +1227,87 @@ function SessionMessagesPanel({
   const t = useLocaleText()
   const client = useQueryClient()
   const realtimeVoice = useRealtimeVoice(workspace, agentId, sessionId)
+  const queryScope = React.useMemo(
+    () => workspaceQueryScope(actorId, workspace),
+    [actorId, workspace.tenant_id, workspace.workspace_id, workspace.membership_version]
+  )
   const voiceBusy = realtimeVoice.isBusy
   const headers = React.useMemo(
     () => ({ 'X-Workspace-ID': workspace.workspace_id }),
     [workspace.workspace_id]
   )
-  const [text, setText] = React.useState('')
-  const [selectedAttachments, setSelectedAttachments] = React.useState<
-    string[]
-  >([])
-  const [sending, setSending] = React.useState(initiallyRunning)
-  const [submitting, setSubmitting] = React.useState(false)
-  const [sendError, setSendError] = React.useState('')
-  const [accessDenied, setAccessDenied] = React.useState(false)
-  const [streamError, setStreamError] = React.useState('')
-  const [streamConnected, setStreamConnected] = React.useState(false)
-  const [streamRetry, setStreamRetry] = React.useState(0)
-  const [liveReplies, setLiveReplies] = React.useState<LiveReply[]>([])
-  const [toolEvents, setToolEvents] = React.useState<ToolExecution[]>([])
-  const [confirmationRequests, setConfirmationRequests] = React.useState<
-    PendingConfirmation[]
-  >([])
-  const [externalRequests, setExternalRequests] = React.useState<
-    PendingExternalResult[]
-  >([])
-  const [interruptPending, setInterruptPending] = React.useState(false)
-  const [stopRequested, setStopRequested] = React.useState(false)
+  const machineScope = React.useMemo<SessionMachineScope>(
+    () => ({
+      actorId,
+      tenantId: workspace.tenant_id,
+      workspaceId: workspace.workspace_id,
+      membershipVersion: workspace.membership_version ?? 0,
+      agentId,
+      sessionId,
+      workspaceStatus: workspace.status,
+    }),
+    [
+      actorId,
+      agentId,
+      sessionId,
+      workspace.membership_version,
+      workspace.status,
+      workspace.tenant_id,
+      workspace.workspace_id,
+    ]
+  )
+  const [machine, dispatchMachine] = React.useReducer(
+    sessionMachineReducer,
+    { scope: machineScope, initialStatus, initiallyRunning },
+    createSessionMachineState
+  )
+  const dispatch = React.useCallback(
+    (action: ScopedSessionMachineAction) =>
+      dispatchMachine(scopeSessionMachineAction(machineScope, action)),
+    [machineScope]
+  )
+  const {
+    text,
+    selectedAttachments,
+    sending,
+    submitting,
+    sendError,
+    accessDenied,
+    streamError,
+    streamConnected,
+    streamRetry,
+    liveReplies,
+    toolEvents,
+    confirmationRequests,
+    externalRequests,
+    interruptPending,
+    stopRequested,
+  } = machine
   const sendController = React.useRef<AbortController | null>(null)
   const interruptInFlight = React.useRef(false)
   const streamController = React.useRef<AbortController | null>(null)
   const streamGeneration = React.useRef(0)
   const seenEventIds = React.useRef(new Set<string>())
-  const toolCallBuffers = React.useRef(new Map<string, string>())
-  const resolvedConfirmationKeys = React.useRef(new Set<string>())
   const confirmationInFlight = React.useRef(new Set<string>())
   const confirmationControllers = React.useRef(
     new Map<string, AbortController>()
   )
   const externalInFlight = React.useRef(new Set<string>())
   const externalControllers = React.useRef(new Map<string, AbortController>())
-  const resolvedExternalKeys = React.useRef(new Set<string>())
-  const confirmationRequestsRef = React.useRef<PendingConfirmation[]>([])
   const historyConfirmationsRef = React.useRef<PendingConfirmation[]>([])
-  const externalRequestsRef = React.useRef<PendingExternalResult[]>([])
   const historyExternalRequestsRef = React.useRef<PendingExternalResult[]>([])
   const messagesKey = React.useMemo(
-    () =>
-      [
-        'synapse',
-        actorId,
-        workspace.tenant_id,
-        workspace.workspace_id,
-        'ai-messages',
-        workspace.membership_version ?? 0,
-        agentId,
-        sessionId,
-        headers,
-      ] as const,
-    [
-      actorId,
-      workspace.tenant_id,
-      workspace.workspace_id,
-      workspace.membership_version,
+    () => queryKeys.agentscope.query(queryScope, ['chat', 'messages'], {
       agentId,
       sessionId,
+      workspaceId: workspace.workspace_id,
       headers,
-    ]
+    }),
+    [queryScope, agentId, sessionId, workspace.workspace_id, headers]
   )
   const attachmentKey = React.useMemo(
-    () =>
-      [
-        'synapse',
-        actorId,
-        workspace.tenant_id,
-        workspace.workspace_id,
-        'workspace-attachments-chat',
-        workspace.membership_version ?? 0,
-        headers,
-      ] as const,
-    [
-      actorId,
-      workspace.tenant_id,
-      workspace.workspace_id,
-      workspace.membership_version,
-      headers,
-    ]
+    () => queryKeys.agentscope.query(queryScope, ['chat', 'attachments'], { headers }),
+    [queryScope, headers]
   )
 
   const history = useInfiniteQuery<
@@ -1547,8 +1370,6 @@ function SessionMessagesPanel({
     }
     return [...merged.values()]
   }, [allMessages, toolEvents])
-  confirmationRequestsRef.current = confirmationRequests
-  externalRequestsRef.current = externalRequests
   const pickedAttachments = (attachments.data?.items ?? []).filter((item) =>
     selectedAttachments.includes(item.attachment_id)
   )
@@ -1558,34 +1379,19 @@ function SessionMessagesPanel({
   )
   const runStatusKey = React.useMemo(
     () =>
-      [
-        'synapse',
-        actorId,
-        workspace.tenant_id,
-        workspace.workspace_id,
-        'ai-messages',
-        workspace.membership_version ?? 0,
+      queryKeys.extend(messagesKey, 'status', {
         agentId,
         sessionId,
-        headers,
-        'status',
-      ] as const,
-    [
-      actorId,
-      workspace.tenant_id,
-      workspace.workspace_id,
-      workspace.membership_version,
-      agentId,
-      sessionId,
-      headers,
-    ]
+        workspaceId: workspace.workspace_id,
+      }),
+    [messagesKey, agentId, sessionId, workspace.workspace_id]
   )
   const runStatus = useQuery({
     queryKey: runStatusKey,
-    queryFn: ({ queryKey }) =>
+    queryFn: () =>
       agentScopeRequest<ChatStatus>(
-        `${aiPath}/sessions/${encodeURIComponent(queryKey[7])}/status?agent_id=${encodeURIComponent(queryKey[6])}`,
-        { headers: queryKey[8] }
+        `${aiPath}/sessions/${encodeURIComponent(sessionId)}/status?agent_id=${encodeURIComponent(agentId)}`,
+        { headers }
       ),
     enabled:
       workspace.status === 'active' &&
@@ -1605,9 +1411,15 @@ function SessionMessagesPanel({
     }
     for (const item of confirmationRequests) merged.set(item.key, item)
     return [...merged.values()].filter(
-      (item) => !resolvedConfirmationKeys.current.has(item.key)
+      (item) => !machine.resolvedConfirmationKeys.includes(item.key)
     )
-  }, [allMessages, confirmationRequests, initialStatus, runStatus.data?.status])
+  }, [
+    allMessages,
+    confirmationRequests,
+    initialStatus,
+    machine.resolvedConfirmationKeys,
+    runStatus.data?.status,
+  ])
   const activeExternalRequests = React.useMemo(() => {
     const merged = new Map<string, PendingExternalResult>()
     if (
@@ -1619,9 +1431,15 @@ function SessionMessagesPanel({
     }
     for (const item of externalRequests) merged.set(item.key, item)
     return [...merged.values()].filter(
-      (item) => !resolvedExternalKeys.current.has(item.key)
+      (item) => !machine.resolvedExternalKeys.includes(item.key)
     )
-  }, [allMessages, externalRequests, initialStatus, runStatus.data?.status])
+  }, [
+    allMessages,
+    externalRequests,
+    initialStatus,
+    machine.resolvedExternalKeys,
+    runStatus.data?.status,
+  ])
   historyConfirmationsRef.current = collectHistoricalConfirmations(allMessages)
   historyExternalRequestsRef.current =
     collectHistoricalExternalRequests(allMessages)
@@ -1633,20 +1451,28 @@ function SessionMessagesPanel({
       error instanceof ApiProblem &&
       [401, 403, 404, 409].includes(error.status)
     ) {
-      setAccessDenied(true)
-      setText('')
-      setSelectedAttachments([])
-      setLiveReplies([])
-      setToolEvents([])
-      setConfirmationRequests([])
-      setExternalRequests([])
+      dispatch({
+        type: 'access/denied',
+        confirmationKeys: historyConfirmationsRef.current.map(
+          (item) => item.key
+        ),
+        externalKeys: historyExternalRequestsRef.current.map(
+          (item) => item.key
+        ),
+      })
       confirmationInFlight.current.clear()
       externalInFlight.current.clear()
-      toolCallBuffers.current.clear()
       void client.removeQueries({ queryKey: messagesKey, exact: true })
       void client.removeQueries({ queryKey: attachmentKey, exact: true })
     }
-  }, [attachmentKey, client, history.error, history.isError, messagesKey])
+  }, [
+    attachmentKey,
+    client,
+    dispatch,
+    history.error,
+    history.isError,
+    messagesKey,
+  ])
 
   React.useEffect(() => {
     const controller = new AbortController()
@@ -1655,138 +1481,15 @@ function SessionMessagesPanel({
     const generation = ++streamGeneration.current
     let buffer = ''
 
-    const registerConfirmationRequests = (
-      replyId: string,
-      calls: PendingToolCall[]
-    ) => {
-      const validCalls = calls.filter(
-        (call) =>
-          call &&
-          typeof call.id === 'string' &&
-          typeof call.name === 'string' &&
-          typeof call.input === 'string'
-      )
-      setConfirmationRequests((current) => {
-        const next = [...current]
-        for (const call of validCalls) {
-          const key = `${replyId}:${call.id}`
-          if (
-            resolvedConfirmationKeys.current.has(key) ||
-            next.some((item) => item.key === key)
-          )
-            continue
-          next.push({ key, replyId, toolCall: call, status: 'pending' })
-        }
-        return next
-      })
-      setToolEvents((current) => {
-        let next = current
-        for (const call of validCalls) {
-          const items = ensureToolExecution(next, call.id, replyId, call.name)
-          next = items.map((item) =>
-            item.id === call.id
-              ? {
-                  ...item,
-                  state: 'awaiting_confirmation',
-                  argumentsSummary: summarizeToolArguments(call.input),
-                }
-              : item
-          )
-        }
-        return next
-      })
-    }
-
-    const resolveConfirmationsForReply = (replyId: string) => {
-      for (const item of confirmationRequestsRef.current) {
-        if (item.replyId === replyId)
-          resolvedConfirmationKeys.current.add(item.key)
-      }
-      for (const item of historyConfirmationsRef.current) {
-        if (item.replyId === replyId)
-          resolvedConfirmationKeys.current.add(item.key)
-      }
-      setConfirmationRequests((current) =>
-        current.filter((item) => item.replyId !== replyId)
-      )
-    }
-
-    const registerExternalRequests = (
-      replyId: string,
-      calls: PendingToolCall[]
-    ) => {
-      const validCalls = calls.filter(
-        (call) =>
-          call &&
-          typeof call.id === 'string' &&
-          typeof call.name === 'string' &&
-          typeof call.input === 'string'
-      )
-      setExternalRequests((current) => {
-        const next = [...current]
-        for (const call of validCalls) {
-          const key = `${replyId}:${call.id}`
-          if (
-            resolvedExternalKeys.current.has(key) ||
-            next.some((item) => item.key === key)
-          )
-            continue
-          next.push({
-            key,
-            replyId,
-            toolCall: call,
-            status: 'pending',
-            output: '',
-          })
-        }
-        return next
-      })
-      setToolEvents((current) => {
-        let next = current
-        for (const call of validCalls) {
-          next = ensureToolExecution(next, call.id, replyId, call.name).map(
-            (item) =>
-              item.id === call.id
-                ? {
-                    ...item,
-                    replyId,
-                    name: call.name,
-                    state: 'awaiting_external_result',
-                    argumentsSummary: summarizeToolArguments(call.input),
-                  }
-                : item
-          )
-        }
-        return next
-      })
-    }
-
-    const resolveExternalForReply = (replyId: string) => {
-      for (const item of externalRequestsRef.current)
-        if (item.replyId === replyId) resolvedExternalKeys.current.add(item.key)
-      for (const item of historyExternalRequestsRef.current)
-        if (item.replyId === replyId) resolvedExternalKeys.current.add(item.key)
-      setExternalRequests((current) =>
-        current.filter((item) => item.replyId !== replyId)
-      )
-    }
-
     const consumeEvent = (payload: string) => {
-      if (controller.signal.aborted || generation !== streamGeneration.current)
-        return
+      if (controller.signal.aborted || generation !== streamGeneration.current) return
       let event: StreamEvent
       try {
         const parsed = JSON.parse(payload) as StreamEvent
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          'payload' in parsed &&
-          parsed.payload
-        ) {
-          event =
-            typeof parsed.payload === 'string'
-              ? (JSON.parse(parsed.payload) as StreamEvent)
-              : parsed.payload
+        if (parsed && typeof parsed === 'object' && 'payload' in parsed && parsed.payload) {
+          event = typeof parsed.payload === 'string'
+            ? (JSON.parse(parsed.payload) as StreamEvent)
+            : parsed.payload
         } else {
           event = parsed
         }
@@ -1794,302 +1497,50 @@ function SessionMessagesPanel({
         return
       }
       if (!event || typeof event.type !== 'string') return
-      const eventKey = event.id
-        ? `id:${event.id}`
-        : typeof (event.sequence ?? event.seq) === 'number'
-          ? `seq:${event.reply_id ?? ''}:${event.sequence ?? event.seq}`
-          : undefined
+
+      const eventKey = sessionStreamEventKey(event)
       if (eventKey && seenEventIds.current.has(eventKey)) return
       if (eventKey) {
         seenEventIds.current.add(eventKey)
-        // The server replays up to 1000 recent events on reconnect.
+        // AgentScope can replay recent events after a reconnect.
         if (seenEventIds.current.size > 5000) {
           const oldest = seenEventIds.current.values().next().value
           if (oldest) seenEventIds.current.delete(oldest)
         }
       }
+
+      const replyId = event.reply_id ?? event.value?.event?.reply_id ?? event.value?.reply_id
+      const historyConfirmationKeys = replyId
+        ? historyConfirmationsRef.current
+            .filter((item) => item.replyId === replyId)
+            .map((item) => item.key)
+        : []
+      const historyExternalKeys = replyId
+        ? historyExternalRequestsRef.current
+            .filter((item) => item.replyId === replyId)
+            .map((item) => item.key)
+        : []
+      dispatch({
+        type: 'stream/event',
+        event,
+        historyConfirmationKeys,
+        historyExternalKeys,
+      })
+
       if (event.type === 'REPLY_START') {
         void client.refetchQueries({ queryKey: sessionListKey, type: 'active' })
       }
       if (
-        event.type === 'CUSTOM' &&
-        event.name === 'subagent_require_user_confirm'
+        (event.type === 'CUSTOM' &&
+          event.name === 'subagent_user_confirm_result' &&
+          event.value?.reply_id) ||
+        (event.type === 'EXTERNAL_EXECUTION_RESULT' && event.reply_id) ||
+        (event.type === 'USER_CONFIRM_RESULT' && event.reply_id)
       ) {
-        const projected = event.value?.event
-        const replyId = projected?.reply_id ?? event.value?.reply_id
-        const calls = projected?.tool_calls ?? []
-        if (replyId && event.value?.event_type === 'require_external_execution')
-          registerExternalRequests(replyId, calls)
-        else if (replyId) registerConfirmationRequests(replyId, calls)
-        return
-      }
-      if (
-        event.type === 'CUSTOM' &&
-        event.name === 'subagent_user_confirm_result'
-      ) {
-        if (event.value?.reply_id) {
-          resolveConfirmationsForReply(event.value.reply_id)
-          resolveExternalForReply(event.value.reply_id)
-          setSending(true)
-          void client.invalidateQueries({
-            queryKey: [...messagesKey, 'status'],
-          })
-          void client.invalidateQueries({ queryKey: messagesKey })
-          void client.invalidateQueries({ queryKey: sessionListKey })
-        }
-        return
-      }
-      if (event.type === 'REQUIRE_USER_CONFIRM' && event.reply_id) {
-        registerConfirmationRequests(event.reply_id, event.tool_calls ?? [])
-        return
-      }
-      if (event.type === 'REQUIRE_EXTERNAL_EXECUTION' && event.reply_id) {
-        registerExternalRequests(event.reply_id, event.tool_calls ?? [])
-        return
-      }
-      if (event.type === 'EXTERNAL_EXECUTION_RESULT' && event.reply_id) {
-        for (const result of event.execution_results ?? [])
-          resolvedExternalKeys.current.add(`${event.reply_id}:${result.id}`)
-        setExternalRequests((current) =>
-          current.filter((item) => !resolvedExternalKeys.current.has(item.key))
-        )
-        setSending(true)
-        void client.invalidateQueries({ queryKey: [...messagesKey, 'status'] })
+        void client.invalidateQueries({ queryKey: runStatusKey })
         void client.invalidateQueries({ queryKey: messagesKey })
         void client.invalidateQueries({ queryKey: sessionListKey })
-        return
-      }
-      if (event.type === 'USER_CONFIRM_RESULT' && event.reply_id) {
-        for (const result of event.confirm_results ?? []) {
-          const key = `${event.reply_id}:${result.tool_call.id}`
-          resolvedConfirmationKeys.current.add(key)
-        }
-        setConfirmationRequests((current) =>
-          current.filter(
-            (item) => !resolvedConfirmationKeys.current.has(item.key)
-          )
-        )
-        setSending(true)
-        void client.invalidateQueries({ queryKey: [...messagesKey, 'status'] })
-        void client.invalidateQueries({ queryKey: messagesKey })
-        void client.invalidateQueries({ queryKey: sessionListKey })
-        return
-      }
-      const replyId = event.reply_id
-      if (!replyId) return
-      if (event.type === 'REPLY_START') {
-        setLiveReplies((current) =>
-          current.some((reply) => reply.id === replyId)
-            ? current
-            : [
-                ...current,
-                { id: replyId, name: event.name || '智能体', blocks: [] },
-              ]
-        )
-      } else if (event.type === 'TEXT_BLOCK_START' && event.block_id) {
-        const blockId = event.block_id
-        setLiveReplies((current) => {
-          const replies = ensureLiveReply(current, replyId)
-          return replies.map((reply) =>
-            reply.id !== replyId ||
-            reply.blocks.some((block) => block.id === blockId)
-              ? reply
-              : {
-                  ...reply,
-                  blocks: [...reply.blocks, { id: blockId, text: '' }],
-                }
-          )
-        })
-      } else if (
-        event.type === 'TEXT_BLOCK_DELTA' &&
-        event.block_id &&
-        typeof event.delta === 'string'
-      ) {
-        const blockId = event.block_id
-        const delta = event.delta
-        setLiveReplies((current) => {
-          const replies = ensureLiveReply(current, replyId)
-          return replies.map((reply) =>
-            reply.id !== replyId
-              ? reply
-              : {
-                  ...reply,
-                  blocks: reply.blocks.some((block) => block.id === blockId)
-                    ? reply.blocks.map((block) =>
-                        block.id === blockId
-                          ? { ...block, text: block.text + delta }
-                          : block
-                      )
-                    : [...reply.blocks, { id: blockId, text: delta }],
-                }
-          )
-        })
-      } else if (
-        event.type === 'TEXT_BLOCK_END' &&
-        event.block_id &&
-        typeof event.text === 'string'
-      ) {
-        const blockId = event.block_id
-        const finalText = event.text
-        setLiveReplies((current) =>
-          current.map((reply) =>
-            reply.id !== replyId
-              ? reply
-              : {
-                  ...reply,
-                  blocks: reply.blocks.map((block) =>
-                    block.id === blockId ? { ...block, text: finalText } : block
-                  ),
-                }
-          )
-        )
-      } else if (event.type === 'TOOL_CALL_START' && event.tool_call_id) {
-        const toolId = event.tool_call_id
-        const name = event.tool_call_name || '工具'
-        toolCallBuffers.current.set(toolId, '')
-        setToolEvents((current) => {
-          const items = ensureToolExecution(current, toolId, replyId, name)
-          return items.map((item) =>
-            item.id === toolId
-              ? {
-                  ...item,
-                  replyId,
-                  name,
-                  state: 'requesting',
-                  startedAt: event.created_at ?? item.startedAt,
-                }
-              : item
-          )
-        })
-      } else if (
-        event.type === 'TOOL_CALL_DELTA' &&
-        event.tool_call_id &&
-        typeof event.delta === 'string'
-      ) {
-        const previous = toolCallBuffers.current.get(event.tool_call_id) ?? ''
-        toolCallBuffers.current.set(
-          event.tool_call_id,
-          (previous + event.delta).slice(0, MAX_TOOL_ARGUMENTS_CHARS * 10)
-        )
-      } else if (event.type === 'TOOL_CALL_END' && event.tool_call_id) {
-        const toolId = event.tool_call_id
-        const rawArguments = toolCallBuffers.current.get(toolId) ?? ''
-        toolCallBuffers.current.delete(toolId)
-        setToolEvents((current) => {
-          const items = ensureToolExecution(
-            current,
-            toolId,
-            replyId,
-            event.tool_call_name || '工具'
-          )
-          return items.map((item) =>
-            item.id === toolId
-              ? {
-                  ...item,
-                  state: 'requesting',
-                  ...(rawArguments
-                    ? { argumentsSummary: summarizeToolArguments(rawArguments) }
-                    : {}),
-                }
-              : item
-          )
-        })
-      } else if (event.type === 'TOOL_RESULT_START' && event.tool_call_id) {
-        const toolId = event.tool_call_id
-        setToolEvents((current) => {
-          const items = ensureToolExecution(
-            current,
-            toolId,
-            replyId,
-            event.tool_call_name || '工具'
-          )
-          return items.map((item) =>
-            item.id === toolId
-              ? {
-                  ...item,
-                  replyId,
-                  name: event.tool_call_name || item.name,
-                  state: 'running',
-                  startedAt: event.created_at ?? item.startedAt,
-                  resultText: '',
-                  resultTruncated: false,
-                }
-              : item
-          )
-        })
-      } else if (
-        event.type === 'TOOL_RESULT_TEXT_DELTA' &&
-        event.tool_call_id &&
-        typeof event.delta === 'string'
-      ) {
-        const toolId = event.tool_call_id
-        const delta = event.delta
-        setToolEvents((current) =>
-          current.map((item) =>
-            item.id !== toolId
-              ? item
-              : {
-                  ...item,
-                  resultText: `${item.resultText ?? ''}${delta}`.slice(
-                    0,
-                    MAX_TOOL_RESULT_CHARS + 1
-                  ),
-                  resultTruncated:
-                    `${item.resultText ?? ''}${delta}`.length >
-                    MAX_TOOL_RESULT_CHARS,
-                }
-          )
-        )
-      } else if (
-        event.type === 'TOOL_RESULT_DATA_DELTA' &&
-        event.tool_call_id
-      ) {
-        const toolId = event.tool_call_id
-        setToolEvents((current) =>
-          current.map((item) => {
-            if (item.id !== toolId) return item
-            const resultText = item.resultText
-              ? `${item.resultText}\n[已隐藏附件或二进制结果]`
-              : '[已隐藏附件或二进制结果]'
-            return {
-              ...item,
-              resultText: resultText.slice(0, MAX_TOOL_RESULT_CHARS + 1),
-              resultTruncated:
-                item.resultTruncated ||
-                resultText.length > MAX_TOOL_RESULT_CHARS,
-            }
-          })
-        )
-      } else if (event.type === 'TOOL_RESULT_END' && event.tool_call_id) {
-        const toolId = event.tool_call_id
-        const state = ['success', 'error', 'interrupted', 'denied'].includes(
-          event.state ?? ''
-        )
-          ? (event.state as ToolExecution['state'])
-          : 'finished'
-        setToolEvents((current) => {
-          const items = ensureToolExecution(
-            current,
-            toolId,
-            replyId,
-            event.tool_call_name || '工具'
-          )
-          return items.map((item) =>
-            item.id !== toolId
-              ? item
-              : {
-                  ...item,
-                  state,
-                  finishedAt: event.created_at ?? item.finishedAt,
-                  resultText: item.resultText
-                    ? redactToolText(item.resultText)
-                    : item.resultText,
-                }
-          )
-        })
-      } else if (event.type === 'REPLY_END') {
-        resolveConfirmationsForReply(replyId)
-        resolveExternalForReply(replyId)
+      } else if (event.type === 'REPLY_END' && event.reply_id) {
         void client.invalidateQueries({ queryKey: messagesKey })
         void client.invalidateQueries({ queryKey: sessionListKey })
       }
@@ -2110,8 +1561,7 @@ function SessionMessagesPanel({
     }
 
     const connect = async () => {
-      setStreamError('')
-      setStreamConnected(false)
+      dispatch({ type: 'stream/connecting' })
       let response: Response
       try {
         response = await fetch(agentScopeStreamUrl(sessionId, agentId), {
@@ -2125,9 +1575,10 @@ function SessionMessagesPanel({
         })
       } catch (error) {
         if (!controller.signal.aborted)
-          setStreamError(
-            error instanceof Error ? error.message : '消息流连接失败。'
-          )
+          dispatch({
+            type: 'stream/failed',
+            error: error instanceof Error ? error.message : '消息流连接失败。',
+          })
         return
       }
       if (controller.signal.aborted || generation !== streamGeneration.current)
@@ -2135,24 +1586,28 @@ function SessionMessagesPanel({
       if (!response.ok || !response.body) {
         if (response.status === 401) useAuthStore.getState().auth.reset()
         if ([401, 403, 404, 409].includes(response.status)) {
-          setAccessDenied(true)
-          setText('')
-          setSelectedAttachments([])
-          setLiveReplies([])
-          setToolEvents([])
-          setConfirmationRequests([])
-          setExternalRequests([])
+          dispatch({
+            type: 'access/denied',
+            confirmationKeys: historyConfirmationsRef.current.map(
+              (item) => item.key
+            ),
+            externalKeys: historyExternalRequestsRef.current.map(
+              (item) => item.key
+            ),
+          })
           confirmationInFlight.current.clear()
           externalInFlight.current.clear()
-          toolCallBuffers.current.clear()
           void client.removeQueries({ queryKey: messagesKey, exact: true })
           void client.removeQueries({ queryKey: attachmentKey, exact: true })
         }
-        setStreamError(`消息流连接失败（HTTP ${response.status}），可重试。`)
+        dispatch({
+          type: 'stream/failed',
+          error: `消息流连接失败（HTTP ${response.status}），可重试。`,
+        })
         return
       }
 
-      setStreamConnected(true)
+      dispatch({ type: 'stream/connected' })
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       try {
@@ -2173,22 +1628,22 @@ function SessionMessagesPanel({
           !controller.signal.aborted &&
           generation === streamGeneration.current
         ) {
-          setStreamConnected(false)
-          setStreamError(
-            '消息流已断开，已收到的文本保留。可重试以接收后续内容。'
-          )
+          dispatch({
+            type: 'stream/failed',
+            error: '消息流已断开，已收到的文本保留。可重试以接收后续内容。',
+          })
         }
       } catch (error) {
         if (
           !controller.signal.aborted &&
           generation === streamGeneration.current
         ) {
-          setStreamConnected(false)
-          setStreamError(
-            error instanceof Error
+          dispatch({
+            type: 'stream/failed',
+            error: error instanceof Error
               ? error.message
-              : '消息流中断，已收到的文本保留。可重试。'
-          )
+              : '消息流中断，已收到的文本保留。可重试。',
+          })
         }
       } finally {
         try {
@@ -2209,6 +1664,7 @@ function SessionMessagesPanel({
     agentId,
     attachmentKey,
     client,
+    dispatch,
     messagesKey,
     sessionId,
     sessionListKey,
@@ -2225,37 +1681,39 @@ function SessionMessagesPanel({
     )
       return
     if (runStatus.isError) {
-      setSending(false)
-      setStopRequested(false)
-      setSendError(formatError(runStatus.error))
-      if (
+      const accessDenied =
         runStatus.error instanceof ApiProblem &&
         [401, 403, 404, 409].includes(runStatus.error.status)
-      ) {
-        setAccessDenied(true)
-        setText('')
-        setSelectedAttachments([])
-        setLiveReplies([])
-        setToolEvents([])
-        setConfirmationRequests([])
-        setExternalRequests([])
+      dispatch({
+        type: 'run/status-failed',
+        error: formatError(runStatus.error),
+        accessDenied,
+        confirmationKeys: historyConfirmationsRef.current.map(
+          (item) => item.key
+        ),
+        externalKeys: historyExternalRequestsRef.current.map(
+          (item) => item.key
+        ),
+      })
+      if (accessDenied) {
         confirmationInFlight.current.clear()
         externalInFlight.current.clear()
-        toolCallBuffers.current.clear()
         void client.removeQueries({ queryKey: messagesKey, exact: true })
         void client.removeQueries({ queryKey: attachmentKey, exact: true })
       }
       return
     }
-    if (runStatus.data && runStatus.data.status !== 'running') {
-      setSending(false)
-      setStopRequested(false)
-      void client.invalidateQueries({ queryKey: messagesKey })
-      void client.invalidateQueries({ queryKey: sessionListKey })
+    if (runStatus.data) {
+      dispatch({ type: 'run/status-updated', status: runStatus.data.status })
+      if (runStatus.data.status !== 'running') {
+        void client.invalidateQueries({ queryKey: messagesKey })
+        void client.invalidateQueries({ queryKey: sessionListKey })
+      }
     }
   }, [
     attachmentKey,
     client,
+    dispatch,
     interruptPending,
     messagesKey,
     runStatus.data,
@@ -2293,12 +1751,11 @@ function SessionMessagesPanel({
       !config.chat_model_config ||
       sending ||
       submitting ||
-      pickedBytes > MAX_CHAT_ATTACHMENT_BYTES
+      pickedBytes > MAX_CHAT_ATTACHMENT_BYTES ||
+      sendController.current
     )
       return
-    setSendError('')
-    setAccessDenied(false)
-    setSubmitting(true)
+    dispatch({ type: 'send/start' })
     const controller = new AbortController()
     sendController.current = controller
     try {
@@ -2335,37 +1792,30 @@ function SessionMessagesPanel({
           }),
         }
       )
-      // Clear the composer only after the server confirms that the run was
-      // accepted. A failed POST leaves the user's text and attachments intact.
-      setText('')
-      setSelectedAttachments([])
-      setSending(true)
-      setSendError('')
-      void client.invalidateQueries({ queryKey: [...messagesKey, 'status'] })
+      // Keep the composer contents until the server confirms the run.
+      dispatch({ type: 'send/accepted' })
+      void client.invalidateQueries({ queryKey: runStatusKey })
     } catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        setSendError(formatError(error))
-        if (
-          error instanceof ApiProblem &&
-          [401, 403, 404].includes(error.status)
-        ) {
-          setAccessDenied(true)
-          setText('')
-          setSelectedAttachments([])
-          setLiveReplies([])
-          setToolEvents([])
-          setConfirmationRequests([])
-          setExternalRequests([])
+        const accessDenied =
+          error instanceof ApiProblem && [401, 403, 404].includes(error.status)
+        dispatch({
+          type: 'send/failed',
+          error: formatError(error),
+          accessDenied,
+          confirmationKeys: historyConfirmationsRef.current.map((item) => item.key),
+          externalKeys: historyExternalRequestsRef.current.map((item) => item.key),
+        })
+        if (accessDenied) {
           confirmationInFlight.current.clear()
           externalInFlight.current.clear()
-          toolCallBuffers.current.clear()
           void client.removeQueries({ queryKey: messagesKey, exact: true })
           void client.removeQueries({ queryKey: attachmentKey, exact: true })
         }
       }
     } finally {
       if (sendController.current === controller) sendController.current = null
-      setSubmitting(false)
+      dispatch({ type: 'send/settled' })
     }
   }
 
@@ -2382,14 +1832,7 @@ function SessionMessagesPanel({
     confirmationInFlight.current.add(request.key)
     const controller = new AbortController()
     confirmationControllers.current.set(request.key, controller)
-    setConfirmationRequests((current) =>
-      current.map((item) =>
-        item.key === request.key
-          ? { ...item, status: 'submitting', error: undefined }
-          : item
-      )
-    )
-    setSendError('')
+    dispatch({ type: 'confirmation/begin', request })
     try {
       const confirmationEvent = {
         type: 'USER_CONFIRM_RESULT' as const,
@@ -2419,63 +1862,44 @@ function SessionMessagesPanel({
         )
       }
       if (controller.signal.aborted) return
-      resolvedConfirmationKeys.current.add(request.key)
-      setConfirmationRequests((current) =>
-        current.filter((item) => item.key !== request.key)
-      )
-      setSending(true)
-      setSendError('')
-      void client.invalidateQueries({ queryKey: [...messagesKey, 'status'] })
+      dispatch({ type: 'confirmation/accepted', key: request.key })
+      void client.invalidateQueries({ queryKey: runStatusKey })
       void client.invalidateQueries({ queryKey: messagesKey })
       void client.invalidateQueries({ queryKey: sessionListKey })
     } catch (error) {
       if (controller.signal.aborted) return
-      const expired =
-        error instanceof ApiProblem && [404, 409].includes(error.status)
-      setConfirmationRequests((current) =>
-        current.map((item) =>
-          item.key === request.key
-            ? {
-                ...item,
-                status: expired ? 'stale' : 'pending',
-                error: expired
-                  ? '确认请求已过期或已被处理，正在刷新当前状态。'
-                  : formatError(error),
-              }
-            : item
-        )
-      )
-      if (error instanceof ApiProblem && [401, 403].includes(error.status)) {
+      const expired = error instanceof ApiProblem && [404, 409].includes(error.status)
+      const accessDenied = error instanceof ApiProblem && [401, 403].includes(error.status)
+      dispatch({
+        type: 'confirmation/failed',
+        request,
+        error: expired
+          ? '确认请求已过期或已被处理，正在刷新当前状态。'
+          : formatError(error),
+        sendError: accessDenied
+          ? undefined
+          : expired
+            ? '确认请求已失效，消息与运行状态已刷新。'
+            : `提交确认失败：${formatError(error)}`,
+        stale: expired,
+        accessDenied,
+        confirmationKeys: historyConfirmationsRef.current.map((item) => item.key),
+        externalKeys: historyExternalRequestsRef.current.map((item) => item.key),
+      })
+      if (accessDenied) {
         if (error.status === 401) useAuthStore.getState().auth.reset()
-        setAccessDenied(true)
-        setText('')
-        setSelectedAttachments([])
-        setLiveReplies([])
-        setToolEvents([])
-        setConfirmationRequests([])
-        setExternalRequests([])
         confirmationInFlight.current.clear()
         externalInFlight.current.clear()
-        toolCallBuffers.current.clear()
-        for (const item of historyConfirmationsRef.current)
-          resolvedConfirmationKeys.current.add(item.key)
         void client.removeQueries({ queryKey: messagesKey, exact: true })
         void client.removeQueries({ queryKey: attachmentKey, exact: true })
-      } else {
-        setSendError(
-          expired
-            ? '确认请求已失效，消息与运行状态已刷新。'
-            : `提交确认失败：${formatError(error)}`
-        )
       }
-      void client.invalidateQueries({ queryKey: [...messagesKey, 'status'] })
+      void client.invalidateQueries({ queryKey: runStatusKey })
       void client.invalidateQueries({ queryKey: messagesKey })
       void client.invalidateQueries({ queryKey: sessionListKey })
     } finally {
       confirmationInFlight.current.delete(request.key)
-      if (confirmationControllers.current.get(request.key) === controller) {
+      if (confirmationControllers.current.get(request.key) === controller)
         confirmationControllers.current.delete(request.key)
-      }
     }
   }
 
@@ -2491,40 +1915,19 @@ function SessionMessagesPanel({
       return
     const output = cancel
       ? '外部任务已由用户取消。'
-      : redactToolText(request.output.trim()).slice(
-          0,
-          MAX_EXTERNAL_RESULT_CHARS
-        )
+      : redactToolText(request.output.trim()).slice(0, MAX_EXTERNAL_RESULT_CHARS)
     if (!cancel && !output) {
-      setExternalRequests((current) => {
-        const existing = current.find((item) => item.key === request.key)
-        if (existing)
-          return current.map((item) =>
-            item.key === request.key
-              ? { ...item, error: '请填写外部任务结果。' }
-              : item
-          )
-        return [...current, { ...request, error: '请填写外部任务结果。' }]
+      dispatch({
+        type: 'external/invalid',
+        request,
+        error: '请填写外部任务结果。',
       })
       return
     }
     externalInFlight.current.add(request.key)
     const controller = new AbortController()
     externalControllers.current.set(request.key, controller)
-    setExternalRequests((current) => {
-      const existing = current.find((item) => item.key === request.key)
-      if (existing)
-        return current.map((item) =>
-          item.key === request.key
-            ? { ...item, status: 'submitting', error: undefined }
-            : item
-        )
-      return [
-        ...current,
-        { ...request, status: 'submitting', error: undefined },
-      ]
-    })
-    setSendError('')
+    dispatch({ type: 'external/begin', request })
     try {
       await agentScopeRequest<{ status: string; session_id: string }>(
         `${aiPath}/chat/`,
@@ -2551,53 +1954,39 @@ function SessionMessagesPanel({
           }),
         }
       )
-      resolvedExternalKeys.current.add(request.key)
-      setExternalRequests((current) =>
-        current.filter((item) => item.key !== request.key)
-      )
-      setSending(true)
-      setSendError('')
-      void client.invalidateQueries({ queryKey: [...messagesKey, 'status'] })
+      if (controller.signal.aborted) return
+      dispatch({ type: 'external/accepted', key: request.key })
+      void client.invalidateQueries({ queryKey: runStatusKey })
       void client.invalidateQueries({ queryKey: messagesKey })
       void client.invalidateQueries({ queryKey: sessionListKey })
     } catch (error) {
-      const expired =
-        error instanceof ApiProblem && [404, 409].includes(error.status)
-      setExternalRequests((current) => {
-        const existing = current.find((item) => item.key === request.key)
-        const next = {
-          ...(existing ?? request),
-          status: expired ? ('stale' as const) : ('pending' as const),
-          error: expired
-            ? '外部任务请求已过期或已被处理，正在刷新当前状态。'
-            : formatError(error),
-        }
-        return existing
-          ? current.map((item) => (item.key === request.key ? next : item))
-          : [...current, next]
+      if (controller.signal.aborted) return
+      const expired = error instanceof ApiProblem && [404, 409].includes(error.status)
+      const accessDenied = error instanceof ApiProblem && [401, 403].includes(error.status)
+      dispatch({
+        type: 'external/failed',
+        request,
+        error: expired
+          ? '外部任务请求已过期或已被处理，正在刷新当前状态。'
+          : formatError(error),
+        sendError: accessDenied
+          ? undefined
+          : expired
+            ? '外部任务请求已失效，消息与运行状态已刷新。'
+            : `提交外部结果失败：${formatError(error)}`,
+        stale: expired,
+        accessDenied,
+        confirmationKeys: historyConfirmationsRef.current.map((item) => item.key),
+        externalKeys: historyExternalRequestsRef.current.map((item) => item.key),
       })
-      if (error instanceof ApiProblem && [401, 403].includes(error.status)) {
+      if (accessDenied) {
         if (error.status === 401) useAuthStore.getState().auth.reset()
-        setAccessDenied(true)
-        setText('')
-        setSelectedAttachments([])
-        setLiveReplies([])
-        setToolEvents([])
-        setConfirmationRequests([])
-        setExternalRequests([])
         confirmationInFlight.current.clear()
         externalInFlight.current.clear()
-        toolCallBuffers.current.clear()
         void client.removeQueries({ queryKey: messagesKey, exact: true })
         void client.removeQueries({ queryKey: attachmentKey, exact: true })
-      } else {
-        setSendError(
-          expired
-            ? '外部任务请求已失效，消息与运行状态已刷新。'
-            : `提交外部结果失败：${formatError(error)}`
-        )
       }
-      void client.invalidateQueries({ queryKey: [...messagesKey, 'status'] })
+      void client.invalidateQueries({ queryKey: runStatusKey })
       void client.invalidateQueries({ queryKey: messagesKey })
       void client.invalidateQueries({ queryKey: sessionListKey })
     } finally {
@@ -2617,12 +2006,10 @@ function SessionMessagesPanel({
       runStatus.data?.status === 'awaiting_permission' ||
       runStatus.data?.status === 'awaiting_external_result'
     if (interruptInFlight.current || !interruptible) return
-    const wasRunning =
-      sending || initiallyRunning || runStatus.data?.status === 'running'
+    const currentStatus = runStatus.data?.status ?? initialStatus
+    if (runStatus.data) dispatch({ type: 'run/status-updated', status: currentStatus })
     interruptInFlight.current = true
-    setInterruptPending(true)
-    setSendError('')
-    setSending(true)
+    dispatch({ type: 'interrupt/requested' })
     try {
       await agentScopeRequest<{ session_id: string }>(
         `${aiPath}/sessions/${encodeURIComponent(sessionId)}/interrupt?agent_id=${encodeURIComponent(agentId)}`,
@@ -2631,46 +2018,36 @@ function SessionMessagesPanel({
           headers,
         }
       )
-      setStopRequested(true)
-      void client.invalidateQueries({ queryKey: [...messagesKey, 'status'] })
+      dispatch({ type: 'interrupt/accepted' })
+      void client.invalidateQueries({ queryKey: runStatusKey })
       void client.invalidateQueries({ queryKey: messagesKey })
       void client.invalidateQueries({ queryKey: sessionListKey })
     } catch (error) {
-      setSending(wasRunning)
-      setStopRequested(false)
-      setSendError(`中断失败：${formatError(error)}`)
-      if (
-        error instanceof ApiProblem &&
-        [401, 403, 404, 409].includes(error.status)
-      ) {
-        setAccessDenied(true)
-        setText('')
-        setSelectedAttachments([])
-        setLiveReplies([])
-        setToolEvents([])
-        setConfirmationRequests([])
-        setExternalRequests([])
+      const accessDenied = error instanceof ApiProblem && [401, 403, 404, 409].includes(error.status)
+      dispatch({
+        type: 'interrupt/failed',
+        error: `中断失败：${formatError(error)}`,
+        accessDenied,
+        confirmationKeys: historyConfirmationsRef.current.map((item) => item.key),
+        externalKeys: historyExternalRequestsRef.current.map((item) => item.key),
+      })
+      if (accessDenied) {
         confirmationInFlight.current.clear()
         externalInFlight.current.clear()
-        toolCallBuffers.current.clear()
         void client.removeQueries({ queryKey: messagesKey, exact: true })
         void client.removeQueries({ queryKey: attachmentKey, exact: true })
       } else {
-        void client.invalidateQueries({ queryKey: [...messagesKey, 'status'] })
+        void client.invalidateQueries({ queryKey: runStatusKey })
         void client.invalidateQueries({ queryKey: sessionListKey })
       }
     } finally {
       interruptInFlight.current = false
-      setInterruptPending(false)
+      dispatch({ type: 'interrupt/settled' })
     }
   }
 
   const toggleAttachment = (id: string) =>
-    setSelectedAttachments((current) =>
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id]
-    )
+    dispatch({ type: 'composer/attachment-toggled', attachmentId: id })
   const historyError = history.isError ? formatError(history.error) : ''
   const historyAccessDenied =
     history.isError &&
@@ -2862,12 +2239,10 @@ function SessionMessagesPanel({
                             size='sm'
                             variant='outline'
                             onClick={() => {
-                              resolvedConfirmationKeys.current.add(request.key)
-                              setConfirmationRequests((current) =>
-                                current.filter(
-                                  (item) => item.key !== request.key
-                                )
-                              )
+                              dispatch({
+                                type: 'confirmation/dismiss',
+                                key: request.key,
+                              })
                             }}
                           >
                             <LocalizedText text={'关闭'} />
@@ -2975,28 +2350,10 @@ function SessionMessagesPanel({
                             disabled={disabled}
                             placeholder='填写外部执行器返回的文本结果…'
                             onChange={(event) =>
-                              setExternalRequests((current) => {
-                                const existing = current.find(
-                                  (item) => item.key === request.key
-                                )
-                                if (existing)
-                                  return current.map((item) =>
-                                    item.key === request.key
-                                      ? {
-                                          ...item,
-                                          output: event.target.value,
-                                          error: undefined,
-                                        }
-                                      : item
-                                  )
-                                return [
-                                  ...current,
-                                  {
-                                    ...request,
-                                    output: event.target.value,
-                                    error: undefined,
-                                  },
-                                ]
+                              dispatch({
+                                type: 'external/edit',
+                                request,
+                                output: event.target.value,
                               })
                             }
                           />
@@ -3024,12 +2381,10 @@ function SessionMessagesPanel({
                             size='sm'
                             variant='outline'
                             onClick={() => {
-                              resolvedExternalKeys.current.add(request.key)
-                              setExternalRequests((current) =>
-                                current.filter(
-                                  (item) => item.key !== request.key
-                                )
-                              )
+                              dispatch({
+                                type: 'external/dismiss',
+                                key: request.key,
+                              })
                             }}
                           >
                             <LocalizedText text={'关闭'} />
@@ -3170,7 +2525,7 @@ function SessionMessagesPanel({
                   type='button'
                   size='sm'
                   variant='outline'
-                  onClick={() => setStreamRetry((value) => value + 1)}
+                  onClick={() => dispatch({ type: 'stream/retry' })}
                 >
                   <LocalizedText text={'重试消息流'} />
                 </Button>
@@ -3183,7 +2538,12 @@ function SessionMessagesPanel({
                 className='min-h-24 resize-y border-0 shadow-none focus-visible:ring-0'
                 value={text}
                 disabled={sending || submitting || accessDenied || voiceBusy}
-                onChange={(event) => setText(event.target.value)}
+                onChange={(event) =>
+                  dispatch({
+                    type: 'composer/text-changed',
+                    value: event.target.value,
+                  })
+                }
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault()

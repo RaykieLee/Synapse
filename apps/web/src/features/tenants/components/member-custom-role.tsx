@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Member } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
 import { useLocale, useLocaleText } from '@/lib/i18n'
+import { queryKeys } from '@/lib/query-keys'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +56,7 @@ export function MemberCustomRoleCell({
   const [roleId, setRoleId] = React.useState('')
   const [revokeOpen, setRevokeOpen] = React.useState(false)
   const [revokeError, setRevokeError] = React.useState('')
+  const tenantScope = { actorId, tenantId, membershipVersion }
   const canAssign =
     member.status === 'active' && member.tenant_role === 'member'
   const assignment = useQuery(
@@ -68,19 +70,16 @@ export function MemberCustomRoleCell({
   )
   const invalidate = async () => {
     await client.invalidateQueries({
-      queryKey: [
-        'synapse',
-        actorId,
-        tenantId,
-        'personal',
-        'member-custom-role',
-      ],
+      queryKey: queryKeys.tenant.resource(tenantScope, [
+        'members',
+        'custom-role',
+      ]),
     })
     await client.invalidateQueries({
-      queryKey: ['synapse', actorId, tenantId, 'personal', 'tenant-members'],
+      queryKey: queryKeys.tenant.resource(tenantScope, ['members', 'list']),
     })
     await client.invalidateQueries({
-      queryKey: ['synapse', actorId, tenantId, 'personal', 'tenant'],
+      queryKey: queryKeys.tenant.query({ actorId, tenantId }, 'detail'),
     })
   }
   const assign = useMutation({

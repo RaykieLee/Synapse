@@ -4,6 +4,7 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { ArrowRight, ChevronRight, Laptop, Moon, Sun, X } from 'lucide-react'
 import { getWorkspace } from '@/api/workspaces'
 import { api } from '@/lib/api'
+import { queryKeys } from '@/lib/query-keys'
 import { useAuthStore } from '@/stores/auth-store'
 import { useSearch } from '@/context/search-provider'
 import { useTheme } from '@/context/theme-provider'
@@ -12,6 +13,11 @@ import {
   useWorkspaceDirectory,
   useWorkspaceSwitch,
 } from '@/features/workspaces/directory'
+import {
+  WORKSPACE_QUERY_STALE_TIME,
+  unresolvedWorkspaceDetailQueryKey,
+  workspaceDetailQueryKey,
+} from '@/features/workspaces/workspace-query-keys'
 import {
   buildTenantNavigationGroup,
   buildWorkspaceNavigationGroup,
@@ -209,14 +215,12 @@ export function CommandMenu() {
     : undefined
 
   const detail = useQuery({
-    queryKey: [
-      'synapse',
-      directory.actorId,
-      workspace?.tenant_id ?? 'unresolved',
-      workspaceId ?? 'none',
-      'workspace-detail',
-      workspace?.membership_version ?? 0,
-    ],
+    queryKey: workspace
+      ? workspaceDetailQueryKey(directory.actorId, workspace)
+      : unresolvedWorkspaceDetailQueryKey(
+          directory.actorId,
+          workspaceId ?? 'none'
+        ),
     queryFn: () => getWorkspace(workspaceId!),
     enabled: Boolean(
       authUser?.user_id &&
@@ -226,9 +230,9 @@ export function CommandMenu() {
         directory.tenantQuery.isSuccess &&
         directory.workspaceQuery.isSuccess
     ),
-    initialData: workspace,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: WORKSPACE_QUERY_STALE_TIME,
+    refetchOnMount: false,
+    refetchOnWindowFocus: true,
   })
   const detailVersion = detail.data?.membership_version
   const workspaceContextReady = Boolean(
@@ -282,23 +286,23 @@ export function CommandMenu() {
     }
   }, [authUser?.user_id, detail.data, detailVersion, workspaceContextReady, workspaceId])
 
-  const navigationKey = contextScope
-    ? [
-        'synapse',
-        contextScope.actorId,
-        contextScope.tenantId,
-        'tenant-navigation',
-        contextScope.workspaceId,
-        contextScope.membershipVersion,
-      ]
-    : [
-        'synapse',
-        authUser?.user_id ?? 'anonymous',
-        'unresolved',
-        'tenant-navigation',
-        workspaceId ?? 'none',
-        0,
-      ]
+  const navigationScope = contextScope
+    ? queryKeys.workspaceScope(contextScope.actorId, {
+        tenant_id: contextScope.tenantId,
+        workspace_id: contextScope.workspaceId,
+        membership_version: contextScope.membershipVersion,
+      })
+    : {
+        actorId: authUser?.user_id ?? 'anonymous',
+        tenantId: 'unresolved',
+        workspaceId: workspaceId ?? 'none',
+        membershipVersion: 0,
+      }
+  const navigationKey = queryKeys.workspace.query(
+    navigationScope,
+    'tenant-navigation',
+    { tenantId: contextScope?.tenantId }
+  )
   const navigation = useQuery({
     queryKey: navigationKey,
     queryFn: () =>
@@ -306,8 +310,8 @@ export function CommandMenu() {
         '/tenants/' + contextScope!.tenantId + '/menus/visible-tree'
       ),
     enabled: Boolean(contextScope),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: WORKSPACE_QUERY_STALE_TIME,
+    refetchOnMount: false,
     refetchOnWindowFocus: true,
   })
   const authorizedNavigation = selectAuthorizedNavigationCandidates(

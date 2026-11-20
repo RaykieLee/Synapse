@@ -1,4 +1,4 @@
-import * as React from 'react'
+﻿import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { BookText, Loader2, Plug, SlidersHorizontal } from 'lucide-react'
@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { LocalizedText } from '@/components/localized-text'
 import type { Workspace } from '@/features/workspaces/types'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import {
   addSessionMcpsFromLibrary,
   addSessionSkillsFromLibrary,
@@ -679,15 +680,8 @@ export function SessionConfigPanel({
   disabled: boolean
   onPatch: (patch: SessionConfigPatch) => Promise<void>
 }) {
-  const scopeKey = React.useMemo(
-    () =>
-      [
-        'synapse',
-        actorId,
-        workspace.tenant_id,
-        workspace.workspace_id,
-        workspace.membership_version ?? 0,
-      ] as const,
+  const queryScope = React.useMemo(
+    () => workspaceQueryScope(actorId, workspace),
     [
       actorId,
       workspace.tenant_id,
@@ -696,56 +690,81 @@ export function SessionConfigPanel({
     ]
   )
   const chatModels = useQuery({
-    queryKey: [...scopeKey, 'agent-scope-chat-models', workspace],
+    queryKey: queryKeys.agentscope.query(queryScope, ['chat', 'models'], {
+      modelType: 'chat',
+      workspace,
+    }),
     queryFn: () => listCredentialModelGroups(workspace, 'chat'),
     enabled: workspace.status === 'active',
   })
   const ttsModels = useQuery({
-    queryKey: [...scopeKey, 'agent-scope-tts-models', workspace],
+    queryKey: queryKeys.agentscope.query(queryScope, ['chat', 'models'], {
+      modelType: 'tts',
+      workspace,
+    }),
     queryFn: () => listCredentialModelGroups(workspace, 'tts'),
     enabled: workspace.status === 'active',
   })
   const realtimeModels = useQuery({
-    queryKey: [...scopeKey, 'agent-scope-realtime-models', workspace],
+    queryKey: queryKeys.agentscope.query(queryScope, ['chat', 'models'], {
+      modelType: 'realtime',
+      workspace,
+    }),
     queryFn: () => listRealtimeModelGroups(workspace),
     enabled: workspace.status === 'active',
   })
   const knowledgeBases = useQuery({
-    queryKey: [
-      ...scopeKey,
-      'agent-scope-knowledge-bases',
-      workspace.workspace_id,
-    ],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['chat', 'knowledge-bases'],
+      { workspaceId: workspace.workspace_id }
+    ),
     queryFn: () =>
       listKnowledgeBases(workspace.workspace_id, { page: 1, pageSize: 100 }),
     enabled: workspace.status === 'active',
   })
   const middlewareSchema = useQuery({
-    queryKey: [...scopeKey, 'agent-scope-knowledge-middleware', workspace],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['chat', 'knowledge-middleware'],
+      { workspace }
+    ),
     queryFn: () => listKnowledgeMiddlewareSchema(workspace),
     enabled: workspace.status === 'active',
   })
   const libraryMcps = useQuery({
-    queryKey: [...scopeKey, 'agent-scope-mcp-library', workspace.workspace_id],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['resources', 'mcp', 'library'],
+      { workspaceId: workspace.workspace_id }
+    ),
     queryFn: () => listMcps(workspace.workspace_id),
     enabled: workspace.status === 'active',
   })
   const librarySkills = useQuery({
-    queryKey: [
-      ...scopeKey,
-      'agent-scope-skill-library',
-      workspace.workspace_id,
-    ],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['resources', 'skills', 'library'],
+      { workspaceId: workspace.workspace_id }
+    ),
     queryFn: () => listSkills(workspace.workspace_id),
     enabled: workspace.status === 'active',
   })
   const sessionMcps = useQuery({
-    queryKey: [...scopeKey, agentId, sessionId, 'workspace-mcp', workspace],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['chat', 'session-resources', 'mcp'],
+      { agentId, sessionId, workspace }
+    ),
     queryFn: () => listSessionMcps(workspace, agentId, sessionId),
     enabled: workspace.status === 'active' && !disabled,
   })
   const sessionSkills = useQuery({
-    queryKey: [...scopeKey, agentId, sessionId, 'workspace-skill', workspace],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['chat', 'session-resources', 'skills'],
+      { agentId, sessionId, workspace }
+    ),
     queryFn: () => listSessionSkills(workspace, agentId, sessionId),
     enabled: workspace.status === 'active' && !disabled,
   })

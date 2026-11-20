@@ -52,6 +52,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useWorkspace } from '@/features/workspaces/context'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 
 const panel = 'rounded-xl border bg-card p-5'
 
@@ -107,8 +108,9 @@ function parseJsonArray(value: string, label: string) {
 }
 
 export function AgentScopeSopPage() {
-  const { workspace } = useWorkspace()
+  const { workspace, actorId } = useWorkspace()
   const workspaceId = workspace.workspace_id
+  const queryScope = workspaceQueryScope(actorId, workspace)
   const client = useQueryClient()
   const [selectedSop, setSelectedSop] = React.useState<SopRecord | null>(null)
   const [editorValue, setEditorValue] = React.useState<SopData | null>(null)
@@ -127,27 +129,39 @@ export function AgentScopeSopPage() {
   const [verdictPassed, setVerdictPassed] = React.useState(true)
 
   const schemaQuery = useQuery({
-    queryKey: ['agentscope', workspaceId, 'sop-schema'],
+    queryKey: queryKeys.agentscope.query(queryScope, ['sop', 'schema'], { workspaceId }),
     queryFn: () => getSopSchema(workspaceId),
   })
   const sopsQuery = useQuery({
-    queryKey: ['agentscope', workspaceId, 'sops'],
+    queryKey: queryKeys.agentscope.query(queryScope, ['sop', 'sops'], { workspaceId }),
     queryFn: () => listSops(workspaceId),
   })
   const agentsQuery = useQuery({
-    queryKey: ['agentscope', workspaceId, 'sop-editor-agents'],
+    queryKey: queryKeys.agentscope.query(queryScope, [
+      'sop',
+      'editor-agents',
+    ], { workspaceId }),
     queryFn: () => listSopEditorAgents(workspaceId),
   })
   const credentialsQuery = useQuery({
-    queryKey: ['agentscope', workspaceId, 'sop-editor-credentials'],
+    queryKey: queryKeys.agentscope.query(queryScope, [
+      'sop',
+      'editor-credentials',
+    ], { workspaceId }),
     queryFn: () => listSopEditorCredentials(workspaceId),
   })
   const runsQuery = useQuery({
-    queryKey: ['agentscope', workspaceId, 'sop-runs', selectedSop?.id ?? 'all'],
+    queryKey: queryKeys.agentscope.query(queryScope, ['sop', 'runs'], {
+      sopId: selectedSop?.id ?? 'all',
+      workspaceId,
+    }),
     queryFn: () => listSopRuns(workspaceId, { sopId: selectedSop?.id }),
   })
   const runDetailQuery = useQuery({
-    queryKey: ['agentscope', workspaceId, 'sop-run', selectedRunId],
+    queryKey: queryKeys.agentscope.query(queryScope, ['sop', 'run'], {
+      runId: selectedRunId,
+      workspaceId,
+    }),
     queryFn: () => getSopRun(workspaceId, selectedRunId),
     enabled: Boolean(selectedRunId),
     refetchInterval: (query) => {
@@ -159,10 +173,10 @@ export function AgentScopeSopPage() {
   const refresh = async () => {
     await Promise.all([
       client.invalidateQueries({
-        queryKey: ['agentscope', workspaceId, 'sops'],
+        queryKey: queryKeys.agentscope.resource(queryScope, ['sop', 'sops']),
       }),
       client.invalidateQueries({
-        queryKey: ['agentscope', workspaceId, 'sop-runs'],
+        queryKey: queryKeys.agentscope.resource(queryScope, ['sop', 'runs']),
       }),
     ])
   }
@@ -202,7 +216,9 @@ export function AgentScopeSopPage() {
       setSelectedRunId(run.id)
       await refresh()
       await client.invalidateQueries({
-        queryKey: ['agentscope', workspaceId, 'sop-run', run.id],
+        queryKey: queryKeys.agentscope.query(queryScope, ['sop', 'run'], {
+          runId: run.id,
+        }),
       })
     },
     onError: (cause) => setRunError(errorText(cause)),
@@ -222,7 +238,9 @@ export function AgentScopeSopPage() {
       setSelectedRunId(run.id)
       await refresh()
       await client.invalidateQueries({
-        queryKey: ['agentscope', workspaceId, 'sop-run', run.id],
+        queryKey: queryKeys.agentscope.query(queryScope, ['sop', 'run'], {
+          runId: run.id,
+        }),
       })
     },
   })

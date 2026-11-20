@@ -14,6 +14,8 @@ import {
 import { getTenant } from '@/api/tenants'
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiProblem } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
@@ -38,21 +40,20 @@ export function TenantDepartmentsPage() {
   const [error, setError] = useState('')
   const [saveError, setSaveError] = useState('')
   const actorId = actor?.user_id ?? 'anonymous'
-  const tenantKey = ['synapse', actorId, tenantId, 'personal', 'tenant']
+  const tenantKey = queryKeys.tenant.query({ actorId, tenantId }, 'detail')
   const tenant = useQuery({
     queryKey: tenantKey,
     queryFn: () => getTenant(tenantId),
   })
-  const canManage =
-    tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
-  const treeKey = [
-    'synapse',
+  const canManage = getPermissionCapabilities({
+    tenantRole: tenant.data?.tenant_role,
+  }).tenant.manageTenantAdministration
+  const tenantScope = {
     actorId,
     tenantId,
-    'tenant',
-    'departments',
-    'tree',
-  ]
+    membershipVersion: tenant.data?.membership_version ?? 0,
+  }
+  const treeKey = queryKeys.tenant.query(tenantScope, ['departments', 'tree'])
   const tree = useQuery({
     queryKey: treeKey,
     enabled: canManage,
@@ -60,7 +61,7 @@ export function TenantDepartmentsPage() {
   })
   const invalidate = async () => {
     await client.invalidateQueries({
-      queryKey: ['synapse', actorId, tenantId, 'tenant', 'departments'],
+      queryKey: queryKeys.tenant.resource(tenantScope, ['departments']),
     })
     await client.invalidateQueries({ queryKey: tenantKey })
   }

@@ -4,6 +4,7 @@ import { Check, Search } from 'lucide-react'
 import { listUsers, type GlobalUser } from '@/api/users'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/stores/auth-store'
+import { queryKeys } from '@/lib/query-keys'
 import { LocalizedText } from '@/components/localized-text'
 import { useLocaleText } from '@/lib/i18n'
 
@@ -20,7 +21,11 @@ export function OwnerPicker({ value, onChange }: {
     return () => window.clearTimeout(timer)
   }, [search])
   const users = useQuery({
-    queryKey: ['synapse', actorId, 'global', 'owner-candidates', term],
+    queryKey: queryKeys.global.query(
+      queryKeys.actorScope(actorId),
+      ['users', 'owner-candidates'],
+      { page: 1, pageSize: 100, term }
+    ),
     queryFn: () => listUsers({ page: 1, pageSize: 100, search: term || undefined }),
   })
   const candidates = users.data?.items.filter((user) => user.status === 'active') ?? []

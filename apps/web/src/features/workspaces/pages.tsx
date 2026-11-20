@@ -1,4 +1,4 @@
-import * as React from 'react'
+﻿import * as React from 'react'
 import { LocalizedNativeSelect } from '@/components/localized-native-select'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
@@ -13,11 +13,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import { useWorkspace } from './context'
 import {
   roleLabel,
   statusLabel,
-  type Workspace,
   type WorkspaceRole,
   type WorkspaceStatus,
 } from './types'
@@ -41,19 +42,12 @@ import {
 } from '@/components/ui/table'
 
 const panel = 'rounded-xl border bg-card p-5'
-const scopedKey = (actorId: string, workspace: Workspace, resource: string) =>
-  [
-    'synapse',
-    actorId,
-    workspace.tenant_id,
-    workspace.workspace_id,
-    resource,
-    workspace.membership_version ?? 0,
-  ] as const
+
 export function WorkspaceHome() {
   const { workspace } = useWorkspace()
-  const manager =
-    workspace.workspace_role === 'owner' || workspace.workspace_role === 'admin'
+  const manager = getPermissionCapabilities({
+    workspaceRole: workspace.workspace_role,
+  }).workspace.manageWorkspaceSettings
   return (
     <main className='space-y-6 p-6'>
       <header>
@@ -181,8 +175,10 @@ export function WorkspaceHome() {
 export function WorkspaceSettings() {
   const { workspace, actorId } = useWorkspace()
   const client = useQueryClient()
-  const canManage =
-    workspace.workspace_role === 'owner' || workspace.workspace_role === 'admin'
+  const scope = workspaceQueryScope(actorId, workspace)
+  const canManage = getPermissionCapabilities({
+    workspaceRole: workspace.workspace_role,
+  }).workspace.manageWorkspaceSettings
   const [name, setName] = React.useState(workspace.name)
   const [icon, setIcon] = React.useState(workspace.icon ?? '')
   const [basicOpen, setBasicOpen] = React.useState(false)
@@ -190,16 +186,13 @@ export function WorkspaceSettings() {
   const [error, setError] = React.useState('')
   const refresh = async () => {
     await client.invalidateQueries({
-      queryKey: scopedKey(actorId, workspace, 'workspace-detail'),
+      queryKey: queryKeys.workspace.resource(scope, 'detail'),
     })
     await client.invalidateQueries({
-      queryKey: [
-        'synapse',
-        actorId,
-        'global',
-        'personal',
-        'workspace-directory',
-      ],
+      queryKey: queryKeys.workspace.resource(
+        queryKeys.actorScope(actorId),
+        'directory'
+      ),
     })
   }
   const update = useMutation({
@@ -323,6 +316,7 @@ export function WorkspaceSettings() {
 export function WorkspaceMembers() {
   const { workspace, actorId } = useWorkspace()
   const client = useQueryClient()
+  const scope = workspaceQueryScope(actorId, workspace)
   const [page, setPage] = React.useState(1)
   const [sorting, setSorting] = React.useState<TableSortState>(null)
   const [targetId, setTargetId] = React.useState('')
@@ -334,15 +328,17 @@ export function WorkspaceMembers() {
   const [transferTarget, setTransferTarget] = React.useState<WorkspaceMember | null>(null)
   const [transferOpen, setTransferOpen] = React.useState(false)
   const [error, setError] = React.useState('')
-  const canManage =
-    workspace.workspace_role === 'owner' || workspace.workspace_role === 'admin'
+  const workspacePermissions = getPermissionCapabilities({
+    workspaceRole: workspace.workspace_role,
+  }).workspace
+  const canManage = workspacePermissions.manageWorkspaceMembers
   const canEdit = canManage && workspace.status === 'active'
-  const isOwner = workspace.workspace_role === 'owner'
-  const membersKey = [
-    ...scopedKey(actorId, workspace, 'workspace-members'),
+  const isOwner = workspacePermissions.transferWorkspaceOwnership
+  const membersKey = queryKeys.workspace.query(scope, 'members', {
     page,
-    20,
-  ] as const
+    pageSize: 20,
+    workspaceId: workspace.workspace_id,
+  })
   const members = useQuery({
     queryKey: membersKey,
     queryFn: () =>
@@ -369,19 +365,16 @@ export function WorkspaceMembers() {
   )
   const refresh = async () => {
     await client.invalidateQueries({
-      queryKey: scopedKey(actorId, workspace, 'workspace-members'),
+      queryKey: queryKeys.workspace.resource(scope, 'members'),
     })
     await client.invalidateQueries({
-      queryKey: [
-        'synapse',
-        actorId,
-        'global',
-        'personal',
-        'workspace-directory',
-      ],
+      queryKey: queryKeys.workspace.resource(
+        queryKeys.actorScope(actorId),
+        'directory'
+      ),
     })
     await client.invalidateQueries({
-      queryKey: scopedKey(actorId, workspace, 'workspace-detail'),
+      queryKey: queryKeys.workspace.query(scope, 'detail'),
     })
   }
   const changeRole = useMutation({

@@ -45,6 +45,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { FormDialog } from '@/components/form-dialog'
 import { useWorkspace } from '@/features/workspaces/context'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import {
   cancelChannelBinding,
   createChannel,
@@ -78,6 +79,12 @@ import type {
 
 type Tab = 'schedules' | 'channels'
 type ScheduleFrequency = 'once' | 'daily' | 'weekly' | 'monthly' | 'custom'
+
+function useAgentScopeQueryScope() {
+  const { workspace, actorId } = useWorkspace()
+  return workspaceQueryScope(actorId, workspace)
+}
+
 type ScheduleDraft = {
   id?: string
   name: string
@@ -441,8 +448,9 @@ export function AgentScopeOpsPage({
 }: {
   initialTab?: Tab
 }) {
-  const { workspace } = useWorkspace()
+  const { workspace, actorId } = useWorkspace()
   const workspaceId = workspace.workspace_id
+  const queryScope = workspaceQueryScope(actorId, workspace)
   const [tab, setTab] = React.useState<Tab>(initialTab)
   const [scheduleEditor, setScheduleEditor] =
     React.useState<ScheduleDraft | null>(null)
@@ -462,29 +470,32 @@ export function AgentScopeOpsPage({
 
   const queryClient = useQueryClient()
   const schedules = useQuery({
-    queryKey: ['agentscope-ops', workspaceId, 'schedules'],
+    queryKey: queryKeys.agentscope.query(queryScope, ['ops', 'schedules'], { workspaceId }),
     queryFn: () => listSchedules(workspaceId),
   })
   const channels = useQuery({
-    queryKey: ['agentscope-ops', workspaceId, 'channels'],
+    queryKey: queryKeys.agentscope.query(queryScope, ['ops', 'channels'], { workspaceId }),
     queryFn: () => listChannels(workspaceId),
   })
   const agents = useQuery({
-    queryKey: ['agentscope-ops', workspaceId, 'agents'],
+    queryKey: queryKeys.agentscope.query(queryScope, ['ops', 'agents'], { workspaceId }),
     queryFn: () => listAgents(workspaceId),
   })
   const credentials = useQuery({
-    queryKey: ['agentscope-ops', workspaceId, 'credentials'],
+    queryKey: queryKeys.agentscope.query(queryScope, ['ops', 'credentials'], { workspaceId }),
     queryFn: () => listCredentials(workspaceId),
   })
   const channelTypes = useQuery({
-    queryKey: ['agentscope-ops', workspaceId, 'channel-types'],
+    queryKey: queryKeys.agentscope.query(queryScope, [
+      'ops',
+      'channel-types',
+    ], { workspaceId }),
     queryFn: () => listChannelTypes(workspaceId),
   })
 
   const refresh = () => {
     void queryClient.invalidateQueries({
-      queryKey: ['agentscope-ops', workspaceId],
+      queryKey: queryKeys.agentscope.resource(queryScope, 'ops'),
     })
   }
 
@@ -1160,6 +1171,7 @@ function ScheduleEditor({
   onSubmit: () => void
   onCancel: () => void
 }) {
+  const queryScope = useAgentScopeQueryScope()
   const set = <K extends keyof ScheduleDraft>(
     key: K,
     value: ScheduleDraft[K]
@@ -1167,23 +1179,16 @@ function ScheduleEditor({
   const selectedCredential = credentials.find(
     (credential) => credential.id === draft?.credential_id
   )
+  const modelType = credentialType(
+    selectedCredential ?? ({ id: '' } as AgentScopeCredential)
+  )
   const models = useQuery({
-    queryKey: [
-      'agentscope-ops',
+    queryKey: queryKeys.agentscope.query(queryScope, ['ops', 'models'], {
+      credentialId: selectedCredential?.id,
+      credentialType: modelType,
       workspaceId,
-      'models',
-      selectedCredential?.id,
-      credentialType(
-        selectedCredential ?? ({ id: '' } as AgentScopeCredential)
-      ),
-    ],
-    queryFn: () =>
-      listModels(
-        workspaceId,
-        credentialType(
-          selectedCredential ?? ({ id: '' } as AgentScopeCredential)
-        )
-      ),
+    }),
+    queryFn: () => listModels(workspaceId, modelType),
     enabled: Boolean(selectedCredential?.id),
   })
   const modelOptions = models.data?.models ?? []
@@ -1395,6 +1400,7 @@ function ChannelEditor({
   onSubmit: () => void
   onCancel: () => void
 }) {
+  const queryScope = useAgentScopeQueryScope()
   const set = <K extends keyof ChannelDraft>(key: K, value: ChannelDraft[K]) =>
     onChange(draft ? { ...draft, [key]: value } : draft)
   const selectedType = channelTypes.find(
@@ -1522,23 +1528,16 @@ function ChannelEditor({
     (credential) =>
       credential.id === String(chatModelConfig.credential_id ?? '')
   )
+  const modelType = credentialType(
+    selectedCredential ?? ({ id: '' } as AgentScopeCredential)
+  )
   const models = useQuery({
-    queryKey: [
-      'agentscope-ops',
+    queryKey: queryKeys.agentscope.query(queryScope, ['ops', 'models'], {
+      credentialId: selectedCredential?.id,
+      credentialType: modelType,
       workspaceId,
-      'models',
-      selectedCredential?.id,
-      credentialType(
-        selectedCredential ?? ({ id: '' } as AgentScopeCredential)
-      ),
-    ],
-    queryFn: () =>
-      listModels(
-        workspaceId,
-        credentialType(
-          selectedCredential ?? ({ id: '' } as AgentScopeCredential)
-        )
-      ),
+    }),
+    queryFn: () => listModels(workspaceId, modelType),
     enabled: Boolean(selectedCredential?.id),
   })
   const modelOptions = models.data?.models ?? []
@@ -1967,13 +1966,13 @@ function ScheduleDetail({
   workspaceId: string
   onClose: () => void
 }) {
+  const queryScope = useAgentScopeQueryScope()
   const sessions = useQuery({
-    queryKey: [
-      'agentscope-ops',
-      workspaceId,
-      'schedule-sessions',
-      schedule?.id,
-    ],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['ops', 'schedule-sessions'],
+      { scheduleId: schedule?.id, workspaceId }
+    ),
     queryFn: () => listScheduleSessions(workspaceId, schedule!.id),
     enabled: Boolean(schedule),
   })
@@ -2050,18 +2049,31 @@ function ChannelDetail({
   agents: AgentScopeAgent[]
   onClose: () => void
 }) {
+  const queryScope = useAgentScopeQueryScope()
   const status = useQuery({
-    queryKey: ['agentscope-ops', workspaceId, 'channel-status', channel?.id],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['ops', 'channel-status'],
+      { channelId: channel?.id, workspaceId }
+    ),
     queryFn: () => getChannelStatus(workspaceId, channel!.id),
     enabled: Boolean(channel),
   })
   const sessions = useQuery({
-    queryKey: ['agentscope-ops', workspaceId, 'channel-sessions', channel?.id],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['ops', 'channel-sessions'],
+      { channelId: channel?.id, workspaceId }
+    ),
     queryFn: () => listChannelSessions(workspaceId, channel!.id),
     enabled: Boolean(channel),
   })
   const chats = useQuery({
-    queryKey: ['agentscope-ops', workspaceId, 'channel-chats', channel?.id],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['ops', 'channel-chats'],
+      { channelId: channel?.id, workspaceId }
+    ),
     queryFn: () => listChannelChatIds(workspaceId, channel!.id),
     enabled: Boolean(channel),
   })

@@ -27,7 +27,7 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useQuery: (options: any) =>
-    options.queryKey[4] === 'tenant-directory'
+    options.queryKey[6] === 'tenant'
       ? mocks.tenantQuery
       : mocks.workspaceQuery,
   useQueryClient: () => ({

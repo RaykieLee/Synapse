@@ -34,7 +34,7 @@
 | UX-F17C-DELETE-001 | 审查 F17c 附件删除部分失败与重试体验 | 实现前 UX/契约审查完成；commit 不确定状态与删除后 404 提示策略待决 | UX worker `ctx_ab75cba94b7c` / Task `task_b182a78de766`；方案及未决事项见 [附件删除一致性 UX 契约](ux/attachment-deletion-consistency.md)。本轮不增加 `delete_outcome`，也不改变隐私 404 语义 |
 | UX-F43-ROUTE-CLEANUP-001 | 审查演示与模板路由的清理策略 | UX 设计与二次修复完成；聚焦复验通过 | 独立 UX worker `ctx_8df70ca301bc`；方案见 [F43 路由清理 UX 契约](ux/F43-route-cleanup.md)。二次修复删除确认无引用文案并同步 document lang；第三次复验 `task_bac6c4f97beb` 通过聚焦范围，报告记录生产深链、真实授权、完整读屏、route regeneration/build 与来源部署证据仍未覆盖 |
 | UX-WORKSPACE-HOME-001 | 审查稳定工作台与 Workspace 概览 UX/API 契约 | UX 设计完成；第一阶段实现完成；自动化 UI 补测完成，真实验收待补 | 独立 UX worker `ctx_ee20f7f090c7`；方案见 [Workspace 工作台与空间概览 UX 契约](ux/workspace-home-overview.md)。核心决策为登录后 `/` 保持稳定工作台，不自动进入最近/首个/唯一 Workspace；概览聚合 API 与指标清单均未存在，实施不得使用模板值或前端拼凑指标 |
-| IMPL-F43-ROUTE-CLEANUP-001 | 实施演示与模板路由清理 | 二次修复完成；第三次复验中 | 实现 worker `ctx_5e1b8acea403` 完成路由清理；首轮修复 `task_a1f9fa471d9d` 增加 Clerk 父路由 404 与测试、移除 Clerk/Faker 依赖及 37 条死文案。二次修复 `task_4371bdcd75be` 仅删除确认无引用的 Apps/Chats/Connected/Connect/Coming Soon 词条，并同步存储 locale 与 `document.documentElement.lang`；Help Center 与 Tasks 因现存引用保留 |
+| IMPL-F43-ROUTE-CLEANUP-001 | 实施演示与模板路由清理 | 二次修复完成；第三次聚焦复验通过 | 实现 worker `ctx_5e1b8acea403` 完成路由清理；首轮修复 `task_a1f9fa471d9d` 增加 Clerk 父路由 404 与测试、移除 Clerk/Faker 依赖及 37 条死文案。二次修复 `task_4371bdcd75be` 仅删除确认无引用的 Apps/Chats/Connected/Connect/Coming Soon 词条，并同步存储 locale 与 `document.documentElement.lang`；Help Center 与 Tasks 因现存引用保留 |
 | VERIFY-F43-ROUTE-CLEANUP-001 | 独立验收 F43 路由清理 | 通过（聚焦范围） | verifier `task_bac6c4f97beb` / `ctx_8bc2a3c82e20` 完成 [F43 复验报告](verification/F43-route-cleanup-second-reacceptance.md)：死键引用扫描、locale/lang、嵌套 Clerk 404、别名、已移除路径与 3 文件/18 测试通过。生产 HTTP/认证授权、完整读屏、route regeneration/build 与来源部署仍待验证 |
 | IMPL-WORKSPACE-HOME-001 | 实施稳定根工作台第一阶段 | 部分目录修复完成；自动化 UI 补测通过，真实验收仍受限 | 独立实现 worker `ctx_579c7e7adf77`；首验 `ctx_e3820c17d8bc` 发现 Tenant 目录失败但 Workspace 目录成功时丢失成功 Workspace，修复 `ctx_5921a14e74de` 已完成。独立补测覆盖 Workspace-only 失败、archived-only、运行时英文、320/390px、Tab/Enter 并通过 `10/10`；真实 API/受保护路由、生产权限、读屏与人工移动验收仍未完成。详见 [首验](verification/F44-workspace-home-acceptance.md)、[复验](verification/F44-workspace-home-reacceptance.md) 和 [补充复验](verification/F44-workspace-home-reacceptance-supplement.md) |
 | FIX-F44-PARTIAL-DIRECTORY-001 | 保留成功 Workspace 目录并呈现部分失败 | 修复完成；自动化 UI 回归通过，整体验收待真实证据 | 独立修复 worker `ctx_5921a14e74de` 报告定向测试 `6/6` 与 build 通过；独立复验 `task_d39d2ac30401` 的 mock UI 与临时数据库 API 部分通过；补充 verifier `task_c767e5244a3e` 新增的场景/UI 断言 `10/10` 通过。真实 API/认证进入、服务端权限、读屏和生产验收仍未覆盖；见 [F44 首验](verification/F44-workspace-home-acceptance.md)、[复验](verification/F44-workspace-home-reacceptance.md)、[补充复验](verification/F44-workspace-home-reacceptance-supplement.md) |
@@ -223,7 +223,7 @@
 | F40 | 人脸账号绑定与登录 | 待开始 | — | — |
 | F41 | 本地启动与持久化部署配置 | 共享基础设施与 Wiki.js 生产部署完成；本地启动手册待补 | — | 腾讯云 2 已切换 PostgreSQL 18.6 + pgvector 0.8.7（新卷，PG16 旧卷保留）；Wiki.js 使用共享库 `wikijs`、专用最小权限角色与 `infra_wiki_db` 隔离网络，监听 `127.0.0.1:18080`；Glances 留在共享基础设施。迁移前/后备份、HTTP/健康与 Compose 证据见 [基础设施迁移验收](verification/infrastructure-migration-2026-11-09.md) |
 | F42 | 初始化数据与旧数据迁移工具 | 待开始 | — | — |
-| F43 | 范围清理与来源许可证记录 | 二次复验失败；针对性修复中 | 实现 `ctx_5e1b8acea403` / 修复 `task_a1f9fa471d9d` / 复验 `task_5a2ef7921368` / 二次修复 `task_4371bdcd75be` | 未知 `/clerk/*` 应用级 404、兼容别名、旧路由 404 与聚焦测试通过；复验失败于旧 Apps/Chats/Connected 等模板词条残留及中文 `html lang=en`。生产深链/HTTP 状态、真实认证、完整读屏和许可证边界仍未验证；详见 [复验报告](verification/F43-route-cleanup-reacceptance.md) |
+| F43 | 范围清理与来源许可证记录 | 路由清理与第三次聚焦复验通过；生产与许可证来源审查仍待完成 | 实现 `ctx_5e1b8acea403` / 修复 `task_a1f9fa471d9d` / 复验 `task_5a2ef7921368` / 二次修复 `task_4371bdcd75be` / 第三次复验 `task_bac6c4f97beb` | 第三次聚焦复验确认死词条、locale/lang、Clerk 404、别名及已移除路径检查通过；生产深链/HTTP 状态、真实认证、完整读屏、route regeneration/build 与许可证来源边界仍未验证；详见 [第三次复验报告](verification/F43-route-cleanup-second-reacceptance.md) |
 | F44 | 首页真实业务概览替换模板指标 | 第一阶段修复与自动化 UI 补测完成；整体 UX/真实后端验收仍待完成 | `ctx_579c7e7adf77` / 修复 `ctx_5921a14e74de` / 复验 `ctx_0bf5d0f02ed5` / 补测 `ctx_261caf2096e4` | 部分目录保留修复有定向测试和独立 UI/API 证据；补测中的 Workspace-only 失败、archived-only、运行时英文、320/390px 与键盘 10/10 通过。整体仍未通过：真实账号/服务端权限及受保护路由端到端、屏幕阅读器、人工移动/生产验收未覆盖；overview API 与真实指标不在第一阶段范围。详见 [F44 首验](verification/F44-workspace-home-acceptance.md)、[复验](verification/F44-workspace-home-reacceptance.md)、[补充复验](verification/F44-workspace-home-reacceptance-supplement.md) |
 
 ## 最终独立验收任务（每行独立委派）
@@ -248,3 +248,10 @@
 按用户截图实现双栏登录页、生成的人物插画、中文表单、响应式布局和减少动态效果支持。前端构建与登录相关 ESLint 通过；独立浏览器验收覆盖桌面/手机、标签关联、空提交、显隐、记住账号、错误/加载反馈及说明对话框。模拟登录验证请求字段、存储和导航，未重验真实后端登录。证据见 [登录页验收](verification/login-redesign.md)，素材来源与提示词见 [设计实现说明](login-design.md)。
 
 同时修复聊天确认提交中 controller 未定义的构建阻断，当前 pnpm build 通过；聊天确认取消行为和 F24b 的消息接口参数边界仍需各自独立验收。F25a 已完成独立真实 API/Redis/Playwright 验收，但真实模型推理仍不在本次证据范围内。
+
+## 2026-11-20 前端架构加固合并与复验
+
+- 已将前端架构加固提交 `9699c2a5` 合并到本地 `main`，保留主线已有导航、附件和 Workspace UX 改动，并纳入合并后的修复；未推送远端。合并范围包括 OpenAPI 生成类型、权限 capability、Workspace/AgentScope QueryKeys、Workspace 路由去重、i18n 模块化、共享会话 reducer、Dashboard 清理和聚焦页面测试。
+- 最终复验：`pnpm run openapi:verify` 通过（67 paths、126 component schemas、生成物无漂移，并完成 TypeScript project build）；15 个聚焦浏览器测试文件通过，`146/146` tests passed。详见[前端架构合并复验](verification/frontend-architecture-merge-acceptance.md)。本轮未运行全项目 build 或全量 lint。
+- 本地预览 `http://127.0.0.1:5176/` 返回 HTTP 200，未登录时按预期显示本地登录页；受保护页面需用户自己的登录态。本地预览和 fixture 测试不构成生产验收。
+- API wire contract 与服务端授权规则未改；OpenAPI 生成类型仅覆盖 users、tenants、workspaces 核心模型。真实 API 撤权、自然 stale 复验、成员名册/tenant admin 角色契约、Workspace Sessions 专项页面测试与真实 API/SSE、Dashboard 摘要 API、未迁移 QueryKey 目录、完整移动端/读屏及 F43 许可证来源审查仍未覆盖，不宣称全产品验收完成。

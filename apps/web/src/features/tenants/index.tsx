@@ -26,6 +26,8 @@ import {
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiProblem, api } from '@/lib/api'
 import { useLocale, useLocaleText } from '@/lib/i18n'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,7 +84,9 @@ export function Tenants() {
   const t = useLocaleText()
   const isEnglish = locale === 'en'
   const actor = useAuthStore((s) => s.auth.user)
-  const admin = actor?.platform_role === 'platform_admin'
+  const admin = getPermissionCapabilities({
+    platformRole: actor?.platform_role,
+  }).platform.viewTenantAdministration
   const search = tenantsRoute.useSearch()
   const navigate = tenantsRoute.useNavigate()
   const page = search.page ?? 1
@@ -152,17 +156,14 @@ export function Tenants() {
       ? dateBoundary(expiresBefore, true)
       : undefined,
   }
-  const key = [
-    'synapse',
-    actor?.user_id ?? 'anonymous',
-    'global',
-    'personal',
+  const actorScope = queryKeys.actorScope(actor?.user_id ?? 'anonymous')
+  const tenantsResource = [
     'tenants',
     admin ? 'platform' : 'member',
-    page,
-    pageSize,
-    request,
-  ]
+  ] as const
+  const key = queryKeys.global.query(actorScope, tenantsResource, {
+    ...request,
+  })
   const tenants = useQuery({
     queryKey: key,
     queryFn: () =>
@@ -170,13 +171,7 @@ export function Tenants() {
   })
   const refresh = async () => {
     await client.invalidateQueries({
-      queryKey: [
-        'synapse',
-        actor?.user_id ?? 'anonymous',
-        'global',
-        'personal',
-        'tenants',
-      ],
+      queryKey: queryKeys.global.resource(actorScope, 'tenants'),
     })
   }
   const mutation = useMutation({
@@ -695,50 +690,47 @@ export function Tenants() {
 
 export function TenantDetail() {
   const actor = useAuthStore((s) => s.auth.user)
-  const platformAdmin = actor?.platform_role === 'platform_admin'
+  const actorId = actor?.user_id ?? 'anonymous'
   const { tenantId } = useParams({ from: '/_authenticated/tenants/$tenantId' })
   const client = useQueryClient()
   const [error, setError] = useState('')
   const [memberPage, setMemberPage] = useState(1)
-  const tenantKey = [
-    'synapse',
-    actor?.user_id ?? 'anonymous',
-    tenantId,
-    'personal',
-    'tenant',
-  ]
+  const tenantKey = queryKeys.tenant.query({ actorId, tenantId }, 'detail')
   const tenant = useQuery({
     queryKey: tenantKey,
     queryFn: () => getTenant(tenantId),
   })
-  const canManage =
-    tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
-  const canManageStatus = platformAdmin
-  const membersKey = [
-    'synapse',
-    actor?.user_id ?? 'anonymous',
+  const permissions = getPermissionCapabilities({
+    platformRole: actor?.platform_role,
+    tenantRole: tenant.data?.tenant_role,
+  })
+  const platformAdmin = permissions.platform.viewTenantAdministration
+  const canManage = permissions.tenant.manageTenantAdministration
+  const canViewMembers = permissions.tenant.viewTenantMembers
+  const canEditTenantSettings =
+    permissions.platform.manageTenantSettings ||
+    permissions.tenant.manageTenantSettings
+  const canManageStatus = permissions.platform.manageTenantLifecycle
+  const tenantScope = {
+    actorId,
     tenantId,
-    'personal',
-    'tenant-members',
-    tenant.data?.membership_version ?? 0,
-    memberPage,
-    20,
-  ]
+    membershipVersion: tenant.data?.membership_version ?? 0,
+  }
+  const membersKey = queryKeys.tenant.query(
+    tenantScope,
+    ['members', 'list'],
+    { page: memberPage, pageSize: 20 }
+  )
   const members = useQuery({
     queryKey: membersKey,
-    enabled: canManage || tenant.data?.tenant_role === 'member',
+    enabled: canViewMembers,
     queryFn: () =>
       listTenantMembers(tenantId, { page: memberPage, pageSize: 20 }),
   })
-  const rolesKey = [
-    'synapse',
-    actor?.user_id ?? 'anonymous',
-    tenantId,
-    'tenant',
-    'roles',
-    'active-assignment-options',
-    tenant.data?.membership_version ?? 0,
-  ]
+  const rolesKey = queryKeys.tenant.query(
+    tenantScope,
+    ['roles', 'active-assignment-options']
+  )
   const activeRoles = useQuery({
     queryKey: rolesKey,
     enabled: canManage,
@@ -747,13 +739,10 @@ export function TenantDetail() {
         `/tenants/${tenantId}/roles?page=1&page_size=100&status=active`
       ),
   })
-  const invitationKey = [
-    'synapse',
-    actor?.user_id ?? 'anonymous',
-    tenantId,
-    'personal',
-    'tenant-invitations',
-  ]
+  const invitationKey = queryKeys.tenant.query(tenantScope, [
+    'invitations',
+    'list',
+  ])
   const invitations = useQuery({
     queryKey: invitationKey,
     enabled: canManage,
@@ -764,13 +753,7 @@ export function TenantDetail() {
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: tenantKey })
     await client.invalidateQueries({
-      queryKey: [
-        'synapse',
-        actor?.user_id ?? 'anonymous',
-        tenantId,
-        'personal',
-        'tenant-members',
-      ],
+      queryKey: queryKeys.tenant.resource(tenantScope, ['members', 'list']),
     })
   }
   const patchTenant = useMutation({
@@ -835,13 +818,13 @@ export function TenantDetail() {
     <main className='space-y-5 p-6'>
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='flex flex-wrap items-center gap-2'>
-          {canManage || platformAdmin ? (
+          {canEditTenantSettings ? (
             <EditTenantNameDialog
               tenant={item}
               onSave={(name) => patchTenant.mutate({ name })}
             />
           ) : null}
-          {canManage || platformAdmin ? (
+          {canEditTenantSettings ? (
             <EditTenantValidityDialog
               tenant={item}
               onSave={(payload) => patchTenant.mutate(payload)}
@@ -942,7 +925,7 @@ export function TenantDetail() {
         ) : null}
       </section>
       {error ? <ErrorBox message={error} /> : null}
-      {canManage || item.tenant_role === 'member' ? (
+      {canViewMembers ? (
         <section className={panelClass}>
           <div className='flex flex-wrap items-center justify-between gap-3 p-5 pb-4'>
             <div>
@@ -1036,7 +1019,7 @@ export function TenantDetail() {
               created={createdInvite}
               invitations={invitations.data?.items ?? []}
               loading={invitations.isLoading}
-              canInviteAdmin={item.tenant_role === 'owner'}
+              canInviteAdmin={permissions.tenant.inviteTenantAdmins}
               onCreate={(payload) => createInvite.mutate(payload)}
               onRevoke={(invitation) =>
                 revokeInvite.mutate(invitation.invitation_id)

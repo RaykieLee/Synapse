@@ -1,6 +1,7 @@
 import { redirect, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { Users } from '@/features/users'
+import { getPermissionCapabilities } from '@/lib/permissions'
 import { useAuthStore } from '@/stores/auth-store'
 
 const usersSearchSchema = z.object({
@@ -11,7 +12,10 @@ const usersSearchSchema = z.object({
 
 export const Route = createFileRoute('/_authenticated/users/')({
   beforeLoad: () => {
-    if (useAuthStore.getState().auth.user?.platform_role !== 'platform_admin') {
+    const canManagePlatformUsers = getPermissionCapabilities({
+      platformRole: useAuthStore.getState().auth.user?.platform_role,
+    }).platform.managePlatformUsers
+    if (!canManagePlatformUsers) {
       throw redirect({ to: '/403' })
     }
   },

@@ -20,6 +20,8 @@ import {
   type TaskRun,
 } from '@/api/scheduled-tasks'
 import { ApiProblem } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
 import { FormDialog } from '@/components/form-dialog'
@@ -78,16 +80,27 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
   const [enabledFilter, setEnabledFilter] = useState('')
   const [page, setPage] = useState(1)
   const [sorting, setSorting] = useState<TableSortState>(null)
-  const tenantKey = ['synapse', actorId, tenantId, 'personal', 'tenant'] as const
+  const tenantKey = queryKeys.tenant.query({ actorId, tenantId }, 'detail')
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
-  const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
+  const canManage = getPermissionCapabilities({
+    tenantRole: tenant.data?.tenant_role,
+  }).tenant.manageTenantAdministration
   const active = tenant.data?.status === 'active'
+  const tenantScope = {
+    actorId,
+    tenantId,
+    membershipVersion: tenant.data?.membership_version ?? 0,
+  }
   const params = new URLSearchParams({ page: String(page), page_size: '20' })
   if (search.trim()) params.set('task_name', search.trim())
   if (targetFilter) params.set('execution_target', targetFilter)
   if (scheduleFilter) params.set('schedule_type', scheduleFilter)
   if (enabledFilter) params.set('enabled', enabledFilter)
-  const listKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'list', page, params.toString()] as const
+  const listKey = queryKeys.tenant.query(
+    tenantScope,
+    ['scheduled-tasks', 'list'],
+    { page, query: params.toString() }
+  )
   const tasks = useQuery({
     queryKey: listKey,
     enabled: canManage && active,
@@ -121,14 +134,19 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
       }
     }
   )
-  const targetKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'targets'] as const
+  const targetKey = queryKeys.tenant.query(
+    tenantScope,
+    ['scheduled-tasks', 'targets']
+  )
   const targets = useQuery({
     queryKey: targetKey,
     enabled: canManage && active,
     queryFn: () => listScheduledTaskTargets(tenantId),
   })
   const invalidate = async () => {
-    await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks'] })
+    await client.invalidateQueries({
+      queryKey: queryKeys.tenant.resource(tenantScope, ['scheduled-tasks']),
+    })
   }
   const save = useMutation({
     mutationFn: (value: TaskDraft) => {
@@ -171,7 +189,11 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
       setManualRun({ tenantId: requestTenantId, task, run })
       setHistoryTask(task)
       setManualRunPendingId(null)
-      await client.invalidateQueries({ queryKey: ['synapse', actorId, requestTenantId, 'tenant', 'scheduled-tasks'] })
+      await client.invalidateQueries({
+        queryKey: queryKeys.tenant.resource(tenantScope, [
+          'scheduled-tasks',
+        ]),
+      })
     } catch (cause) {
       setManualRunError(manualRunErrorText(cause))
       setManualRunPendingId(null)
@@ -263,7 +285,7 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
       </div>
       <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground"><LocalizedText text={"共 "} />{tasks.data?.total ?? 0} <LocalizedText text={" 项"} /></span><div className="flex gap-2"><button className={button} disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><LocalizedText text={"上一页"} /></button><span className="px-2 py-2 text-sm"><LocalizedText text={"第 "} />{page} <LocalizedText text={" 页"} /></span><button className={button} disabled={page * 20 >= (tasks.data?.total ?? 0)} onClick={() => setPage((value) => value + 1)}><LocalizedText text={"下一页"} /></button></div></div>
     </section>
-    {historyTask && <TaskRunsPanel key={`${tenantId}:${historyTask.task_id}:${manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''}`} tenantId={tenantId} actorId={actorId} task={historyTask} initialSelectedRunId={manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''} onClose={() => setHistoryTask(null)} />}
+    {historyTask && <TaskRunsPanel key={`${tenantId}:${historyTask.task_id}:${manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''}`} tenantId={tenantId} actorId={actorId} membershipVersion={tenant.data?.membership_version ?? 0} task={historyTask} initialSelectedRunId={manualRun?.tenantId === tenantId && manualRun.task.task_id === historyTask.task_id ? manualRun.run.run_id : ''} onClose={() => setHistoryTask(null)} />}
     {manualRun?.tenantId === tenantId && <p role="status" aria-live="polite" className="rounded-md border p-3 text-sm">{manualRun.run.status === 'succeeded' ? (isEnglish ? 'Manual run succeeded. The execution record is open.' : '手工运行成功，已打开执行记录。') : manualRun.run.status === 'failed' ? <>{isEnglish ? 'Manual run failed. The execution record is open. Error code: ' : '手工运行失败，已打开执行记录。错误码：'}{manualRun.run.error_code ?? '—'}</> : (isEnglish ? 'The run record was created; the task is still running.' : '已创建运行记录，任务仍在运行中。')}</p>}
     {manualRunPendingId && <p role="status" aria-live="polite" className="rounded-md border p-3 text-sm">{isEnglish ? 'Task is running; waiting for the server to save its execution record…' : '正在运行任务，等待服务端写入执行记录…'}{` ${tasks.data?.items.find((task) => task.task_id === manualRunPendingId)?.task_name ?? ''}`}</p>}
     {manualRunError && <ErrorBox message={manualRunError} />}
@@ -301,7 +323,7 @@ function TenantScheduledTasksPanel({ tenantId, actorId }: { tenantId: string; ac
   </main>
 }
 
-function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose }: { tenantId: string; actorId: string; task: Task; initialSelectedRunId?: string; onClose: () => void }) {
+function TaskRunsPanel({ tenantId, actorId, membershipVersion, task, initialSelectedRunId, onClose }: { tenantId: string; actorId: string; membershipVersion: number; task: Task; initialSelectedRunId?: string; onClose: () => void }) {
   const [status, setStatus] = useState('')
   const [startedFrom, setStartedFrom] = useState('')
   const [startedTo, setStartedTo] = useState('')
@@ -312,7 +334,12 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
   if (status) params.set('status', status)
   if (startedFrom) params.set('started_from', new Date(startedFrom).toISOString())
   if (startedTo) params.set('started_to', new Date(startedTo).toISOString())
-  const runsKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'runs', task.task_id, params.toString()] as const
+  const tenantScope = { actorId, tenantId, membershipVersion }
+  const runsKey = queryKeys.tenant.query(
+    tenantScope,
+    ['scheduled-tasks', 'runs'],
+    { taskId: task.task_id, query: params.toString() }
+  )
   const runs = useQuery({
     queryKey: runsKey,
     queryFn: () => listScheduledTaskRuns(tenantId, task.task_id, {
@@ -342,7 +369,11 @@ function TaskRunsPanel({ tenantId, actorId, task, initialSelectedRunId, onClose 
       }
     }
   )
-  const detailKey = ['synapse', actorId, tenantId, 'tenant', 'scheduled-tasks', 'run', task.task_id, selectedRunId] as const
+  const detailKey = queryKeys.tenant.query(
+    tenantScope,
+    ['scheduled-tasks', 'run'],
+    { taskId: task.task_id, runId: selectedRunId }
+  )
   const detail = useQuery({
     queryKey: detailKey,
     enabled: Boolean(selectedRunId),

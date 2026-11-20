@@ -20,6 +20,8 @@ import { getRouteApi, useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
 import { FormDialog } from '@/components/form-dialog'
@@ -86,12 +88,21 @@ export function TenantRolesPage() {
   const [error, setError] = useState('')
   const [sorting, setSorting] = useState<TableSortState>(null)
 
-  const tenantKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant']
+  const actorId = actor?.user_id ?? 'anonymous'
+  const tenantKey = queryKeys.tenant.query({ actorId, tenantId }, 'detail')
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
-  const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
+  const canManage = getPermissionCapabilities({
+    tenantRole: tenant.data?.tenant_role,
+  }).tenant.manageTenantRoles
   const normalizedSearch = search.trim()
   const membershipVersion = tenant.data?.membership_version ?? 0
-  const roleKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'roles', membershipVersion, page, 20, normalizedSearch, status]
+  const tenantScope = { actorId, tenantId, membershipVersion }
+  const roleKey = queryKeys.tenant.query(tenantScope, ['roles', 'list'], {
+    page,
+    pageSize: 20,
+    search: normalizedSearch,
+    status,
+  })
   const roles = useQuery({
     queryKey: roleKey,
     enabled: canManage,
@@ -104,7 +115,9 @@ export function TenantRolesPage() {
   })
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: tenantKey })
-    await queryClient.invalidateQueries({ queryKey: ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'roles'] })
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.tenant.resource(tenantScope, ['roles', 'list']),
+    })
   }
   const save = useMutation({
     mutationFn: (value: RoleDraft) => {
@@ -331,8 +344,13 @@ function RoleMenuEditor({ tenantId, actorId, membershipVersion, role, onCancel, 
   const [selected, setSelected] = useState<string[] | null>(null)
   const [confirmPrune, setConfirmPrune] = useState(false)
   const [saveError, setSaveError] = useState('')
-  const menuTreeKey = ['synapse', actorId, tenantId, 'tenant', 'menus', membershipVersion, 'tree'] as const
-  const roleMenusKey = ['synapse', actorId, tenantId, 'tenant', 'roles', membershipVersion, role.role_id, 'menus'] as const
+  const tenantScope = { actorId, tenantId, membershipVersion }
+  const menuTreeKey = queryKeys.tenant.query(tenantScope, ['menus', 'tree'])
+  const roleMenusKey = queryKeys.tenant.query(
+    tenantScope,
+    ['roles', 'menu-assignments'],
+    { roleId: role.role_id }
+  )
   const menuTree = useQuery({ queryKey: menuTreeKey, queryFn: () => api<MenuTree>(`/tenants/${tenantId}/menus/tree?include_disabled=true`) })
   const roleMenus = useQuery({ queryKey: roleMenusKey, queryFn: () => api<RoleMenuSet>(`/tenants/${tenantId}/roles/${role.role_id}/menus`) })
   const allMenus = flattenTenantMenus(menuTree.data?.items ?? [])
@@ -346,9 +364,15 @@ function RoleMenuEditor({ tenantId, actorId, membershipVersion, role, onCancel, 
     onSuccess: async () => {
       setConfirmPrune(false)
       setSaveError('')
-      await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'personal', 'tenant'] })
-      await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'tenant', 'menus'] })
-      await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'tenant', 'roles'] })
+      await client.invalidateQueries({
+        queryKey: queryKeys.tenant.query({ actorId, tenantId }, 'detail'),
+      })
+      await client.invalidateQueries({
+        queryKey: queryKeys.tenant.resource(tenantScope, ['menus']),
+      })
+      await client.invalidateQueries({
+        queryKey: queryKeys.tenant.resource(tenantScope, ['roles']),
+      })
       onError('')
       await onSaved()
     },

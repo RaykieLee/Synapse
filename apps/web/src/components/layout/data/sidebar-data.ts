@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import type { WorkspaceRole } from '@/api/workspaces'
 import { ApiProblem } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
 import { type NavGroup, type SidebarData } from '../types'
 
 export type NavigationMenuNode = {
@@ -135,13 +136,14 @@ export function buildTenantNavigationGroup(
   tenantId: string,
   tenantRole: 'owner' | 'admin' | 'member' | null | undefined
 ): NavGroup | null {
-  if (!tenantRole) return null
+  const capabilities = getPermissionCapabilities({ tenantRole }).tenant
+  if (!capabilities.viewTenant) return null
   const overview = {
     title: '成员与邀请',
     url: `/tenants/${tenantId}`,
     icon: Users,
   }
-  if (tenantRole === 'member') {
+  if (!capabilities.manageTenantAdministration) {
     return { title: '当前租户', items: [overview] }
   }
   return {
@@ -178,6 +180,7 @@ export function buildWorkspaceNavigationGroup(
   workspaceId: string,
   workspaceRole: WorkspaceRole
 ): NavGroup {
+  const capabilities = getPermissionCapabilities({ workspaceRole }).workspace
   const items = [
     { title: 'AI 对话', url: `/w/${workspaceId}/chat`, icon: Bot },
     { title: '智能体', url: `/w/${workspaceId}/agents`, icon: Bot },
@@ -201,7 +204,7 @@ export function buildWorkspaceNavigationGroup(
     { title: '模型与凭据', url: `/w/${workspaceId}/models`, icon: Wrench },
     { title: '成员管理', url: `/w/${workspaceId}/members`, icon: Users },
   ]
-  if (workspaceRole === 'owner' || workspaceRole === 'admin') {
+  if (capabilities.manageWorkspaceSettings) {
     items.push({
       title: 'Workspace 设置',
       url: `/w/${workspaceId}/settings`,

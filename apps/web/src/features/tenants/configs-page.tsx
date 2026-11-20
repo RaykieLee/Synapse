@@ -29,6 +29,8 @@ import {
   updateTenantConfig,
 } from '@/api/tenant-configs'
 import { ApiProblem } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
 import { FormDialog } from '@/components/form-dialog'
@@ -76,9 +78,11 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
   const [saveError, setSaveError] = useState('')
   const [reveal, setReveal] = useState<{ tenantId: string; id: string; name: string; value: string | null; loading: boolean; error: string }>({ tenantId: '', id: '', name: '', value: null, loading: false, error: '' })
   const revealRequest = useRef(0)
-  const tenantKey = ['synapse', actorId, tenantId, 'personal', 'tenant'] as const
+  const tenantKey = queryKeys.tenant.query({ actorId, tenantId }, 'detail')
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
-  const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
+  const canManage = getPermissionCapabilities({
+    tenantRole: tenant.data?.tenant_role,
+  }).tenant.manageTenantSettings
   const tenantActive = tenant.data?.status === 'active'
   const listParams = {
     page,
@@ -89,14 +93,21 @@ function TenantConfigsPanel({ tenantId, actorId }: { tenantId: string; actorId: 
     ...(statusFilter ? { status: statusFilter as '0' | '1' } : {}),
     ...(sensitiveFilter ? { isSensitive: sensitiveFilter === 'true' } : {}),
   }
-  const listKey = ['synapse', actorId, tenantId, 'tenant', 'configs', tenant.data?.membership_version ?? 0, listParams] as const
+  const tenantScope = {
+    actorId,
+    tenantId,
+    membershipVersion: tenant.data?.membership_version ?? 0,
+  }
+  const listKey = queryKeys.tenant.query(tenantScope, ['configs', 'list'], listParams)
   const configs = useQuery({
     queryKey: listKey,
     enabled: canManage && tenantActive,
     queryFn: () => listTenantConfigs(tenantId, listParams),
   })
   const refresh = async () => {
-    await client.invalidateQueries({ queryKey: ['synapse', actorId, tenantId, 'tenant', 'configs'] })
+    await client.invalidateQueries({
+      queryKey: queryKeys.tenant.resource(tenantScope, ['configs', 'list']),
+    })
     await client.invalidateQueries({ queryKey: tenantKey })
   }
   const save = useMutation({

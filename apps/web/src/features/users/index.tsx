@@ -34,6 +34,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ApiProblem } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
 
@@ -41,7 +43,7 @@ const route = getRouteApi('/_authenticated/users/')
 const pageSizes = [10, 20, 50, 100]
 
 const userKey = (actorId: string, page: number, size: number, search: string) =>
-  ['synapse', actorId, 'global', 'personal', 'users', page, size, search] as const
+  queryKeys.global.query({ actorId }, ['users', 'list'], { page, size, search })
 
 function errorMessage(error: unknown) {
   const english = getLocale() === 'en'
@@ -87,6 +89,9 @@ export function Users() {
   const navigate = route.useNavigate()
   const actor = useAuthStore((state) => state.auth.user)
   const actorId = actor?.user_id ?? 'anonymous'
+  const canManagePlatformUsers = getPermissionCapabilities({
+    platformRole: actor?.platform_role,
+  }).platform.managePlatformUsers
   const locale = useLocale()
   const client = useQueryClient()
   const page = params.page ?? 1
@@ -118,9 +123,12 @@ export function Users() {
     queryKey: userKey(actorId, page, pageSize, search),
     queryFn: () =>
       listUsers({ page, pageSize, search: search || undefined }),
-    enabled: actor?.platform_role === 'platform_admin',
+    enabled: canManagePlatformUsers,
   })
-  const refresh = () => client.invalidateQueries({ queryKey: ['synapse', actorId, 'global', 'personal', 'users'] })
+  const refresh = () =>
+    client.invalidateQueries({
+      queryKey: queryKeys.global.resource({ actorId }, ['users', 'list']),
+    })
   const create = useMutation({
     mutationFn: (body: UserCreatePayload) => createUser(body),
     onSuccess: async () => { setCreateOpen(false); setActionError(''); setNotice('用户账号已创建。'); await navigate({ search: (old) => ({ ...old, search: '', page: 1 }) }); await refresh() },

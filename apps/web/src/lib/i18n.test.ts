@@ -1,62 +1,183 @@
-import { describe, expect, it } from 'vitest'
-import { getLocale, setLocale, syncLocaleFromStorage, translate } from './i18n'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import {
+  formatMessage,
+  getLocale,
+  setLocale,
+  syncLocaleFromStorage,
+  t,
+  translate,
+} from './i18n'
+import {
+  translationCatalogModules,
+  translationLookupChains,
+  validateTranslationCatalog,
+} from './i18n/index'
 
-describe('translate', () => {
-  it('keeps authored Chinese labels unchanged in the Chinese locale', () => {
-    expect(translate('选择工作区', 'zh-CN')).toBe('选择工作区')
-    expect(translate('我的个人附件', 'zh-CN')).toBe('我的个人附件')
+const localeStorageKey = 'synapse-locale'
+
+beforeEach(() => {
+  window.localStorage.removeItem(localeStorageKey)
+  setLocale('zh-CN')
+})
+
+afterEach(() => {
+  setLocale('zh-CN')
+  window.localStorage.removeItem(localeStorageKey)
+})
+
+describe('translation catalog registration', () => {
+  it('statically registers every domain module with complete bilingual keys', () => {
+    expect(translationCatalogModules.map(({ id }) => id)).toEqual([
+      'auth',
+      'attachments',
+      'common',
+      'dashboard',
+      'legacy',
+      'navigation',
+      'settings',
+      'tenants',
+      'workspaces',
+    ])
+    expect(translationLookupChains.en.map(({ chainOrder }) => chainOrder)).toEqual([
+      0, 1, 2, 3, 4, 5, 6,
+    ])
+    expect(
+      translationLookupChains['zh-CN'].map(({ chainOrder }) => chainOrder),
+    ).toEqual([0, 1, 2, 3])
+    expect(validateTranslationCatalog(translationCatalogModules)).toEqual({
+      duplicateModuleIds: [],
+      duplicateEntryKeys: [],
+      missingLocaleKeys: [],
+    })
   })
 
-  it('removes only unused template labels and integration statuses', () => {
-    expect(translate('应用', 'en')).toBe('应用')
-    expect(translate('聊天', 'en')).toBe('聊天')
-    expect(translate('Apps', 'zh-CN')).toBe('Apps')
-    expect(translate('Chats', 'zh-CN')).toBe('Chats')
-    expect(translate('Connected', 'zh-CN')).toBe('Connected')
-    expect(translate('Connect', 'zh-CN')).toBe('Connect')
+  it('reports a missing locale key through the catalog guard', () => {
+    expect(
+      validateTranslationCatalog([
+        {
+          id: 'example',
+          entries: [{ key: 'greeting', locales: { 'zh-CN': '你好' } }],
+        }],
+      ).missingLocaleKeys,
+    ).toEqual(['example.greeting.en'])
   })
 
-  it('preserves Help Center and Tasks translations used by active pages', () => {
-    expect(translate('帮助中心', 'en')).toBe('Help Center')
-    expect(translate('任务', 'en')).toBe('Tasks')
-    expect(translate('Tasks', 'zh-CN')).toBe('任务')
-  })
-
-  it('localizes Workspace switcher and breadcrumb navigation labels', () => {
-    expect(translate('搜索 Workspace 或租户…', 'zh-CN')).toBe(
-      '搜索 Workspace 或租户…'
+  it('restores every Dashboard lookup without changing legacy precedence', () => {
+    const dashboardMessages = [
+      ['Workspace summary', '工作区摘要'],
+      ['Workspace overview', '工作区概览'],
+      ['Workspace activity', '工作区动态'],
+      ['Workspace analytics', '工作区分析'],
+      ['Activity', '活动'],
+      ['Agents', '智能体'],
+      ['Resources', '资源'],
+      ['Data sources', '数据来源'],
+      ['Resource categories', '资源分类'],
+      ["Workspace data isn't connected yet.", '工作区数据尚未接入。'],
+      [
+        'No workspace data source is configured, so metrics are unavailable.',
+        '尚未配置工作区数据源，因此指标暂不可用。',
+      ],
+      ["Workspace overview data isn't connected yet.", '工作区概览数据尚未接入。'],
+      [
+        'No workspace data source is configured, so this overview is unavailable.',
+        '尚未配置工作区数据源，因此概览暂不可用。',
+      ],
+      ["Workspace activity data isn't connected yet.", '工作区动态数据尚未接入。'],
+      [
+        'No workspace data source is configured, so activity history is unavailable.',
+        '尚未配置工作区数据源，因此动态记录暂不可用。',
+      ],
+      ["Analytics data isn't connected yet.", '分析数据尚未接入。'],
+      [
+        'No analytics data source is configured, so metrics are unavailable.',
+        '尚未配置分析数据源，因此指标暂不可用。',
+      ],
+      [
+        'No analytics data source is configured, so charts are unavailable.',
+        '尚未配置分析数据源，因此图表暂不可用。',
+      ],
+      [
+        'No analytics data source is configured, so charts and breakdowns are unavailable.',
+        '尚未配置分析数据源，因此图表和分类数据暂不可用。',
+      ],
+    ] as const
+    const dashboardModule = translationCatalogModules.find(
+      ({ id }) => id === 'dashboard',
     )
-    expect(translate('搜索 Workspace 或租户…', 'en')).toBe(
-      'Search Workspaces or tenants…'
-    )
-    expect(translate('平台管理', 'en')).toBe('Platform administration')
-    expect(translate('Workspace 工作台', 'en')).toBe('Workspace workbench')
-  })
 
-  it.each([
-    ['zh-CN', 'en'],
-    ['en', 'zh-CN'],
-  ] as const)(
-    'initializes the document language from stored locale %s before mount',
-    (storedLocale, staleDocumentLanguage) => {
-      setLocale(storedLocale === 'en' ? 'zh-CN' : 'en')
-      window.localStorage.setItem(
-        'synapse-locale',
-        storedLocale === 'en' ? 'en' : 'zh-CN'
+    expect(
+      dashboardModule?.entries.flatMap(({ lookups }) => lookups),
+    ).toHaveLength(37)
+
+    for (const [english, chinese] of dashboardMessages) {
+      expect(translate(english, 'zh-CN')).toBe(chinese)
+      expect(translate(chinese, 'en')).toBe(
+        english === 'Agents' ? 'Agent' : english,
       )
-      document.documentElement.lang = staleDocumentLanguage
-      syncLocaleFromStorage()
-      expect(getLocale()).toBe(storedLocale)
-      expect(document.documentElement.lang).toBe(storedLocale)
     }
-  )
+  })
+})
 
-  it('synchronizes the document language immediately when the locale changes', () => {
-    document.documentElement.lang = 'zh-CN'
+describe('locale switching and translation lookup', () => {
+  it('switches synchronously, persists the locale, and keeps the t alias', () => {
+    expect(getLocale()).toBe('zh-CN')
     setLocale('en')
+    expect(getLocale()).toBe('en')
+    expect(window.localStorage.getItem(localeStorageKey)).toBe('en')
+    expect(t('保存')).toBe('Save')
+
+    setLocale('zh-CN')
+    expect(getLocale()).toBe('zh-CN')
+    expect(window.localStorage.getItem(localeStorageKey)).toBe('zh-CN')
+    expect(t('保存')).toBe('保存')
+  })
+
+  it('synchronizes the document language and restores the locale from storage', () => {
+    window.localStorage.setItem(localeStorageKey, 'en')
+    document.documentElement.lang = 'zh-CN'
+
+    syncLocaleFromStorage()
+
+    expect(getLocale()).toBe('en')
     expect(document.documentElement.lang).toBe('en')
-    document.documentElement.lang = 'en'
+
     setLocale('zh-CN')
     expect(document.documentElement.lang).toBe('zh-CN')
+  })
+
+  it('keeps existing domain translations in both directions', () => {
+    expect(translate('登录工作空间', 'en')).toBe('Sign in to workspace')
+    expect(translate('当前没有可访问的启用租户', 'en')).toBe(
+      'No active tenants are accessible to you',
+    )
+    expect(translate('创建团队草稿', 'en')).toBe('Create a team draft')
+    expect(translate('删除附件', 'en')).toBe('Delete attachment')
+    expect(translate('Delete attachment', 'zh-CN')).toBe('删除附件')
+    expect(translate('Dashboard', 'zh-CN')).toBe('仪表盘')
+  })
+
+  it('registers workbench directory messages in both directions', () => {
+    expect(translate('租户名称暂不可用', 'en')).toBe(
+      'Tenant name temporarily unavailable',
+    )
+    expect(translate('Could not load the tenant directory', 'zh-CN')).toBe(
+      '无法加载租户目录',
+    )
+  })
+
+  it('preserves the original dictionary and merge fallback priority', () => {
+    expect(translate('成员', 'en')).toBe('Members')
+    expect(translate('错误页面', 'en')).toBe('Errors')
+    expect(translate('团队成员', 'zh-CN')).toBe('团队成员')
+  })
+
+  it('returns unknown keys unchanged and retains missing format placeholders', () => {
+    const unknown = '  未登记的词条  '
+    expect(translate(unknown, 'en')).toBe(unknown)
+    expect(translate(unknown, 'zh-CN')).toBe(unknown)
+    expect(formatMessage('确定归档“{name}”吗？', {}, 'en')).toBe(
+      'Archive “{name}”?',
+    )
   })
 })
