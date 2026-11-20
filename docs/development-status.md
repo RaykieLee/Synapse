@@ -254,4 +254,4 @@
 - 已将前端架构加固提交 `9699c2a5` 合并到本地 `main`，保留主线已有导航、附件和 Workspace UX 改动，并纳入合并后的修复；未推送远端。合并范围包括 OpenAPI 生成类型、权限 capability、Workspace/AgentScope QueryKeys、Workspace 路由去重、i18n 模块化、共享会话 reducer、Dashboard 清理和聚焦页面测试。
 - 最终复验：`pnpm run openapi:verify` 通过（67 paths、126 component schemas、生成物无漂移，并完成 TypeScript project build）；15 个聚焦浏览器测试文件通过，`146/146` tests passed。详见[前端架构合并复验](verification/frontend-architecture-merge-acceptance.md)。本轮未运行全项目 build 或全量 lint。
 - 本地预览 `http://127.0.0.1:5176/` 返回 HTTP 200，未登录时按预期显示本地登录页；受保护页面需用户自己的登录态。本地预览和 fixture 测试不构成生产验收。
-- API wire contract 与服务端授权规则未改；OpenAPI 生成类型仅覆盖 users、tenants、workspaces 核心模型。真实 API 撤权、自然 stale 复验、成员名册/tenant admin 角色契约、Workspace Sessions 专项页面测试与真实 API/SSE、Dashboard 摘要 API、未迁移 QueryKey 目录、完整移动端/读屏及 F43 许可证来源审查仍未覆盖，不宣称全产品验收完成。
+- API wire contract 与服务端授权规则未改；OpenAPI 生成类型仅覆盖 users、tenants、workspaces 核心模型。真实 API 撤权、自然 stale 复验、成员名册/tenant admin 角色契约、Workspace Sessions 专项页面测试与真实 API/SSE、Dashboard 摘要 API、未迁移 QueryKey 目录、完整移动端/读屏及 F43 许可证来源审查仍未覆盖，不宣称全产品验收完成。此前核心页面独立报告指出的 Workspace 目录错误/空态混淆已在本次合并代码改为独立错误提示和重试入口；现有错误 fixture 测试尚未断言该可见状态，需独立复验后再关闭该缺口。
