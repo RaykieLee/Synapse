@@ -1,5 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { queryKeys } from '@/lib/query-keys'
 import type { MemberCustomRoleResponse } from '../types'
 
 export function memberCustomRoleQueryOptions({
@@ -15,16 +16,13 @@ export function memberCustomRoleQueryOptions({
   userId: string
   enabled: boolean
 }) {
+  const tenantScope = { actorId, tenantId, membershipVersion }
   return queryOptions({
-    queryKey: [
-      'synapse',
-      actorId,
-      tenantId,
-      'personal',
-      'member-custom-role',
-      membershipVersion,
-      userId,
-    ],
+    queryKey: queryKeys.tenant.query(
+      tenantScope,
+      ['members', 'custom-role'],
+      { userId }
+    ),
     enabled,
     queryFn: () =>
       api<MemberCustomRoleResponse>(

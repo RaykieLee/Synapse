@@ -1,4 +1,4 @@
-import * as React from 'react'
+﻿import * as React from 'react'
 import { getRouteApi } from '@tanstack/react-router'
 import {
   keepPreviousData,
@@ -8,6 +8,8 @@ import {
 } from '@tanstack/react-query'
 import { Download, File, FileUp, Loader2, RotateCcw, Trash2 } from 'lucide-react'
 import { ApiProblem } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import {
   attachmentErrorMessage,
   deleteAttachment,
@@ -94,29 +96,29 @@ function WorkspaceAttachmentsContent({
   const [deletingIds, setDeletingIds] = React.useState<Set<string>>(new Set())
   const [downloadingId, setDownloadingId] = React.useState<string | null>(null)
   const fileInput = React.useRef<HTMLInputElement>(null)
+  const queryScope = workspaceQueryScope(actorId, workspace)
+  const workspacePermissions = getPermissionCapabilities({
+    workspaceRole: workspace.workspace_role,
+  }).workspace
   const canUpload =
-    ['owner', 'admin', 'member'].includes(workspace.workspace_role) &&
+    workspacePermissions.useWorkspaceResources &&
     workspace.status === 'active'
-  const canDeleteWorkspaceFiles = ['owner', 'admin'].includes(
-    workspace.workspace_role,
+  const canDeleteWorkspaceFiles =
+    workspacePermissions.manageWorkspaceResources
+  const keyPrefix = queryKeys.workspace.resource(
+    queryScope,
+    ['attachments', 'list']
   )
-  const keyPrefix = [
-    'synapse',
-    actorId,
-    workspace.tenant_id,
-    workspace.workspace_id,
-    'attachments',
-  ] as const
-  const queryKey = [
-    ...keyPrefix,
+  const queryKey = queryKeys.workspace.query(
+    queryScope,
+    ['attachments', 'list'],
     {
       scopeKind,
       page,
       pageSize,
       workspaceId: workspace.workspace_id,
-      membershipVersion: workspace.membership_version ?? 0,
-    },
-  ] as const
+    }
+  )
 
   const changeScope = (nextScope: AttachmentScopeKind) => {
     if (nextScope === scopeKind) return

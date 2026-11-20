@@ -5,8 +5,10 @@ import '@/styles/index.css'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, type RenderResult } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
+import type { useNavigate as useNavigateHook } from '@tanstack/react-router'
 import type { Team, TeamRun } from '@/api/team-orchestration'
 import { setLocale } from '@/lib/i18n'
+import { useWorkspace } from '@/features/workspaces/context'
 import { WorkspaceTeamsPage } from './teams-page'
 import type { Workspace } from './types'
 
@@ -26,23 +28,33 @@ const { fixtureContext } = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('./context', () => ({ useWorkspace: () => fixtureContext }))
-vi.mock('@tanstack/react-router', () => ({
-  Link: ({
-    to,
-    params,
-    children,
-    ...props
-  }: {
-    to: string
-    params: { workspaceId: string }
-    children: ReactNode
-  } & ComponentProps<'a'>) => (
-    <a {...props} href={to.replace('$workspaceId', params.workspaceId)}>
-      {children}
-    </a>
-  ),
-}))
+type NavigateFunction = ReturnType<typeof useNavigateHook>
+
+vi.mock('@/features/workspaces/context', { spy: true })
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-router')>()
+  return {
+    ...actual,
+    useNavigate: () =>
+      vi.fn(
+        async (_options: Parameters<NavigateFunction>[0]) => undefined
+      ) as NavigateFunction,
+    Link: ({
+      to,
+      params,
+      children,
+      ...props
+    }: {
+      to: string
+      params: { workspaceId: string }
+      children: ReactNode
+    } & ComponentProps<'a'>) => (
+      <a {...props} href={to.replace('$workspaceId', params.workspaceId)}>
+        {children}
+      </a>
+    ),
+  }
+})
 
 const base = '/api/v1/workspaces/11/teams'
 const runPath = `${base}/team-a/runs/run-a`
@@ -227,6 +239,7 @@ beforeEach(async () => {
     workspace_role: 'owner',
     membership_version: 3,
   }
+  vi.mocked(useWorkspace).mockReturnValue(fixtureContext)
   requests.length = 0
   overrides.clear()
   teamsFixture = [teamFixture()]

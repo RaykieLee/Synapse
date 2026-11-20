@@ -59,6 +59,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { useWorkspace } from '@/features/workspaces/context'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import { api, apiBlob, ApiProblem } from '@/lib/api'
 import {
   EmptyState,
@@ -312,8 +313,23 @@ export function AgentScopeKnowledgePage({
 }: {
   workspaceId?: string
 }) {
-  const workspace = useWorkspace()
-  const workspaceId = workspaceIdProp ?? workspace.workspace.workspace_id
+  const workspaceContext = useWorkspace()
+  const workspace = workspaceContext.workspace
+  const workspaceId = workspaceIdProp ?? workspace.workspace_id
+  const queryScope = React.useMemo(
+    () =>
+      workspaceQueryScope(workspaceContext.actorId, {
+        ...workspace,
+        workspace_id: workspaceId,
+      }),
+    [
+      workspaceContext.actorId,
+      workspace.tenant_id,
+      workspace.workspace_id,
+      workspace.membership_version,
+      workspaceId,
+    ]
+  )
   const client = useQueryClient()
   const [search, setSearch] = React.useState('')
   const query = search
@@ -331,7 +347,11 @@ export function AgentScopeKnowledgePage({
   const [searchOpen, setSearchOpen] = React.useState(false)
 
   const bases = useQuery({
-    queryKey: ['agentscope', workspaceId, 'knowledge-bases', page, query],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['resources', 'knowledge', 'bases'],
+      { page, query, workspaceId }
+    ),
     queryFn: () => listKnowledgeBases(workspaceId, { page, name: query }),
   })
   const selected = React.useMemo(
@@ -339,14 +359,16 @@ export function AgentScopeKnowledgePage({
     [bases.data, selectedId]
   )
   const documents = useQuery({
-    queryKey: [
-      'agentscope',
-      workspaceId,
-      'knowledge-documents',
-      selected?.id,
-      docPage,
-      docSearch,
-    ],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['resources', 'knowledge', 'documents'],
+      {
+        knowledgeBaseId: selected?.id,
+        page: docPage,
+        query: docSearch,
+        workspaceId,
+      }
+    ),
     queryFn: () =>
       listKnowledgeDocuments(workspaceId, selected!.id, {
         page: docPage,
@@ -355,7 +377,11 @@ export function AgentScopeKnowledgePage({
     enabled: Boolean(selected),
   })
   const capabilities = useQuery({
-    queryKey: ['agentscope', workspaceId, 'knowledge-capabilities'],
+    queryKey: queryKeys.agentscope.query(queryScope, [
+      'resources',
+      'knowledge',
+      'capabilities',
+    ], { workspaceId }),
     queryFn: async () => {
       const [embedding, chunkers] = await Promise.all([
         listKnowledgeEmbeddingModels(workspaceId),
@@ -370,7 +396,11 @@ export function AgentScopeKnowledgePage({
     enabled: Boolean(draft && !draft.id),
   })
   const supportedTypes = useQuery({
-    queryKey: ['agentscope', workspaceId, 'knowledge-supported-content-types'],
+    queryKey: queryKeys.agentscope.query(queryScope, [
+      'resources',
+      'knowledge',
+      'supported-content-types',
+    ], { workspaceId }),
     queryFn: () => listSupportedContentTypes(workspaceId),
     enabled: Boolean(selected),
   })
@@ -385,13 +415,11 @@ export function AgentScopeKnowledgePage({
   )
   const pollIdsKey = pollIds.join(',')
   const statuses = useQuery({
-    queryKey: [
-      'agentscope',
-      workspaceId,
-      'knowledge-document-status',
-      selected?.id,
-      pollIdsKey,
-    ],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['resources', 'knowledge', 'document-status'],
+      { knowledgeBaseId: selected?.id, documentIds: pollIdsKey, workspaceId }
+    ),
     queryFn: () =>
       listDocumentStatuses(workspaceId, selected!.id, pollIdsKey ? pollIdsKey.split(',') : []),
     enabled: Boolean(selected && pollIds.length > 0),
@@ -413,12 +441,20 @@ export function AgentScopeKnowledgePage({
   React.useEffect(() => {
     if (!terminalTransition || !selected) return
     void client.invalidateQueries({
-      queryKey: ['agentscope', workspaceId, 'knowledge-documents', selected.id],
+      queryKey: queryKeys.agentscope.query(
+        queryScope,
+        ['resources', 'knowledge', 'documents'],
+        { knowledgeBaseId: selected.id }
+      ),
     })
     void client.invalidateQueries({
-      queryKey: ['agentscope', workspaceId, 'knowledge-bases'],
+      queryKey: queryKeys.agentscope.resource(queryScope, [
+        'resources',
+        'knowledge',
+        'bases',
+      ]),
     })
-  }, [client, selected, terminalTransition, workspaceId])
+  }, [client, queryScope, selected, terminalTransition, workspaceId])
 
   const embeddingOptions = React.useMemo(
     () => capabilities.data?.embeddings ?? [],
@@ -454,7 +490,13 @@ export function AgentScopeKnowledgePage({
   )
 
   const refreshBases = () =>
-    client.invalidateQueries({ queryKey: ['agentscope', workspaceId, 'knowledge-bases'] })
+    client.invalidateQueries({
+      queryKey: queryKeys.agentscope.resource(queryScope, [
+        'resources',
+        'knowledge',
+        'bases',
+      ]),
+    })
   const save = useMutation({
     mutationFn: async (value: BaseDraft) => {
       if (value.id) {
@@ -515,7 +557,11 @@ export function AgentScopeKnowledgePage({
       setUploadError('')
       if (selected) {
         await client.invalidateQueries({
-          queryKey: ['agentscope', workspaceId, 'knowledge-documents', selected.id],
+          queryKey: queryKeys.agentscope.query(
+            queryScope,
+            ['resources', 'knowledge', 'documents'],
+            { knowledgeBaseId: selected.id }
+          ),
         })
       }
       await refreshBases()
@@ -531,7 +577,11 @@ export function AgentScopeKnowledgePage({
       if (detailTarget?.id === value.id) setDetailTarget(null)
       if (selected) {
         await client.invalidateQueries({
-          queryKey: ['agentscope', workspaceId, 'knowledge-documents', selected.id],
+          queryKey: queryKeys.agentscope.query(
+            queryScope,
+            ['resources', 'knowledge', 'documents'],
+            { knowledgeBaseId: selected.id }
+          ),
         })
       }
       await refreshBases()
@@ -1343,17 +1393,24 @@ function DocumentDetailDialog({
   document: KnowledgeDocumentView
   onClose: () => void
 }) {
+  const workspaceContext = useWorkspace()
+  const queryScope = workspaceQueryScope(workspaceContext.actorId, {
+    ...workspaceContext.workspace,
+    workspace_id: workspaceId,
+  })
   const [chunkPage, setChunkPage] = React.useState(1)
 
   const chunks = useQuery({
-    queryKey: [
-      'agentscope',
-      workspaceId,
-      'knowledge-document-chunks',
-      knowledgeBaseId,
-      document.id,
-      chunkPage,
-    ],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['resources', 'knowledge', 'document-chunks'],
+      {
+        knowledgeBaseId,
+        documentId: document.id,
+        page: chunkPage,
+        workspaceId,
+      }
+    ),
     queryFn: () => listDocumentChunks(workspaceId, knowledgeBaseId, document.id, chunkPage),
   })
   const media = mediaType(document)
@@ -1362,18 +1419,20 @@ function DocumentDetailDialog({
   const isImage = INLINE_IMAGE_TYPES.includes(media)
   const tooLarge = isTextType && document.size > MAX_INLINE_TEXT_BYTES
   const preview = useQuery({
-    queryKey: [
-      'agentscope',
-      workspaceId,
-      'knowledge-document-preview',
-      knowledgeBaseId,
-      document.id,
-      media,
-      isTextType,
-      tooLarge,
-      isPdf,
-      isImage,
-    ],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['resources', 'knowledge', 'document-preview'],
+      {
+        knowledgeBaseId,
+        documentId: document.id,
+        media,
+        isTextType,
+        tooLarge,
+        workspaceId,
+        isPdf,
+        isImage,
+      }
+    ),
     queryFn: async () => {
       if (isTextType && !tooLarge) {
         return {

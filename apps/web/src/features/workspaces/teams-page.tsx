@@ -1,4 +1,4 @@
-import * as React from 'react'
+﻿import * as React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { ArrowLeft, Bot, CircleStop, Loader2, Plus, Users } from 'lucide-react'
@@ -12,6 +12,8 @@ import {
 } from '@/api/team-orchestration'
 import { api, ApiProblem } from '@/lib/api'
 import { useLocaleText } from '@/lib/i18n'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -46,22 +48,6 @@ type RunReference = {
   runId?: string
   requestKey?: string
   teamVersion?: number
-}
-
-function key(
-  actorId: string,
-  workspace: Workspace,
-  ...resource: (string | undefined)[]
-) {
-  return [
-    'synapse',
-    actorId,
-    workspace.tenant_id,
-    workspace.workspace_id,
-    'teams',
-    workspace.membership_version ?? 0,
-    ...resource,
-  ] as const
 }
 
 const statusLabels: Record<string, string> = {
@@ -200,8 +186,15 @@ function TeamsPage({
 }) {
   const t = useLocaleText()
   const client = useQueryClient()
-  const scope = key(actorId, workspace)
-  const storageKey = `synapse:team-runs:${JSON.stringify(scope)}`
+  const storageScope = [
+    'synapse',
+    actorId,
+    workspace.tenant_id,
+    workspace.workspace_id,
+    'teams',
+    workspace.membership_version ?? 0,
+  ] as const
+  const storageKey = `synapse:team-runs:${JSON.stringify(storageScope)}`
   const [references, setReferences] = React.useState(() =>
     readRunReferences(storageKey)
   )
@@ -217,14 +210,19 @@ function TeamsPage({
   const statusSummary = React.useRef<HTMLParagraphElement>(null)
   const manager =
     workspace.status === 'active' &&
-    ['owner', 'admin'].includes(workspace.workspace_role)
+    getPermissionCapabilities({
+      workspaceRole: workspace.workspace_role,
+    }).workspace.manageWorkspaceResources
+  const queryScope = workspaceQueryScope(actorId, workspace)
 
   React.useEffect(() => {
     saveRunReferences(storageKey, references)
   }, [references, storageKey])
 
   const teams = useQuery({
-    queryKey: key(actorId, workspace, 'list'),
+    queryKey: queryKeys.workspace.query(queryScope, ['teams', 'list'], {
+      workspaceId: workspace.workspace_id,
+    }),
     queryFn: () => listTeams(workspace.workspace_id),
     retry: false,
   })
@@ -234,7 +232,11 @@ function TeamsPage({
       teams.data?.items[0] ??
       null)
   const runId = selected ? references[selected.team_id]?.runId : undefined
-  const runKey = key(actorId, workspace, 'run', selected?.team_id, runId)
+  const runKey = queryKeys.workspace.query(
+    queryScope,
+    ['teams', 'run'],
+    { teamId: selected?.team_id, runId, workspaceId: workspace.workspace_id }
+  )
   const runQuery = useQuery({
     queryKey: runKey,
     queryFn: () =>
@@ -251,7 +253,11 @@ function TeamsPage({
           : false,
   })
   const run = permissionError(runQuery.error) ? undefined : runQuery.data
-  const eventsKey = key(actorId, workspace, 'events', selected?.team_id, runId)
+  const eventsKey = queryKeys.workspace.query(
+    queryScope,
+    ['teams', 'events'],
+    { teamId: selected?.team_id, runId, workspaceId: workspace.workspace_id }
+  )
   const events = useQuery({
     queryKey: eventsKey,
     queryFn: () =>
@@ -267,7 +273,9 @@ function TeamsPage({
           : false,
   })
   const agents = useQuery({
-    queryKey: key(actorId, workspace, 'agents'),
+    queryKey: queryKeys.workspace.query(queryScope, ['teams', 'agents'], {
+      workspaceId: workspace.workspace_id,
+    }),
     queryFn: () =>
       api<{ agents: Agent[] }>('/ai/agent/', {
         headers: { 'X-Workspace-ID': workspace.workspace_id },
@@ -306,7 +314,9 @@ function TeamsPage({
       setAgentId('')
       setCreateOpen(false)
       setSelectedId(team.team_id)
-      await client.invalidateQueries({ queryKey: [...scope, 'list'] })
+      await client.invalidateQueries({
+        queryKey: queryKeys.workspace.resource(queryScope, ['teams', 'list']),
+      })
     },
   })
   const start = useMutation({
@@ -332,7 +342,12 @@ function TeamsPage({
     },
     onError: (error) => {
       if (error instanceof ApiProblem && error.status === 409)
-        void client.invalidateQueries({ queryKey: [...scope, 'list'] })
+        void client.invalidateQueries({
+          queryKey: queryKeys.workspace.resource(
+            queryScope,
+            ['teams', 'list']
+          ),
+        })
     },
   })
   const interrupt = useMutation({

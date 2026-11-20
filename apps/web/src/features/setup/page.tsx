@@ -23,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useWorkspaceDirectory } from '@/features/workspaces/directory'
 import { useAuthStore } from '@/stores/auth-store'
+import { queryKeys } from '@/lib/query-keys'
 import {
   probeSetupStatus,
   type AgentScopeHealthResponse,
@@ -207,7 +208,11 @@ export function SetupPage() {
   )
   const workspaceId = preferredWorkspace?.workspace_id
   const statusQuery = useQuery({
-    queryKey: ['synapse', actor?.user_id ?? 'anonymous', 'setup-status', workspaceId ?? 'none'],
+    queryKey: queryKeys.global.query(
+      queryKeys.actorScope(actor?.user_id ?? 'anonymous'),
+      ['setup', 'status'],
+      { workspaceId: workspaceId ?? 'none' }
+    ),
     queryFn: () => probeSetupStatus(workspaceId),
     enabled: Boolean(actor) && !directory.workspaceQuery.isLoading,
   })

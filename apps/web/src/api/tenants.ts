@@ -1,4 +1,5 @@
 import { api } from '@/lib/api'
+import type { components } from '@/api/generated/openapi'
 
 export type TenantStatus = 'active' | 'suspended' | 'archived'
 export type TenantValidity = 'current' | 'not_started' | 'expired' | 'unlimited'
@@ -6,31 +7,20 @@ export type TenantRole = 'owner' | 'admin' | 'member'
 export type MemberStatus = 'active' | 'suspended' | 'removed'
 export type MemberRole = TenantRole
 
-export type Tenant = {
-  tenant_id: string
-  slug: string
-  name: string
-  status: TenantStatus
-  valid_from: string | null
-  valid_until: string | null
-  settings: Record<string, unknown>
-  tenant_role: TenantRole | null
-  membership_version: number
-  created_at: string
-  updated_at: string
-}
+export type Tenant = Omit<
+  components['schemas']['TenantResponse'],
+  'status' | 'tenant_role'
+> & { status: TenantStatus; tenant_role: TenantRole | null }
 
-export type Member = {
-  user_id: string
-  user_name: string
-  nick_name: string | null
-  email: string | null
-  status: MemberStatus
-  tenant_role: MemberRole
-  joined_at: string | null
-  created_at: string
-  updated_at: string
-}
+export type TenantListItem = Omit<
+  components['schemas']['TenantWithWorkspacesResponse'],
+  'status' | 'tenant_role'
+> & { status: TenantStatus; tenant_role: TenantRole | null }
+
+export type Member = Omit<
+  components['schemas']['MemberResponse'],
+  'status' | 'tenant_role'
+> & { status: MemberStatus; tenant_role: MemberRole }
 
 export type Page<T> = {
   items: T[]
@@ -53,31 +43,39 @@ export type TenantListParams = {
   expiresBefore?: string
 }
 
-export type TenantCreatePayload = {
-  slug: string
-  name: string
-  first_owner_user_id: string
-  valid_from?: string | null
-  valid_until?: string | null
-}
+export type TenantPage = Omit<
+  components['schemas']['TenantPageResponse'],
+  'items'
+> & { items: TenantListItem[] }
 
-export type TenantPatchPayload = {
-  name?: string
-  status?: TenantStatus
-  settings?: Record<string, unknown>
-  valid_from?: string | null
-  valid_until?: string | null
-}
+export type PlatformTenantPage = Omit<
+  components['schemas']['PlatformTenantPageResponse'],
+  'items'
+> & { items: Tenant[] }
 
-export type MemberCreatePayload = {
-  user_id: string
-  tenant_role?: MemberRole
-}
+export type MemberPage = Omit<
+  components['schemas']['MemberPageResponse'],
+  'items'
+> & { items: Member[] }
 
-export type MemberPatchPayload = {
-  tenant_role?: MemberRole
-  status?: MemberStatus
-}
+export type TenantCreatePayload = components['schemas']['TenantCreate']
+
+export type TenantCreated = components['schemas']['TenantCreatedResponse']
+
+export type TenantPatchPayload = Omit<
+  components['schemas']['TenantPatch'],
+  'status'
+> & { status?: TenantStatus }
+
+export type MemberCreatePayload = Omit<
+  components['schemas']['MemberCreate'],
+  'tenant_role'
+> & { tenant_role?: MemberRole }
+
+export type MemberPatchPayload = Omit<
+  components['schemas']['MemberPatch'],
+  'tenant_role' | 'status'
+> & { tenant_role?: MemberRole; status?: MemberStatus }
 
 function withQuery(
   path: string,
@@ -108,11 +106,11 @@ function toTenantQuery(params: TenantListParams) {
 }
 
 export function listTenants(params: TenantListParams = {}) {
-  return api<Page<Tenant>>(`/tenants${toTenantQuery(params)}`)
+  return api<TenantPage>(`/tenants${toTenantQuery(params)}`)
 }
 
 export function listPlatformTenants(params: TenantListParams = {}) {
-  return api<Page<Tenant>>(`/platform/tenants${toTenantQuery(params)}`)
+  return api<PlatformTenantPage>(`/platform/tenants${toTenantQuery(params)}`)
 }
 
 export function getTenant(tenantId: string) {
@@ -120,7 +118,7 @@ export function getTenant(tenantId: string) {
 }
 
 export function createTenant(payload: TenantCreatePayload) {
-  return api<Tenant>('/tenants', {
+  return api<TenantCreated>('/tenants', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -137,7 +135,7 @@ export function listTenantMembers(
   tenantId: string,
   params: { page?: number; pageSize?: number } = {}
 ) {
-  return api<Page<Member>>(
+  return api<MemberPage>(
     withQuery(`/tenants/${tenantId}/members`, {
       page: params.page,
       page_size: params.pageSize,

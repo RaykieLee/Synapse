@@ -1,33 +1,45 @@
 import { api } from '@/lib/api'
+import type { components } from '@/api/generated/openapi'
 
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer'
 export type WorkspaceStatus = 'active' | 'archived'
 
-export type Workspace = {
-  workspace_id: string
-  tenant_id: string
-  slug: string
-  name: string
-  icon: string | null
+type WorkspaceResponse =
+  components['schemas']['WorkspacePageResponse']['items'][number]
+
+export type Workspace = Pick<
+  WorkspaceResponse,
+  'workspace_id' | 'tenant_id' | 'slug' | 'name' | 'icon'
+> & {
   status: WorkspaceStatus
-  settings?: Record<string, unknown>
+  settings?: WorkspaceResponse['settings']
   workspace_role: WorkspaceRole
-  membership_version?: number
-  created_at?: string
-  updated_at?: string
+  membership_version?: WorkspaceResponse['membership_version']
+  created_by?: WorkspaceResponse['created_by']
+  created_at?: WorkspaceResponse['created_at']
+  updated_at?: WorkspaceResponse['updated_at']
 }
 
-export type WorkspaceMember = {
-  user_id: string
-  user_name: string
-  nick_name: string | null
-  email: string | null
-  status: string
+export type WorkspacePage = Omit<
+  components['schemas']['WorkspacePageResponse'],
+  'items'
+> & { items: Workspace[] }
+
+type WorkspaceMemberResponse = components['schemas']['WorkspaceMemberResponse']
+
+export type WorkspaceMember = Omit<
+  WorkspaceMemberResponse,
+  'workspace_role' | 'created_at' | 'updated_at'
+> & {
   workspace_role: WorkspaceRole
-  joined_at: string | null
-  created_at?: string
-  updated_at?: string
+  created_at?: WorkspaceMemberResponse['created_at']
+  updated_at?: WorkspaceMemberResponse['updated_at']
 }
+
+export type WorkspaceMemberPage = Omit<
+  components['schemas']['WorkspaceMemberPageResponse'],
+  'items'
+> & { items: WorkspaceMember[] }
 
 export type Page<T> = {
   items: T[]
@@ -36,32 +48,31 @@ export type Page<T> = {
   page_size: number
 }
 
-export type WorkspaceCreatePayload = {
-  slug: string
-  name: string
-  icon?: string | null
-}
+export type WorkspaceCreatePayload = components['schemas']['WorkspaceCreate']
 
-export type WorkspacePatchPayload = {
-  name?: string
-  icon?: string | null
-  status?: WorkspaceStatus
-  settings?: Record<string, unknown>
-}
+export type WorkspacePatchPayload = Omit<
+  components['schemas']['WorkspacePatch'],
+  'status'
+> & { status?: WorkspaceStatus }
 
-export type WorkspaceMembership = {
-  user_id: string
-  status: string
+export type WorkspaceMembership = Omit<
+  components['schemas']['WorkspaceMembershipResponse'],
+  'workspace_role'
+> & {
   workspace_role: WorkspaceRole
-  membership_version: number
 }
 
-export type WorkspaceTransfer = {
-  workspace_id: string
-  previous_owner_user_id: string
-  new_owner_user_id: string
-  membership_version: number
-}
+export type WorkspaceMemberRemoval =
+  components['schemas']['WorkspaceMemberRemovalResponse']
+
+export type WorkspaceTransfer = components['schemas']['WorkspaceTransferResponse']
+
+export type WorkspaceMembershipPayload = Omit<
+  components['schemas']['WorkspaceMemberPut'],
+  'workspace_role'
+> & { workspace_role: WorkspaceRole }
+
+export type WorkspaceTransferPayload = components['schemas']['TransferOwnership']
 
 export type WorkspaceListParams = {
   page?: number
@@ -84,7 +95,7 @@ function toWorkspaceQuery(params: WorkspaceListParams) {
 }
 
 export async function listWorkspaces(params: WorkspaceListParams = {}) {
-  return api<Page<Workspace>>(`/workspaces?${toWorkspaceQuery(params)}`)
+  return api<WorkspacePage>(`/workspaces?${toWorkspaceQuery(params)}`)
 }
 
 export async function listAllWorkspaces(includeArchived = false) {
@@ -136,7 +147,7 @@ export function listWorkspaceMembers(
     page: String(params.page ?? 1),
     page_size: String(params.pageSize ?? 20),
   })
-  return api<Page<WorkspaceMember>>(
+  return api<WorkspaceMemberPage>(
     `/workspaces/${workspaceId}/members?${query}`,
     { headers: workspaceHeaders(workspaceId) }
   )
@@ -145,7 +156,7 @@ export function listWorkspaceMembers(
 export function putWorkspaceMember(
   workspaceId: string,
   userId: string,
-  body: { workspace_role: WorkspaceRole }
+  body: WorkspaceMembershipPayload
 ) {
   return api<WorkspaceMembership>(
     `/workspaces/${workspaceId}/members/${userId}`,
@@ -158,7 +169,7 @@ export function putWorkspaceMember(
 }
 
 export function removeWorkspaceMember(workspaceId: string, userId: string) {
-  return api<WorkspaceMembership>(
+  return api<WorkspaceMemberRemoval>(
     `/workspaces/${workspaceId}/members/${userId}`,
     {
       method: 'DELETE',
@@ -169,7 +180,7 @@ export function removeWorkspaceMember(workspaceId: string, userId: string) {
 
 export function transferWorkspaceOwnership(
   workspaceId: string,
-  newOwnerUserId: string
+  newOwnerUserId: WorkspaceTransferPayload['new_owner_user_id']
 ) {
   return api<WorkspaceTransfer>(
     `/workspaces/${workspaceId}/transfer-ownership`,

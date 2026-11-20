@@ -1,4 +1,4 @@
-import * as React from 'react'
+﻿import * as React from 'react'
 import {
   useMutation,
   useQuery,
@@ -45,6 +45,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LocalizedText } from '@/components/localized-text'
 import { useWorkspace } from './context'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import { modelProviderQueryKey } from './model-provider-query-key'
 
 const panel = 'rounded-xl border bg-card p-5'
@@ -86,28 +88,42 @@ function WorkspaceModelsContent({
   const queryClient = useQueryClient()
   const workspaceId = workspace.workspace_id
   const active = workspace.status === 'active'
-  const manager = ['owner', 'admin'].includes(workspace.workspace_role)
-  const canWriteOwnCredential = ['owner', 'admin', 'member'].includes(
-    workspace.workspace_role
-  )
+  const workspacePermissions = getPermissionCapabilities({
+    workspaceRole: workspace.workspace_role,
+  }).workspace
+  const manager = workspacePermissions.manageWorkspaceResources
+  const canWriteOwnCredential = workspacePermissions.useWorkspaceResources
   const key = modelProviderQueryKey(
     actorId,
     workspace.tenant_id,
     workspaceId,
     workspace.membership_version ?? 0
   )
+  const queryScope = workspaceQueryScope(actorId, workspace)
   const providers = useQuery({
-    queryKey: [...key, 'providers', workspaceId],
+    queryKey: queryKeys.workspace.query(
+      queryScope,
+      ['model-providers', 'providers'],
+      { workspaceId }
+    ),
     queryFn: () => listProviders(workspaceId),
     enabled: active,
   })
   const credentials = useQuery({
-    queryKey: [...key, 'credentials', workspaceId],
+    queryKey: queryKeys.workspace.query(
+      queryScope,
+      ['model-providers', 'credentials'],
+      { workspaceId }
+    ),
     queryFn: () => listCredentials(workspaceId),
     enabled: active,
   })
   const models = useQuery({
-    queryKey: [...key, 'models', workspaceId],
+    queryKey: queryKeys.workspace.query(
+      queryScope,
+      ['model-providers', 'models'],
+      { workspaceId }
+    ),
     queryFn: () => listModelBindings(workspaceId),
     enabled: active,
   })
@@ -144,8 +160,10 @@ function WorkspaceModelsContent({
   const refreshResources = async (message: string) => {
     setNotice(message)
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: [...key, 'credentials'] }),
-      queryClient.invalidateQueries({ queryKey: [...key, 'models'] }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.extend(key, 'credentials'),
+      }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.extend(key, 'models') }),
     ])
   }
   const credentialMutation = useMutation({
@@ -230,7 +248,7 @@ function WorkspaceModelsContent({
               <LocalizedText text='当前空间权限无法验证，修改操作已停用。请重试加载。' />
             </p>
           )}
-          {workspace.workspace_role === 'member' && !scopeDenied && (
+          {canWriteOwnCredential && !manager && !scopeDenied && (
             <p className='text-sm text-muted-foreground'>
               <LocalizedText text='成员可添加和更新自己的凭据；删除凭据和管理模型需要 Workspace 所有者或管理员权限。' />
             </p>

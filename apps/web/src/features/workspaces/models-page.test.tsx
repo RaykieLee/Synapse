@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+﻿import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createMemoryHistory,
   createRootRoute,
@@ -14,6 +14,7 @@ import type { Credential, ModelBinding, Provider } from '@/api/model-providers'
 import type { WorkspaceRole } from '@/api/workspaces'
 import { useAuthStore } from '@/stores/auth-store'
 import { setLocale } from '@/lib/i18n'
+import { queryKeys } from '@/lib/query-keys'
 import { WorkspaceRouteLayout } from './context'
 import { modelProviderQueryKey } from './model-provider-query-key'
 import { WorkspaceModelsPage } from './models-page'
@@ -537,7 +538,11 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
     )
     fixture.membershipVersion = 4
     await queryClient.invalidateQueries({
-      queryKey: ['synapse', '1', '7', '11', 'workspace-detail'],
+      queryKey: queryKeys.scope({
+        actorId: '1',
+        tenantId: '7',
+        workspaceId: '11',
+      }),
     })
     await expect
       .element(
@@ -643,11 +648,18 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
     await expect
       .poll(
         () =>
-          queryClient.getQueryState([
-            ...modelProviderQueryKey('1', '7', '11', 3),
-            'credentials',
-            '11',
-          ])?.status
+          queryClient.getQueryState(
+            queryKeys.workspace.query(
+              {
+                actorId: '1',
+                tenantId: '7',
+                workspaceId: '11',
+                membershipVersion: 3,
+              },
+              ['model-providers', 'credentials'],
+              { workspaceId: '11' }
+            )
+          )?.status
       )
       .toBe('success')
     await expect
@@ -791,17 +803,18 @@ describe('Workspace models page (browser with fixture HTTP API)', () => {
         nextForm.getByLabelText('API key', { exact: true }),
         'fixture-new-context-key'
       )
-      const currentScope = modelProviderQueryKey(
-        switchTo === 'actor' ? '2' : '1',
-        '7',
-        switchTo === 'actor' ? '11' : '12',
-        3
+      const actorId = switchTo === 'actor' ? '2' : '1'
+      const workspaceId = switchTo === 'actor' ? '11' : '12'
+      const currentCredentials = queryKeys.workspace.query(
+        {
+          actorId,
+          tenantId: '7',
+          workspaceId,
+          membershipVersion: 3,
+        },
+        ['model-providers', 'credentials'],
+        { workspaceId }
       )
-      const currentCredentials = [
-        ...currentScope,
-        'credentials',
-        switchTo === 'actor' ? '11' : '12',
-      ]
       const currentUpdatedAt =
         queryClient.getQueryState(currentCredentials)?.dataUpdatedAt
       release()

@@ -5,6 +5,8 @@ import { useParams } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenant, type Page } from '@/api/tenants'
 import { ApiProblem, api } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import { useAuthStore } from '@/stores/auth-store'
 import { LocalizedText } from '@/components/localized-text'
 import { FormDialog } from '@/components/form-dialog'
@@ -35,6 +37,7 @@ const panel = 'rounded-lg border bg-card p-5 shadow-sm'
 const input = 'h-10 w-full rounded-md border bg-background px-3 text-sm'
 const button = 'rounded-md border px-3 py-2 text-sm hover:bg-muted disabled:opacity-50'
 const primary = 'rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50'
+const dictionaryEntriesResource = ['dictionaries', 'entries', 'list'] as const
 
 export function TenantDictionariesPage() {
   const actor = useAuthStore((state) => state.auth.user)
@@ -57,21 +60,37 @@ export function TenantDictionariesPage() {
   const [typeError, setTypeError] = useState('')
   const [entryError, setEntryError] = useState('')
 
-  const tenantKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'personal', 'tenant'] as const
+  const actorId = actor?.user_id ?? 'anonymous'
+  const tenantKey = queryKeys.tenant.query({ actorId, tenantId }, 'detail')
   const tenant = useQuery({ queryKey: tenantKey, queryFn: () => getTenant(tenantId) })
-  const canManage = tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
+  const canManage = getPermissionCapabilities({
+    tenantRole: tenant.data?.tenant_role,
+  }).tenant.manageTenantAdministration
   const tenantActive = tenant.data?.status === 'active'
+  const tenantScope = {
+    actorId,
+    tenantId,
+    membershipVersion: tenant.data?.membership_version ?? 0,
+  }
   const normalizedTypeSearch = typeSearch.trim()
   const typeParams = new URLSearchParams({ page: String(typePage), page_size: '20' })
   if (normalizedTypeSearch) typeParams.set(typeSearchField, normalizedTypeSearch)
   if (typeStatus) typeParams.set('status', typeStatus)
-  const typesKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'types', tenant.data?.membership_version ?? 0, typePage, typeParams.toString()] as const
+  const typesKey = queryKeys.tenant.query(
+    tenantScope,
+    ['dictionaries', 'types', 'list'],
+    { page: typePage, query: typeParams.toString() }
+  )
   const types = useQuery({
     queryKey: typesKey,
     enabled: canManage && tenantActive,
     queryFn: () => api<Page<DictType>>(`/tenants/${tenantId}/dict/types?${typeParams}`),
   })
-  const selectedTypeKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'type', selectedTypeId] as const
+  const selectedTypeKey = queryKeys.tenant.query(
+    tenantScope,
+    ['dictionaries', 'types', 'detail'],
+    { typeId: selectedTypeId }
+  )
   const selectedType = useQuery({
     queryKey: selectedTypeKey,
     enabled: canManage && tenantActive && Boolean(selectedTypeId),
@@ -81,7 +100,11 @@ export function TenantDictionariesPage() {
   const entryParams = new URLSearchParams({ page: String(entryPage), page_size: '20' })
   if (normalizedEntrySearch) entryParams.set('dict_label', normalizedEntrySearch)
   if (entryStatus) entryParams.set('status', entryStatus)
-  const entriesKey = ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'data', selectedTypeId, tenant.data?.membership_version ?? 0, entryPage, entryParams.toString()] as const
+  const entriesKey = queryKeys.tenant.query(
+    tenantScope,
+    dictionaryEntriesResource,
+    { typeId: selectedTypeId, page: entryPage, query: entryParams.toString() }
+  )
   const entries = useQuery({
     queryKey: entriesKey,
     enabled: canManage && tenantActive && Boolean(selectedTypeId) && !selectedType.isError,
@@ -89,11 +112,25 @@ export function TenantDictionariesPage() {
   })
 
   const invalidateTypes = async () => {
-    await client.invalidateQueries({ queryKey: ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'types'] })
-    await client.invalidateQueries({ queryKey: ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'type'] })
+    await client.invalidateQueries({
+      queryKey: queryKeys.tenant.resource(tenantScope, [
+        'dictionaries',
+        'types',
+        'list',
+      ]),
+    })
+    await client.invalidateQueries({
+      queryKey: queryKeys.tenant.resource(tenantScope, [
+        'dictionaries',
+        'types',
+        'detail',
+      ]),
+    })
   }
   const invalidateEntries = async () => {
-    await client.invalidateQueries({ queryKey: ['synapse', actor?.user_id ?? 'anonymous', tenantId, 'tenant', 'dictionaries', 'data', selectedTypeId] })
+    await client.invalidateQueries({
+      queryKey: queryKeys.tenant.resource(tenantScope, dictionaryEntriesResource),
+    })
   }
   const saveType = useMutation({
     mutationFn: (value: TypeDraft) => {
@@ -384,7 +421,7 @@ function TypeEditor({ draft, pending, error, onChange, onCancel, onSave }: { dra
   >
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="space-y-1 text-sm"><span><LocalizedText text={"类型名称"} /></span><Input autoFocus required maxLength={100} className={input} value={draft.dict_name} onChange={(event) => set('dict_name', event.target.value)} /></label>
-      <label className="space-y-1 text-sm"><span><LocalizedText text={"类型标识"} /></span><Input required maxLength={100} pattern="[A-Za-z][A-Za-z0-9_.-]*" className={input} value={draft.dict_type} onChange={(event) => set('dict_type', event.target.value)} /></label>
+      <label className="space-y-1 text-sm"><span><LocalizedText text={"类型标识"} /></span><Input required maxLength={100} pattern="[A-Za-z][A-Za-z0-9_.\-]*" className={input} value={draft.dict_type} onChange={(event) => set('dict_type', event.target.value)} /></label>
       <label className="space-y-1 text-sm"><span><LocalizedText text={"排序"} /></span><Input type="number" min={0} className={input} value={draft.order_num} onChange={(event) => set('order_num', Number(event.target.value))} /></label>
       <label className="space-y-1 text-sm"><span><LocalizedText text={"状态"} /></span><LocalizedNativeSelect className={input} value={draft.status} onChange={(event) => set('status', event.target.value as '0' | '1')}><option value="0"><LocalizedText text={"启用"} /></option><option value="1"><LocalizedText text={"停用"} /></option></LocalizedNativeSelect></label>
       <label className="space-y-1 text-sm sm:col-span-2"><span><LocalizedText text={"备注"} /></span><textarea maxLength={500} rows={2} className="w-full rounded-md border bg-background p-3" value={draft.remark} onChange={(event) => set('remark', event.target.value)} /></label>

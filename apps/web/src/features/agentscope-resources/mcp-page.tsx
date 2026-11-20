@@ -27,12 +27,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useWorkspace } from '@/features/workspaces/context'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import { EmptyState, ResourceError, ResourceLoading, SearchBox } from './shared'
 import { panel, parseJsonObject } from './shared-utils'
 
 export function AgentScopeMcpPage({ workspaceId: workspaceIdProp }: { workspaceId?: string }) {
-  const workspace = useWorkspace()
-  const workspaceId = workspaceIdProp ?? workspace.workspace.workspace_id
+  const workspaceContext = useWorkspace()
+  const workspaceId = workspaceIdProp ?? workspaceContext.workspace.workspace_id
+  const queryScope = workspaceQueryScope(workspaceContext.actorId, {
+    ...workspaceContext.workspace,
+    workspace_id: workspaceId,
+  })
   const client = useQueryClient()
   const [hubId, setHubId] = React.useState('')
   const [search, setSearch] = React.useState('')
@@ -41,15 +46,26 @@ export function AgentScopeMcpPage({ workspaceId: workspaceIdProp }: { workspaceI
   const [deleteTarget, setDeleteTarget] = React.useState<McpView | null>(null)
   const [detailCard, setDetailCard] = React.useState<{ hubId: string; cardId: string } | null>(null)
   const [error, setError] = React.useState('')
-  const installed = useQuery({ queryKey: ['agentscope', workspaceId, 'mcp'], queryFn: () => listMcps(workspaceId) })
-  const hubs = useQuery({ queryKey: ['agentscope', workspaceId, 'mcp-hubs'], queryFn: () => listMcpHubs(workspaceId) })
+  const installed = useQuery({ queryKey: queryKeys.agentscope.query(queryScope, ['resources', 'mcp', 'installed'], { workspaceId }), queryFn: () => listMcps(workspaceId) })
+  const hubs = useQuery({ queryKey: queryKeys.agentscope.query(queryScope, ['resources', 'mcp', 'hubs'], { workspaceId }), queryFn: () => listMcpHubs(workspaceId) })
   const activeHubId = hubId || hubs.data?.[0]?.hub_id || ''
   const cards = useQuery({
-    queryKey: ['agentscope', workspaceId, 'mcp-cards', activeHubId, search],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['resources', 'mcp', 'cards'],
+      { hubId: activeHubId, query: search, workspaceId }
+    ),
     queryFn: () => listMcpCards(workspaceId, activeHubId, { q: search }),
     enabled: Boolean(activeHubId),
   })
-  const refresh = () => client.invalidateQueries({ queryKey: ['agentscope', workspaceId, 'mcp'] })
+  const refresh = () =>
+    client.invalidateQueries({
+      queryKey: queryKeys.agentscope.resource(queryScope, [
+        'resources',
+        'mcp',
+        'installed',
+      ]),
+    })
   const update = useMutation({
     mutationFn: (value: { id: string; name: string; enabled: boolean }) => updateMcp(workspaceId, value.id, { name: value.name.trim(), enabled: value.enabled }),
     onSuccess: async () => { setEditing(null); setError(''); await refresh() },
@@ -84,6 +100,11 @@ function McpInstallDialog({ target, open, pending, error, onClose, onSubmit }: {
 }
 
 function McpCardDialog({ target, workspaceId, onClose }: { target: { hubId: string; cardId: string } | null; workspaceId: string; onClose: () => void }) {
-  const card = useQuery({ queryKey: ['agentscope', workspaceId, 'mcp-card', target?.hubId, target?.cardId], queryFn: () => getMcpCard(workspaceId, target!.hubId, target!.cardId), enabled: Boolean(target) })
+  const workspaceContext = useWorkspace()
+  const queryScope = workspaceQueryScope(workspaceContext.actorId, {
+    ...workspaceContext.workspace,
+    workspace_id: workspaceId,
+  })
+  const card = useQuery({ queryKey: queryKeys.agentscope.query(queryScope, ['resources', 'mcp', 'card'], { hubId: target?.hubId, cardId: target?.cardId, workspaceId }), queryFn: () => getMcpCard(workspaceId, target!.hubId, target!.cardId), enabled: Boolean(target) })
   return <Dialog open={Boolean(target)} onOpenChange={(open) => !open && onClose()}><DialogContent><DialogHeader><DialogTitle>{card.data?.display_name || card.data?.name || 'MCP 配置'}</DialogTitle><DialogDescription>{card.data?.description}</DialogDescription></DialogHeader>{card.isLoading ? '正在加载…' : card.isError ? card.error.message : <pre className='max-h-[60vh] overflow-auto rounded bg-muted/40 p-3 text-xs'>{JSON.stringify(card.data?.inputs_schema ?? {}, null, 2)}</pre>}</DialogContent></Dialog>
 }

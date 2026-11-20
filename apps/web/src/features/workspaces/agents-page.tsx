@@ -1,4 +1,4 @@
-import * as React from 'react'
+﻿import * as React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bot, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiProblem, api } from '@/lib/api'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 import { useWorkspace } from './context'
 import type { Workspace } from './types'
 import { LocalizedText } from '@/components/localized-text'
@@ -39,8 +40,6 @@ type AgentDraft = {
   inviteConfig: string
 }
 
-const scopedKey = (actorId: string, workspace: Workspace, resource: string) =>
-  ['synapse', actorId, workspace.tenant_id, workspace.workspace_id, resource, workspace.membership_version ?? 0] as const
 const headers = (workspace: Workspace) => ({ 'X-Workspace-ID': workspace.workspace_id })
 const aiPath = '/ai'
 
@@ -79,7 +78,20 @@ export function WorkspaceAgentsPage() {
 
 function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; actorId: string }) {
   const queryClient = useQueryClient()
-  const scope = scopedKey(actorId, workspace, 'agent-list')
+  const queryScope = React.useMemo(
+    () => workspaceQueryScope(actorId, workspace),
+    [
+      actorId,
+      workspace,
+      workspace.tenant_id,
+      workspace.workspace_id,
+      workspace.membership_version,
+    ]
+  )
+  const listKey = queryKeys.workspace.query(queryScope, ['agents', 'list'], {
+    workspace,
+    workspaceId: workspace.workspace_id,
+  })
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [editor, setEditor] = React.useState<{ mode: 'create' } | { mode: 'edit'; id: string } | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(null)
@@ -88,19 +100,27 @@ function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; 
   const canCreate = workspace.status === 'active'
 
   const agents = useQuery({
-    queryKey: scope,
+    queryKey: listKey,
     queryFn: () => api<AgentList>(`${aiPath}/agent/`, { headers: headers(workspace) }),
   })
   const selectedIdInScope = selectedId && agents.data?.agents.some((agent) => agent.id === selectedId) ? selectedId : null
+  const detailKey = queryKeys.workspace.query(
+    queryScope,
+    ['agents', 'detail'],
+    { agentId: selectedIdInScope, workspace, workspaceId: workspace.workspace_id }
+  )
   const detail = useQuery({
-    queryKey: [...scopedKey(actorId, workspace, 'agent-detail'), selectedIdInScope],
+    queryKey: detailKey,
     queryFn: () => api<AgentView>(`${aiPath}/agent/${encodeURIComponent(selectedIdInScope!)}`, { headers: headers(workspace) }),
     enabled: Boolean(selectedIdInScope),
   })
 
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: scope })
-    if (selectedIdInScope) await queryClient.invalidateQueries({ queryKey: [...scopedKey(actorId, workspace, 'agent-detail'), selectedIdInScope] })
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.workspace.resource(queryScope, ['agents', 'list']),
+    })
+    if (selectedIdInScope)
+      await queryClient.invalidateQueries({ queryKey: detailKey })
   }
   const createAgent = useMutation({
     mutationFn: (value: AgentDraft) => api<{ agent_id: string }>(`${aiPath}/agent/`, {
@@ -129,7 +149,12 @@ function WorkspaceAgentsContent({ workspace, actorId }: { workspace: Workspace; 
     }),
     onSuccess: async (result) => {
       await refresh()
-      queryClient.setQueryData([...scopedKey(actorId, workspace, 'agent-detail'), result.id], result)
+      queryClient.setQueryData(
+        queryKeys.workspace.query(queryScope, ['agents', 'detail'], {
+          agentId: result.id,
+        }),
+        result
+      )
       setEditor(null)
       setFormError('')
     },

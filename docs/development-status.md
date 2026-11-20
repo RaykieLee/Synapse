@@ -6,6 +6,14 @@
 
 状态：待开始 → 开发中 → 待独立验收 → 通过；验证失败转回修复。外部运行条件不足的功能记为待实际验收，不记为通过。
 
+> 2026-11-19 前端架构 8 项优化完成实现与独立验收闭环：1 OpenAPI 契约生成通过（限已生成 users/tenants/workspaces 类型，其余手写模块与部分约束待迁移）；2 模板/Clerk/Faker 清理通过二次复验（真实 Dashboard API、390px、键盘与真实读屏未验）；3 Workspace 路由数据流通过独立复验（mocked API 下单次 GET、scope 隔离、错误隐私回退与受控后台 403；真实撤权/自然 stale 未验）；4 权限 capability 指定迁移通过复验（作用域不继承、45 focused tests；tenant member 名册与 tenant admin 细分契约待确认，范围外 member-table owner 选项保留）；5 QueryKeys 最终复验通过指定范围（full shell 首屏 detail GET 1 次、scope/prefix 隔离；未列目录与真实 API/权限未全量审计）；6 i18n 模块化与 Dashboard 词条修复通过复验（37 个方向 lookup 回归保护；生产行为未验）；7 共享会话状态机核心 fail-closed 修复通过复验（19 tests；Workspace Sessions 页面专项、真实 API/SSE、服务端授权与页面级 lint 仍待后续，整体 PARTIAL）；8 核心复杂页面测试指定 10 tests 通过但整体 PARTIAL（目录错误态误显示为空态、actor/服务端撤权断言缺口）。8 项报告均在 `docs/verification/`；本闭环不宣称全量前端迁移、生产验收或全项目质量完成。
+
+> 2026-11-19 会话 reducer fail-closed 修复：`SessionMachineAction.scopeKey` 改为必需字段，reducer 在所有 action（包括 `session/switch`）处理前比对当前状态作用域，缺失或不匹配时保持原 state。新增覆盖 actor、tenant、workspace、membership version、agent、session、workspace status 七个维度的动态隔离测试，并覆盖缺失 key 与 stale switch；未改 API、权限、QueryKeys 或既有状态迁移。`pnpm exec vitest run src/features/agentscope-chat/session-state.test.ts src/features/agentscope-chat/page.test.tsx --browser.headless`：19 passed；`pnpm exec tsc -b --pretty false`、scoped ESLint 与 `git diff --check` 均通过，diff check 仅提示其他既有文件 CRLF→LF 规范化，无 whitespace error。真实 API/SSE、服务端授权及 Workspace Sessions 页面/UX 独立验收仍待验证。
+
+> 2026-11-19 前端架构优化 7/8 主工作树续迁移：在保留主工作树已有 QueryKeys/query-scope 与会话编辑权限变更的前提下，将 AgentScope Chat 与 Workspace Sessions 接入共享纯 TypeScript session reducer；当前消息、附件和运行状态查询继续使用原有作用域 key，HTTP wire contract、路由与服务端授权边界未改。状态机与 AgentScope Chat focused 浏览器测试共 `11 passed`（7 reducer、4 页面 fixture）；`pnpm exec tsc -b` 与 `git diff --check` 通过；未发现 Workspace Sessions 页面专项测试。diff 检查另提示既有 `features/tasks/data/tasks.ts` CRLF→LF 转换警告，不是空白错误。真实登录态 API/SSE、独立 UX 审阅、独立功能验收及验收后的复验仍待安排。
+
+> 2026-11-19 前端权限 capability 模型主 worktree 合并续迁移（4/8）：已将 app-sidebar、Workspace 目录/设置/成员、模型凭据、团队和附件，以及租户配置/部门/字典/菜单/角色/计划任务子页的当前操作者判断接入 `getPermissionCapabilities`，并保留主 worktree 已有的统一 QueryKeys、Workspace context、API/OpenAPI、Dashboard、会话状态机和测试改动；未修改服务端授权、API 契约、i18n 或目标成员角色约束。`pnpm exec vitest run src/lib/permissions.test.ts --browser.headless` 14 passed（退出码 0）；指定的 models/teams focused command 退出码 1（models-page 14 passed，teams-page 在测试导入阶段因 router mock 缺少 `useNavigate` 失败，未改核心测试）；单独 models-page focused test 14 passed（退出码 0）；`pnpm exec tsc -b` 与 `git diff --check` 均退出码 0；迁移页面当前操作者角色比较的 `rg` 扫描无匹配（退出码 1）。tenant member 完整名册维持既有行为，契约待确认；完整残留为 `features/tenants/components/member-table.tsx` 的当前操作者 `currentRole === 'owner'` owner 选项判断（不在本次指定清单），以及 `features/workspaces/pages.tsx`、`features/tenants/components/member-custom-role.tsx`、`member-table.tsx` 中的目标成员角色保护/资格/显示比较；本轮后续迁移仍待独立验收。
+
 > 2026-10-12 当前 HEAD `bb4351b` 基线与 P0 复验：工作区干净；API 默认套件 `24 passed, 26 deselected, 38 warnings`、`compileall app`、`pnpm build` 均通过；ESLint `0 errors, 24 warnings`。使用现有 Docker Redis `127.0.0.1:16381` 由主线程重跑 F24b 真实 FastAPI/AgentScope/Vite/Chromium 流程，输出 `F24b chat messages frontend verification passed`，退出码 `0`。验证后只清理本轮生成的 1 个 F24b Redis event key，DB4/DB5 恢复为 `6/0`；真实模型推理、工具确认/调用、外部任务和 SSE 重连仍未验证，详见 [F24b 聊天消息验收](verification/F24b-chat-messages-frontend.md) 与 [基线复验报告](verification/baseline-2026-10-12.md)。
 
 > 2026-10-12 F25a SSE 文本增量完成当前工作树独立复验：使用现有 Docker Redis `127.0.0.1:16381`、临时 SQLite（Alembic `0016_tenant_validity`）、真实 FastAPI/AgentScope/Vite/Chromium，`pnpm build` 与完整 F25a runner 均通过，输出 `F25a SSE text frontend verification passed`，退出码 `0`。验收覆盖文本增量、断线 replay、去重、会话/Workspace 切换隔离、历史消息保留、临时 503 重试、删除会话后的 404 清理和撤权后的 403 清理。runner 已补充 Windows `pnpm`/子进程兼容及按名称精确清理 F25a Agent/Session/event fixture；结束后 Redis DB7/DB8 均为 `0` keys。真实模型提供商推理、工具调用和人工确认仍未验证，详见 [F25a SSE 文本验收](verification/F25a-sse-text-frontend.md)。
@@ -15,6 +23,10 @@
 > 2026-10-13 F26b-backend、F27b-1、F32 第一阶段完成最新修复与独立复验：F26b WakeupDispatcher 增加 consuming lease 的 attempt-safe CAS 恢复、任意 spawn 失败回滚和有界 512 条启动恢复索引，聚焦测试 `12 passed`；F27b 控制面增加创建/更新授权、创建者保护、tenant/workspace 复合外键和数据库级单 active run 约束，聚焦测试 `6 passed`，全新 Alembic `0001 -> 0018` 升级通过；F32 endpoint DNS 解析失败改为 fail-closed，同时保留开发环境 localhost 放行，聚焦测试 `4 passed`。这些修复仍不等于 C 级真实 AgentScope model/tool 执行、真实团队 worker 或真实 provider connection；F27b 仍为 `durable_control_only`。当前 API 全量、compile/build/lint 结果仍以各复验报告为准，真实模型 provider、真实工具执行和登录后的双角色浏览器场景仍未宣称通过。详见 [F26b-backend 复验](verification/F26b-wakeup-workspace-context-reacceptance-20261013.md)、[F27b 复验](verification/F27b-team-orchestration-reacceptance-20261013.md)、[F32 复验](verification/F32-model-provider-custom-model-reacceptance-20261013.md)。
 
 > 2026-10-13 设置域交互收口：个人资料、账号密码、外观、显示和通知页面改为“当前设置摘要 + 编辑弹窗”，保留原有设置路由和提交语义；移动端摘要按钮改为纵向布局，设置侧栏移动端选择器改为直接受路由控制。当前已通过设置域 ESLint、前端构建和既有 5 个前端测试文件（47 项）；Display/Notifications 仍是模板演示提交，未接入持久化 API，未宣称真实设置保存验收。
+
+> 2026-11-19 模板与演示残留清理已实现：删除 Clerk demo 路由、logo 资产和依赖，刷新 TanStack Router 生成树；保留 Synapse 本地 `/sign-in` 等认证页。Dashboard 的销售、流量和随机图表数据改为中性空状态并新增定向浏览器测试；移除不再使用的 `recharts`。使用 pnpm 11.7.0 安装；定向测试 `1 passed`、ESLint `0 errors, 25 warnings`、`pnpm build` 通过。未接入首页真实业务概览 API；其他演示路由、来源许可证范围及本项独立验收仍待处理。
+
+> 2026-11-19 Dashboard UX 补充修订完成：空态明确标识数据源尚未接入/配置，移除 Dashboard 上的 Connect 行动措辞并补齐中英双向词条；为摘要、概览、动态和分析区块添加 h2/h3 层级，Tabs orientation 改为 horizontal，清除无依赖的 `@clerk/shared` allowBuilds 配置。Dashboard focused 浏览器测试 `1 passed`、`tsc -b`、相关 ESLint、`git diff --check` 通过；真实摘要 API 仍未接入，独立验收待完成。
 
 ## 功能任务
 
@@ -155,8 +167,8 @@
 | F40 | 人脸账号绑定与登录 | 待开始 | — | — |
 | F41 | 本地启动与持久化部署配置 | 待开始 | — | — |
 | F42 | 初始化数据与旧数据迁移工具 | 待开始 | — | — |
-| F43 | 范围清理与来源许可证记录 | 正式导航和根首页已改，旧演示路由及许可证范围待处理、待独立验收 | formal_nav_impl | 租户/用户/个人设置与 Workspace 动态菜单保留；演示路由仍需逐项审查 |
-| F44 | 首页真实业务概览替换模板指标 | 待开始 | — | — |
+| F43 | 范围清理与来源许可证记录 | Clerk 示例路由、资产及依赖已清理；其他演示路由和许可证来源范围待处理、待独立验收 | formal_nav_impl | 租户/用户/个人设置与 Workspace 动态菜单及本地认证保留；尚需审查其他演示路由并补齐许可证记录 |
+| F44 | 首页真实业务概览替换模板指标 | 模板销售/流量指标已替换为中性占位，待真实业务概览接入及独立验收 | — | 当前不伪造业务数据；尚未接入真实首页摘要 API |
 
 ## 最终独立验收任务（每行独立委派）
 
@@ -180,3 +192,68 @@
 按用户截图实现双栏登录页、生成的人物插画、中文表单、响应式布局和减少动态效果支持。前端构建与登录相关 ESLint 通过；独立浏览器验收覆盖桌面/手机、标签关联、空提交、显隐、记住账号、错误/加载反馈及说明对话框。模拟登录验证请求字段、存储和导航，未重验真实后端登录。证据见 [登录页验收](verification/login-redesign.md)，素材来源与提示词见 [设计实现说明](login-design.md)。
 
 同时修复聊天确认提交中 controller 未定义的构建阻断，当前 pnpm build 通过；聊天确认取消行为和 F24b 的消息接口参数边界仍需各自独立验收。F25a 已完成独立真实 API/Redis/Playwright 验收，但真实模型推理仍不在本次证据范围内。
+
+## 前端架构优化 1/8：OpenAPI 契约生成（2026-11-19）
+
+实现已写，独立验收已通过。新增 FastAPI OpenAPI 导出、TypeScript schema 生成及 `apps/web` 的 `openapi:generate` / `openapi:verify` 脚本，并将 users、tenants、workspaces API 的核心请求/响应模型改为引用生成类型；接口路径、HTTP 方法、请求处理和后端行为未改。实现验证见[前端 OpenAPI 契约生成验证](verification/frontend-openapi-contract-generation.md)，独立验收见[前端 OpenAPI 契约层验收](verification/frontend-openapi-contract-acceptance.md)。本项只覆盖上述三组核心模型；筛选参数、部分状态/角色约束、完整 operation 客户端和其余 API 模块仍保留手写类型，未完成全量契约迁移。
+
+## 2026-11-19 前端权限 capability 模型统一（4/8）
+
+- 已新增 `src/lib/permissions.ts` 与 14 条 capability 测试，并接入全局用户管理、租户列表与租户详情的既有角色判断；未修改 API、导航或 i18n。
+- 权限矩阵保持全局、租户、Workspace 作用域互不继承：`platform_admin` 仅管理平台用户与按契约查看/管理租户；tenant owner/admin 管成员、角色、设置、邀请并可创建 Workspace；Workspace owner/admin 管成员、资源与设置，member 可使用资源，viewer 只读。
+- 定向验证：`pnpm exec vitest run src/lib/permissions.test.ts --browser.headless` 14 passed；`pnpm exec tsc -b` 退出码 0；指定页面已无 `platform_role === 'platform_admin'` 直接比较；`git diff --check` 通过。
+- 独立验收：首批通过，限 capability helper 与指定接入点；证据见[前端权限 capability 验收](verification/frontend-architecture-permissions-acceptance.md)。tenant member 是否可查看完整成员名册需产品契约确认（现有前后端均维持该行为，未扩大权限）。本轮主 worktree 已完成 app-sidebar、Workspace pages/models/directory/teams/attachments 与租户子页的后续迁移；成员组件 `currentRole === 'owner'` 仍决定是否显示 owner 角色选项，目标成员的 owner 保护/资格/显示比较继续保留，均登记在上方残留清单；本轮后续迁移仍待独立验收。权限 UX 审查另见 `docs/ux/frontend-architecture-permissions.md`。
+
+## 2026-11-19 Workspace 路由数据流优化（3/8）
+
+- 设计范围：本项调整 Workspace 路由与详情查询缓存、不可访问回退，不改页面业务功能或 HTTP 契约；未另做页面 UX 审查。
+- 代码状态：已完成。父/子路由使用根 `QueryClient` 的 `ensureQueryData`；Workspace directory key 与目录组件统一使用 `queryKeys.workspace.query(...)`，详情 key 保留 `queryKeys.workspace.resource(...)` 并按 actor、tenant、workspace、membership version 隔离。布局沿用路由缓存数据并关闭 mount refetch；若列表 scope 与服务端详情版本不同，详情缓存迁至服务端返回的 scope key。
+- 定向证据：`pnpm exec vitest run src/features/workspaces/context.test.tsx --browser.headless`：7 passed。父/子路由和布局首次进入共发 1 次 `GET /api/v1/workspaces/11`；同一 QueryClient 动态切换 actor、tenant、workspace、membership version 时共发 5 次详情 GET，逐项呈现对应响应并保留 5 个互不命中的缓存项。403/404/409 mocked 回退各请求失败详情 1 次和 fallback 详情 1 次，页面与 toast 均无失败空间名称、ID、服务端标题/详情；受控后台 403 测试断言初次详情 1 次、后台重验 1 次、目标详情 1 次，暂停回退期间仅显示通用提示。`pnpm exec tsc -b`：退出码 0；`git diff --check`：通过。
+- 独立验收：原报告结论仍为部分通过，见[Workspace 路由查询数据流验收](verification/frontend-workspace-route-query-acceptance.md)；本次补充证据待独立复验后再调整结论。当前测试全部使用 mocked API，真实服务撤权及详情超过 10 秒 stale 后的真实后台重验行为仍待实体验收；业务 API 仍以服务端授权为准。
+
+## 2026-11-19 架构优化阶段合并记录
+
+- 已将 1/8 OpenAPI 契约层、3/8 Workspace 路由数据流、4/8 权限 capability 首批实现合并至当前 worktree，并合入权限与 Dashboard 清理两份独立 UX 审查报告。
+- 合并后重跑定向验证：`pnpm run openapi:verify`、`pnpm exec vitest run src/lib/permissions.test.ts --browser.headless`（14 passed）、`pnpm exec vitest run src/features/workspaces/context.test.tsx --browser.headless`（5 passed）、`git diff --check` 均通过。
+- OpenAPI 独立验收通过；权限首批独立验收通过但残留迁移清单待处理；Workspace 路由独立验收部分通过并已派补测。cleanup 与 querykeys 实现 patch 已回报，querykeys 待合并；i18n Dashboard 缺词修复已完成定向自验，独立复验待安排；i18n 模块化其余工作与会话状态机实现继续。
+
+## TanStack Query 缓存键统一（2026-11-19）
+
+新增 `apps/web/src/lib/query-keys.ts` 统一工厂，实际查询键包含 actor、tenant/global、workspace/personal、membership version、domain、resource 和规范化 params。迁移范围覆盖 Workspace 目录/上下文、成员、agents、sessions、teams、附件及模型提供商；AgentScope chat/session config、credentials、ops、knowledge、MCP、Skills 和 SOP。AgentScope 查询统一使用 `agentscope` domain；未覆盖其他 feature 目录中的查询键。Team run references 的 sessionStorage 键保持原序列化，避免改变已有本地状态读取方式；未修改 API 或后端契约。
+
+定向验收证据：`pnpm exec vitest run src/lib/query-keys.test.ts --browser.headless` 退出码 `0`（1 个文件、5 项通过）；`pnpm exec tsc -b` 退出码 `0`；覆盖目录裸写 `['agentscope-ops', ...]` 和 `['agentscope', workspaceId, ...]` 检查无匹配（ripgrep 无匹配退出码 `1`）；`git diff --check` 通过。迁移会让旧缓存键在部署后冷启动并触发重新取数；actor、tenant、workspace 和 membership version 现在显式参与隔离。当前为实现方定向自验通过，仍待独立验收，不能据此宣告所有前端查询键均已迁移。
+
+## 2026-11-19 Workspace detail 请求去重回归修复
+
+- 侧栏复用 `workspaceDetailQueryKey` 与 Workspace route 的 `WORKSPACE_QUERY_STALE_TIME`，并设置 `refetchOnMount: false`，避免完整 `AuthenticatedLayout` 下同一 actor/tenant/workspace/membership-version detail key 因 mount 强制 refetch 形成第二次 GET。租户导航 query key 显式包含 tenant ID；未改变 API、服务端授权契约或 scope 隔离维度。
+- 回归测试挂载真实 `AuthenticatedLayout`、Workspace 父/子路由和 `WorkspaceRouteLayout`，等待侧栏 visible-tree 查询后断言首次 `/api/v1/workspaces/11` detail GET 恰 1 次。`pnpm exec vitest run src/features/workspaces/context.test.tsx --browser.headless`：7/7 passed；`pnpm exec tsc -b --pretty false` 通过；scoped ESLint 0 errors、3 条 Fast Refresh warnings；目标文件范围内 `git diff --check` 通过。
+- 局限：浏览器测试使用 API stub，未验证真实服务端撤权/授权行为；独立复验仍待协调方安排。
+
+## 2026-11-19 前端模板与 Clerk 残留清理（2/8）
+
+- 已删除 Clerk demo 路由、logo、`@clerk/react` 依赖、Recent Sales 组件和无引用的 recharts；Dashboard 销售、流量与随机图表数据改为中性 Workspace 占位，并保留本地登录与正式业务导航。
+- Dashboard UX 审查指出的必修项已修复：空态明确表示数据源尚未接入/配置，可见区块补足 `h2`/`h3` 语义，Tabs 使用横向语义；`pnpm-workspace.yaml` 中无依赖的 `@clerk/shared` allowBuilds 配置已删除。
+- 实现定向验证：Dashboard focused browser test、`pnpm exec tsc -b`、相关 ESLint、`pnpm build`、`git diff --check` 通过；`@clerk/react`、Clerk 路由、RecentSales/recent-sales 引用清零。真实首页摘要 API、其它模板路由与许可证范围仍未纳入本项。
+- 独立验收待安排。当前主 worktree 已合并 OpenAPI、Workspace 路由、权限首批、QueryKeys 与 cleanup；组合定向验证 `openapi:verify`、5 个测试文件 39 项、`tsc -b`、`git diff --check` 全部通过。
+
+## 2026-11-19 Faker fixture 清理补充
+
+补充修复原独立验收残留：保留 `/tasks` 页面的 5 条固定中性记录，删除未使用的用户 Faker fixture，并从 `package.json` 与 lockfile 移除 `@faker-js/faker`；`DashboardEmptyState` 标题提供可配置语义 heading 层级。Dashboard focused 测试、frozen lockfile、全局 Faker 扫描、`tsc -b` 与 diff 检查通过。独立复验通过，并确认 Breakdown 空态使用 level 4 的建议已解决；真实业务 API 与读屏/窄屏场景不在本轮证据内。
+
+- `/tasks` 仍导入 `features/tasks/data/tasks.ts`；已将 100 条生成数据改为 5 条固定的 `Sample task` 占位记录。`features/users/data/users.ts` 无引用，已删除；正式全局用户页仍使用现有 API。未修改路由或 API。
+- 已从 `apps/web/package.json` 与 `apps/web/pnpm-lock.yaml` 移除 `@faker-js/faker`。`pnpm install --frozen-lockfile` 通过；`rg -n -i faker apps/web/src` 与 `rg -n @faker-js/faker apps/web/package.json apps/web/pnpm-lock.yaml` 均无匹配。
+- `DashboardEmptyState` 已有 `level?: 2 | 3 | 4`，默认值为 `3`；独立复验建议 Analytics breakdown 空态使用子级标题，现已在两个 breakdown 卡片中显式设为 `level={4}`，并由测试断言存在两个 level 4 空态标题。Dashboard focused test `1 passed`，相关 ESLint 通过；`git diff --check` 通过。
+- 原先并发 QueryKeys 迁移造成的 `features/tenants/index.tsx` TS2783 已由协调方移除重复 `page`、`pageSize` 属性；清理任务随后复跑 `pnpm exec tsc -b --pretty false` 通过。
+
+## 2026-11-19 前端 i18n Dashboard 词条回归修复
+
+- 按拆分前暂存 index 版词典恢复静态 Dashboard catalog：19 条英译中、18 条中译英，共 37 个方向性查找；保留 `智能体`→`Agent` 的既有高优先级结果，并按原有查找顺序注册，不引入异步加载、后端依赖或 fallback 变化。
+- `i18n.test.ts` 锁定必需 `dashboard` 模块、37 项查找数量、全部 Dashboard 双向文案及 `Agent` 优先级，防止整域 catalog 遗漏或关键词条回归。
+- 定向验证通过：`pnpm exec vitest run src/lib/i18n.test.ts src/features/dashboard/index.test.tsx --browser.headless`（2 files、8 tests passed）；`pnpm exec tsc -b --pretty false`；`pnpm exec eslint src/lib/i18n.ts src/lib/i18n.test.ts src/lib/i18n --format stylish`；`git diff --check`（退出码 0；Git 对其他已有改动提示 CRLF→LF 规范化警告）。
+- 独立验收待复跑；原报告 `verification/frontend-i18n-modularization-acceptance.md` 保持只读、未改写。未覆盖全项目构建、真实 API 或生产行为。
+
+## 2026-11-20 字典页查询键运行态修复
+
+- 修复初始未选择字典类型时 `selectedTypeId` 为空、被用作 query resource path 段并同步抛错的问题；类型 ID 改为 query params，条目缓存失效使用固定资源前缀。
+- 修复类型标识 HTML pattern 在 Chromium 新正则模式下的连字符语法错误，保留原允许字符；API 契约未变。
+- 定向验证包括 `pnpm exec tsc -b --pretty false`，以及本地临时 SQLite/FastAPI 环境下 Chromium 实测：字典页初始空态、已有类型条目空态及 `pattern-check` 原生校验通过，控制台无错误。详细证据与局限见 `docs/verification/frontend-dictionary-query-key-runtime-fix.md`；未覆盖完整 CRUD、跨租户访问和生产环境。

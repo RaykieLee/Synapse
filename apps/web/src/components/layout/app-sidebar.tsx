@@ -29,7 +29,9 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { getWorkspace } from '@/api/workspaces'
+import { queryKeys } from '@/lib/query-keys'
 import { translate, useLocale } from '@/lib/i18n'
+import { getPermissionCapabilities } from '@/lib/permissions'
 import { useAuthStore } from '@/stores/auth-store'
 import { api } from '@/lib/api'
 import { useLayout } from '@/context/layout-provider'
@@ -49,6 +51,10 @@ import {
   TeamSwitcher,
   useWorkspaceDirectory,
 } from '@/features/workspaces/directory'
+import {
+  WORKSPACE_QUERY_STALE_TIME,
+  workspaceDetailQueryKey,
+} from '@/features/workspaces/context'
 import { sidebarData } from './data/sidebar-data'
 import { NavGroup } from './nav-group'
 import { NavUser } from './nav-user'
@@ -93,7 +99,7 @@ const iconMap: Record<string, LucideIcon> = {
 }
 function workspaceSystemGroups(
   workspaceId: string,
-  isPlatformAdmin: boolean
+  canManagePlatformUsers: boolean
 ): NavGroupType[] {
   return [
     {
@@ -102,7 +108,7 @@ function workspaceSystemGroups(
         { title: '附件', url: `/w/${workspaceId}/attachments`, icon: FileText },
         { title: '模型与凭据', url: `/w/${workspaceId}/models`, icon: Wrench },
         { title: '租户管理', url: '/tenants', icon: Building2 },
-        ...(isPlatformAdmin
+        ...(canManagePlatformUsers
           ? [{ title: '全局用户', url: '/users', icon: Users }]
           : []),
       ],
@@ -165,14 +171,15 @@ function tenantManagementGroup(
   tenantId: string,
   tenantRole: 'owner' | 'admin' | 'member' | null
 ): NavGroupType | null {
-  if (!tenantRole) return null
+  const tenantPermissions = getPermissionCapabilities({ tenantRole }).tenant
+  if (!tenantPermissions.viewTenant) return null
 
   const overview = {
     title: '成员与邀请',
     url: `/tenants/${tenantId}`,
     icon: Users,
   }
-  if (tenantRole === 'member') {
+  if (!tenantPermissions.manageTenantAdministration) {
     return { title: '当前租户配置', items: [overview] }
   }
 
@@ -248,19 +255,22 @@ export function AppSidebar() {
   // Share the verified detail query used by the workspace route. Menus remain
   // hidden until a fresh workspace-context response confirms this URL's scope.
   const detail = useQuery({
-    queryKey: [
-      'synapse',
-      directory.actorId,
-      workspace?.tenant_id ?? 'unresolved',
-      activeWorkspaceId ?? 'none',
-      'workspace-detail',
-      workspace?.membership_version ?? 0,
-    ],
+    queryKey: workspace
+      ? workspaceDetailQueryKey(directory.actorId, workspace)
+      : queryKeys.workspace.resource(
+          {
+            actorId: directory.actorId,
+            tenantId: 'unresolved',
+            workspaceId: activeWorkspaceId ?? 'none',
+            membershipVersion: 0,
+          },
+          ['workspace-detail']
+        ),
     queryFn: () => getWorkspace(activeWorkspaceId!),
     enabled: Boolean(authUser && workspace && activeWorkspaceId),
     initialData: workspace,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: WORKSPACE_QUERY_STALE_TIME,
+    refetchOnMount: false,
   })
   const contextReady = Boolean(
     workspace &&
@@ -279,23 +289,19 @@ export function AppSidebar() {
   const tenantGroup = activeTenant
     ? tenantManagementGroup(activeTenant.tenant_id, activeTenant.tenant_role)
     : null
-  const navigationKey = current
-    ? ([
-        'synapse',
-        directory.actorId,
-        current.tenant_id,
-        'tenant-navigation',
-        current.workspace_id,
-        current.membership_version ?? 0,
-      ] as const)
-    : ([
-        'synapse',
-        directory.actorId,
-        'unresolved',
-        'tenant-navigation',
-        activeWorkspaceId ?? 'none',
-        0,
-      ] as const)
+  const navigationScope = current
+    ? queryKeys.workspaceScope(directory.actorId, current)
+    : {
+        actorId: directory.actorId,
+        tenantId: 'unresolved',
+        workspaceId: activeWorkspaceId ?? 'none',
+        membershipVersion: 0,
+      }
+  const navigationKey = queryKeys.workspace.query(
+    navigationScope,
+    'tenant-navigation',
+    { tenantId: current?.tenant_id }
+  )
   const navigation = useQuery({
     queryKey: navigationKey,
     queryFn: () =>
@@ -310,19 +316,33 @@ export function AppSidebar() {
 
   const scopeRef = useRef<string | null>(null)
   const scope = current
-    ? `${directory.actorId}:${current.tenant_id}:${current.workspace_id}:${current.membership_version ?? 0}`
+    ? JSON.stringify([
+        directory.actorId,
+        current.tenant_id,
+        current.workspace_id,
+        current.membership_version ?? 0,
+      ])
     : null
   useEffect(() => {
     const previous = scopeRef.current
     if (previous && previous !== scope) {
-      const [actorId, tenantId, workspaceId] = previous.split(':')
+      const [actorId, tenantId, workspaceId] = JSON.parse(previous) as [
+        string,
+        string,
+        string,
+        number,
+      ]
+      const workspacePrefix = queryKeys.scope({
+        actorId,
+        tenantId,
+        workspaceId,
+      })
       queryClient.removeQueries({
-        predicate: (query) =>
-          query.queryKey[0] === 'synapse' &&
-          query.queryKey[1] === actorId &&
-          query.queryKey[2] === tenantId &&
-          query.queryKey[3] === 'tenant-navigation' &&
-          query.queryKey[4] === workspaceId,
+        predicate: ({ queryKey }) =>
+          workspacePrefix.every((part, index) => queryKey[index] === part) &&
+          queryKey[workspacePrefix.length] === 'membership' &&
+          queryKey[workspacePrefix.length + 2] === 'workspace' &&
+          queryKey[workspacePrefix.length + 3] === 'tenant-navigation',
       })
     }
     scopeRef.current = scope
@@ -337,6 +357,9 @@ export function AppSidebar() {
       ? toNavLinks(navigation.data.items)
       : []
   const inWorkspaceRoute = Boolean(activeWorkspaceId)
+  const canManagePlatformUsers = getPermissionCapabilities({
+    platformRole: authUser?.platform_role,
+  }).platform.managePlatformUsers
   const navGroups = inWorkspaceRoute
     ? [
         ...(tenantGroup
@@ -347,7 +370,7 @@ export function AppSidebar() {
           : []),
         ...workspaceSystemGroups(
           activeWorkspaceId!,
-          authUser?.platform_role === 'platform_admin'
+          canManagePlatformUsers
         ).map((group) => localizeStaticGroup(group, locale)),
       ]
     : [
@@ -358,7 +381,7 @@ export function AppSidebar() {
           items: group.items.filter(
             (item) =>
               item.title !== '全局用户' ||
-              authUser?.platform_role === 'platform_admin'
+              canManagePlatformUsers
           ).map((item) => localizeStaticItem(item, locale)),
         })),
       ]

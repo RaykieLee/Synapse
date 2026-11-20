@@ -14,6 +14,8 @@ import {
 import { getTenant } from '@/api/tenants'
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiProblem } from '@/lib/api'
+import { getPermissionCapabilities } from '@/lib/permissions'
+import { queryKeys } from '@/lib/query-keys'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { FormDialog } from '@/components/form-dialog'
@@ -38,27 +40,21 @@ export function TenantMenusPage() {
   const [draft, setDraft] = useState<MenuDraft | null>(null)
   const [removeTarget, setRemoveTarget] = useState<Menu | null>(null)
   const [error, setError] = useState('')
-  const tenantKey = [
-    'synapse',
-    actor?.user_id ?? 'anonymous',
-    tenantId,
-    'personal',
-    'tenant',
-  ]
+  const actorId = actor?.user_id ?? 'anonymous'
+  const tenantKey = queryKeys.tenant.query({ actorId, tenantId }, 'detail')
   const tenant = useQuery({
     queryKey: tenantKey,
     queryFn: () => getTenant(tenantId),
   })
-  const canManage =
-    tenant.data?.tenant_role === 'owner' || tenant.data?.tenant_role === 'admin'
-  const treeKey = [
-    'synapse',
-    actor?.user_id ?? 'anonymous',
+  const canManage = getPermissionCapabilities({
+    tenantRole: tenant.data?.tenant_role,
+  }).tenant.manageTenantAdministration
+  const tenantScope = {
+    actorId,
     tenantId,
-    'tenant',
-    'menus',
-    'tree',
-  ]
+    membershipVersion: tenant.data?.membership_version ?? 0,
+  }
+  const treeKey = queryKeys.tenant.query(tenantScope, ['menus', 'tree'])
   const tree = useQuery({
     queryKey: treeKey,
     enabled: canManage,
@@ -66,13 +62,7 @@ export function TenantMenusPage() {
   })
   const refresh = async () => {
     await client.invalidateQueries({
-      queryKey: [
-        'synapse',
-        actor?.user_id ?? 'anonymous',
-        tenantId,
-        'tenant',
-        'menus',
-      ],
+      queryKey: queryKeys.tenant.resource(tenantScope, ['menus']),
     })
     await client.invalidateQueries({ queryKey: tenantKey })
   }

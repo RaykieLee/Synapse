@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useWorkspace } from '@/features/workspaces/context'
+import { queryKeys, workspaceQueryScope } from '@/lib/query-keys'
 
 type FormValue = string | number | boolean | null | undefined
 type CredentialDraft = {
@@ -77,8 +78,9 @@ function errorText(error: unknown) {
 }
 
 export function AgentScopeCredentialPage() {
-  const { workspace } = useWorkspace()
+  const { workspace, actorId } = useWorkspace()
   const workspaceId = workspace.workspace_id
+  const queryScope = workspaceQueryScope(actorId, workspace)
   const client = useQueryClient()
   const [draft, setDraft] = React.useState<CredentialDraft | null>(null)
   const [deleteTarget, setDeleteTarget] =
@@ -87,11 +89,14 @@ export function AgentScopeCredentialPage() {
   const [formError, setFormError] = React.useState('')
 
   const schemas = useQuery({
-    queryKey: ['agentscope', workspaceId, 'credential-schemas'],
+    queryKey: queryKeys.agentscope.query(queryScope, [
+      'credentials',
+      'schemas',
+    ], { workspaceId }),
     queryFn: () => listCredentialSchemas(workspaceId),
   })
   const credentials = useQuery({
-    queryKey: ['agentscope', workspaceId, 'credentials'],
+    queryKey: queryKeys.agentscope.query(queryScope, ['credentials', 'list'], { workspaceId }),
     queryFn: () => listCredentials(workspaceId),
   })
 
@@ -104,7 +109,10 @@ export function AgentScopeCredentialPage() {
 
   const refresh = () =>
     client.invalidateQueries({
-      queryKey: ['agentscope', workspaceId, 'credentials'],
+      queryKey: queryKeys.agentscope.resource(queryScope, [
+        'credentials',
+        'list',
+      ]),
     })
 
   const save = useMutation({
@@ -331,9 +339,15 @@ function CredentialDetail({
   schema?: CredentialSchema
   onClose: () => void
 }) {
+  const { workspace, actorId } = useWorkspace()
+  const queryScope = workspaceQueryScope(actorId, workspace)
   const provider = String(credential.data.type ?? '')
   const models = useQuery({
-    queryKey: ['agentscope', workspaceId, 'models', provider],
+    queryKey: queryKeys.agentscope.query(
+      queryScope,
+      ['credentials', 'models'],
+      { provider, workspaceId }
+    ),
     queryFn: () => listAgentScopeModels(workspaceId, provider),
     enabled: Boolean(provider),
   })
